@@ -1,0 +1,37 @@
+# Expo
+.expo/
+web-build/
+
+# Dependencies
+node_modules/
+npm-debug.log*
+
+# Android
+android/app/build/
+android/.gradle/
+android/local.properties
+
+# iOS
+ios/build/
+ios/Pods/
+ios/Podfile.lock
+
+# Metro
+.metro-health-check*
+
+# Logs
+*.log
+logs/
+
+# Runtime data
+.nyc_output
+coverage/
+.DS_Store
+*.local
+
+# SQLite DB (user data - don't commit)
+cycleiq.db
+
+# IDE
+.vscode/settings.json
+.idea/

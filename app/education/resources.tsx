@@ -42,6 +42,16 @@ const RESOURCES = [
   },
 ];
 
+const getUserRegion = () => {
+    try {
+        const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        if (tz.includes('Europe/London')) return 'UK';
+        if (tz.includes('Australia')) return 'Australia';
+        if (tz.includes('America/Toronto') || tz.includes('America/Vancouver')) return 'Canada';
+    } catch(e) {}
+    return 'US';
+};
+
 export default function ResourcesScreen() {
   const currentMode = useAppStore((state) => state.currentMode);
 
@@ -54,7 +64,19 @@ export default function ResourcesScreen() {
           professional care.
         </Text>
 
-        {RESOURCES.map((section, i) => (
+        {RESOURCES.map((section, i) => {
+          const region = getUserRegion();
+          // Filter items that start with a region tag (e.g. "US:", "UK:"), explicitly ignoring items that don't match the region.
+          // Generic items (without a colon-separated region prefix) will always be included.
+          const filteredItems = section.items.filter(item => {
+            const match = item.match(/^([A-Za-z]+):/);
+            if (match) {
+                return match[1] === region;
+            }
+            return true;
+          });
+
+          return (
           <View
             key={i}
             style={[styles.section, { borderColor: section.color + "20" }]}
@@ -62,17 +84,17 @@ export default function ResourcesScreen() {
             <Text style={[styles.sectionTitle, { color: section.color }]}>
               {section.title}
             </Text>
-            {section.items.map((item, j) => (
+            {filteredItems.map((item, j) => (
               <TouchableOpacity
                 key={j}
                 style={styles.resourceItem}
                 activeOpacity={0.7}
               >
-                <Text style={styles.resourceText}>{item}</Text>
+                <Text style={styles.resourceText}>{item.replace(/^([A-Za-z]+):\s*/, '')}</Text>
               </TouchableOpacity>
             ))}
           </View>
-        ))}
+        )})}
 
         {currentMode === "endo" && (
           <View style={styles.note}>

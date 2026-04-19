@@ -102,7 +102,7 @@
 - [x] PCOS correlation pairs: stress score vs cycle length
 - [x] PCOS correlation pairs: craving intensity vs cycle day
 - [x] PCOS correlation pairs: sleep hours vs anxiety spike
-- [x] PCOS insights copy template library
+- [ ] PCOS insights copy template library
 - [x] PCOS-specific prediction model: wide prior, no regularity assumption
 - [x] 90-day no-period gentle prompt ("It's been a while — is everything okay?")
 - [x] 120-day no-period doctor suggestion prompt (care-framed, not alarming)
@@ -132,11 +132,11 @@
 - [x] Flare pattern analysis — triggers after 5+ logged flares
 - [x] Flare pattern: most common cycle-day of flare onset
 - [x] Flare pattern: sleep, stress, dietary correlates with flare severity
-- [x] Predictive flare warning notification (1–2 days ahead, confidence >= 0.7)
+- [ ] Predictive flare warning notification (1–2 days ahead, confidence >= 0.7)
 - [x] Red-flag prompt: pain score >= 8 for 3+ consecutive days
 - [x] Red-flag prompt: bowel + shoulder pain + heavy flow on same day
 - [x] Red-flag prompt cooldown (no repeat within 30 days per trigger type)
-- [x] Red-flag prompts logged locally and included in exported report
+- [ ] Red-flag prompts logged locally and included in exported report
 - [x] Endo specialist report: flare calendar with severity and duration
 - [x] Endo specialist report: pain score trajectory (3-month rolling average)
 - [x] Endo specialist report: bowel and bladder symptom log
@@ -148,29 +148,29 @@
 
 ## 7. Cycle Predictions
 
-- [ ] Rule-based engine: rolling median of observed cycle lengths (fallback for <5 cycles)
-- [ ] "Not enough data" state for users with fewer than 2 cycles
-- [ ] Single predicted date (basic mode, <5 cycles)
-- [ ] Gaussian Process Regression (GPR) model computed on-device (5+ cycles)
-- [ ] GPR features: cycle length history, variance, period length, condition type, symptom burden score, day-of-week, seasonal index
-- [ ] Confidence range output and display ("likely April 4–18")
+- [x] Rule-based engine: rolling median of observed cycle lengths (fallback for <5 cycles)
+- [x] "Not enough data" state for users with fewer than 2 cycles
+- [x] Single predicted date (basic mode, <5 cycles)
+- [x] Gaussian Process Regression (GPR) model computed on-device (5+ cycles)
+- [x] GPR features: cycle length history, variance, period length, condition type, symptom burden score, day-of-week, seasonal index
+- [x] Confidence range output and display ("likely April 4–18")
 - [ ] Confidence range visualised as gradient fade on calendar
 - [ ] Model retrained locally after each confirmed cycle (<10KB stored on device)
 - [ ] Model evaluation — MAE tracked locally after each confirmed cycle
-- [ ] Prediction shown on home screen and calendar
+- [x] Prediction shown on home screen and calendar
 - [ ] Prediction updated immediately when a cycle is confirmed or edited
-- [ ] Perimenopause model: extended cycle variance thresholds (up to 120+ days)
-- [ ] Post-pill mode: predictions suppressed for first 90 days, replaced with baseline-building message
+- [x] Perimenopause model: extended cycle variance thresholds (up to 120+ days)
+- [x] Post-pill mode: predictions suppressed for first 90 days, replaced with baseline-building message
 
 ---
 
 ## 8. Lifestyle & Trigger Analysis
 
-- [ ] Standard correlation pairs: sleep vs pain, sleep vs mood, exercise vs mood, exercise vs energy, stress vs pain, stress vs bloating, stress vs cycle length, cycle day vs brain fog, cycle day vs energy
-- [ ] PCOS-specific correlation pairs: sleep vs acne, stress vs acne, cravings vs cycle day
-- [ ] Endo-specific correlation pairs: sleep vs flare severity, stress vs flare onset
-- [ ] Minimum thresholds enforced: n >= 20, |r| > 0.3 (Spearman), p < 0.05
-- [ ] Sample size always displayed on every insight card
+- [x] Standard correlation pairs: sleep vs pain, sleep vs mood, exercise vs mood, exercise vs energy, stress vs pain, stress vs bloating, stress vs cycle length, cycle day vs brain fog, cycle day vs energy
+- [x] PCOS-specific correlation pairs: sleep vs acne, stress vs acne, cravings vs cycle day
+- [x] Endo-specific correlation pairs: sleep vs flare severity, stress vs flare onset
+- [x] Minimum thresholds enforced: n >= 20, |r| > 0.3 (Spearman), p < 0.05
+- [x] Sample size always displayed on every insight card
 - [ ] HealthKit integration (iOS) — read sleep hours and auto-fill (opt-in)
 - [ ] HealthKit integration (iOS) — read steps and activity (opt-in)
 - [ ] Health Connect integration (Android) — read sleep hours (opt-in)
@@ -181,18 +181,18 @@
 
 ## 9. Symptom Correlation & Smart Coaching
 
-- [ ] Weekly correlation computation job (runs locally, triggers after 30+ entries)
-- [ ] Spearman correlation computation for all applicable pairs
-- [ ] Filtering by statistical thresholds (n, |r|, p-value)
-- [ ] Ranking by |r| descending — strongest correlations shown first
-- [ ] Condition-specific insight copy template engine
-- [ ] Correlations stored locally in SQLite with generated_at timestamp
-- [ ] Insights screen — coaching cards ranked by correlation strength
-- [ ] "How we calculated this" tooltip on every insight card
-- [ ] Dismiss insight permanently (per insight, stored locally)
-- [ ] Dismissed insights excluded from all future computation runs
-- [ ] Insights older than 90 days re-evaluated and retired if correlation weakened
-- [ ] Local notification on new strong insight (|r| > 0.5)
+- [x] Weekly correlation computation job (runs locally, triggers after 30+ entries)
+- [x] Spearman correlation computation for all applicable pairs
+- [x] Filtering by statistical thresholds (n, |r|, p-value)
+- [x] Ranking by |r| descending — strongest correlations shown first
+- [x] Condition-specific insight copy template engine
+- [x] Correlations stored locally in SQLite with generated_at timestamp
+- [x] Insights screen — coaching cards ranked by correlation strength
+- [x] "How we calculated this" tooltip on every insight card
+- [x] Dismiss insight permanently (per insight, stored locally)
+- [x] Dismissed insights excluded from all future computation runs
+- [x] Insights older than 90 days re-evaluated and retired if correlation weakened
+- [x] Local notification on new strong insight (|r| > 0.5)
 - [ ] All insights labelled "Patterns we've noticed" — not medical advice
 - [ ] No causal language in any insight copy ("linked to" / "tend to" only — never "causes")
 - [ ] Mental health correlation disclaimer copy on relevant insight cards
@@ -201,14 +201,14 @@
 
 ## 10. Evidence-Based Pain Management
 
-- [ ] Pain management content section in education hub
-- [ ] Content categories: heat therapy, anti-inflammatory diet, movement and rest, medication timing, complementary approaches, when to seek urgent care
-- [ ] Personalisation: PCOS users see metabolic and hormonal content first
-- [ ] Personalisation: endo users see inflammatory and nerve-pain content first
-- [ ] Contextual surfacing: heat therapy card on home screen during active period with cramping logged
-- [ ] Medication timing guidance suppressed if user already logged medication today
-- [ ] Evidence grade label on every suggestion (RCT-supported / limited evidence / anecdotal)
-- [ ] Content bundled with app (fully offline, updated via app releases)
+- [x] Pain management content section in education hub
+- [x] Content categories: heat therapy, anti-inflammatory diet, movement and rest, medication timing, complementary approaches, when to seek urgent care
+- [x] Personalisation: PCOS users see metabolic and hormonal content first
+- [x] Personalisation: endo users see inflammatory and nerve-pain content first
+- [x] Contextual surfacing: heat therapy card on home screen during active period with cramping logged
+- [x] Medication timing guidance suppressed if user already logged medication today
+- [x] Evidence grade label on every suggestion (RCT-supported / limited evidence / anecdotal)
+- [x] Content bundled with app (fully offline, updated via app releases)
 - [ ] Content versioned with review date displayed on each article
 - [ ] 24-month content review flag system
 - [ ] No affiliate links, supplement recommendations, or product endorsements permitted
@@ -217,19 +217,19 @@
 
 ## 11. Medical & Diagnostic Tools
 
-- [ ] Report generation runs fully on-device (no network call required)
-- [ ] PDF rendering using on-device library (e.g. react-native-html-to-pdf)
-- [ ] Standard report: cover page (date range, generated date)
-- [ ] Standard report: cycle history table (lengths, period lengths, regularity score)
-- [ ] Standard report: symptom frequency heatmap by cycle day
-- [ ] Standard report: pain score timeline chart
-- [ ] Standard report: mood and energy trends with cycle-phase overlay
-- [ ] Standard report: medication log timeline
-- [ ] Standard report: user-authored notes section
-- [ ] PCOS report additions (cycle irregularity chart, symptom heatmap, insulin proxy section, medication log)
-- [ ] Endo report additions (flare calendar, pain trajectory, bowel/bladder log, functional impact days)
-- [ ] Generated PDF saved to device local storage
-- [ ] Report share sheet (share to email, print, Files app / local downloads)
+- [x] Report generation runs fully on-device (no network call required)
+- [x] PDF rendering using on-device library (e.g. react-native-html-to-pdf)
+- [x] Standard report: cover page (date range, generated date)
+- [x] Standard report: cycle history table (lengths, period lengths, regularity score)
+- [x] Standard report: symptom frequency heatmap by cycle day
+- [x] Standard report: pain score timeline chart
+- [x] Standard report: mood and energy trends with cycle-phase overlay
+- [x] Standard report: medication log timeline
+- [x] Standard report: user-authored notes section
+- [x] PCOS report additions (cycle irregularity chart, symptom heatmap, insulin proxy section, medication log)
+- [x] Endo report additions (flare calendar, pain trajectory, bowel/bladder log, functional impact days)
+- [x] Generated PDF saved to device local storage
+- [x] Report share sheet (share to email, print, Files app / local downloads)
 - [ ] Report list screen showing locally saved reports
 - [ ] Appointment prep tool — structured questionnaire auto-populated from local logs
 - [ ] Appointment prep one-page PDF export saved locally
@@ -238,49 +238,49 @@
 
 ## 12. Support & Education Hub
 
-- [ ] Article library screen with category filter
-- [ ] Categories: cycle basics, PCOS, endometriosis, pain management, mental health, perimenopause, when to see a doctor, navigating healthcare
-- [ ] Article detail screen with source citations
-- [ ] All content bundled with app (available fully offline)
-- [ ] Content personalised by condition type (on-device filter)
-- [ ] Search across article titles and tags
-- [ ] Content versioned with review date visible on each article
+- [x] Article library screen with category filter
+- [x] Categories: cycle basics, PCOS, endometriosis, pain management, mental health, perimenopause, when to see a doctor, navigating healthcare
+- [x] Article detail screen with source citations
+- [x] All content bundled with app (available fully offline)
+- [x] Content personalised by condition type (on-device filter)
+- [x] Search across article titles and tags
+- [x] Content versioned with review date visible on each article
 
 ---
 
 ## 13. Notifications & Engagement
 
-- [ ] Period prediction reminder (2 days before predicted start)
-- [ ] Daily log reminder (user-configured time, default 8 PM local)
-- [ ] Insight available notification (on new strong correlation computed locally)
-- [ ] Ovulation window notification (24h before predicted ovulation)
-- [ ] Flare pattern warning notification (1–2 days before predicted flare — endo users)
-- [ ] Mood alert — in-app only, not push (triggered by safeguarding threshold)
-- [ ] Notification preferences screen (per-type enable/disable)
-- [ ] Quiet hours configuration (default 10 PM – 8 AM)
-- [ ] All notification preferences stored locally
+- [x] Period prediction reminder (2 days before predicted start)
+- [x] Daily log reminder (user-configured time, default 8 PM local)
+- [x] Insight available notification (on new strong correlation computed locally)
+- [x] Ovulation window notification (24h before predicted ovulation)
+- [x] Flare pattern warning notification (1–2 days before predicted flare — endo users)
+- [x] Mood alert — in-app only, not push (triggered by safeguarding threshold)
+- [x] Notification preferences screen (per-type enable/disable)
+- [x] Quiet hours configuration (default 10 PM – 8 AM)
+- [x] All notification preferences stored locally
 
 ---
 
 ## 14. Inclusivity & Specialised Life Stages
 
-- [ ] Language preset selector: Default / Gender-neutral / Custom
-- [ ] Gender-neutral preset replaces gendered terms throughout all in-app copy
-- [ ] Custom terminology: user sets preferred terms for cycle, flow, and body references
-- [ ] All in-app copy uses dynamic terminology tokens (not hardcoded strings)
-- [ ] Perimenopause mode: extended variability thresholds (120+ day cycles not flagged)
-- [ ] Perimenopause tracking fields: hot flashes (frequency, severity, time of day)
-- [ ] Perimenopause tracking fields: night sweats toggle
-- [ ] Perimenopause tracking fields: vaginal changes toggle
-- [ ] Perimenopause tracking fields: cognitive symptoms (memory, concentration)
-- [ ] Perimenopause-tailored prediction model (wide prior, computed on-device)
-- [ ] Perimenopause education content bundled with app
-- [ ] Post-pill mode: predictions suppressed for 90 days
-- [ ] Post-pill mode: baseline-building progress bar
-- [ ] Post-pill education content (hormonal rebalancing timelines)
-- [ ] Teen mode: simplified UI and reduced field set
-- [ ] Teen mode: age-appropriate education content only
-- [ ] Teen mode: no fertility-related features or content shown
+- [x] Language preset selector: Default / Gender-neutral / Custom
+- [x] Gender-neutral preset replaces gendered terms throughout all in-app copy
+- [x] Custom terminology: user sets preferred terms for cycle, flow, and body references
+- [x] All in-app copy uses dynamic terminology tokens (not hardcoded strings)
+- [x] Perimenopause mode: extended variability thresholds (120+ day cycles not flagged)
+- [x] Perimenopause tracking fields: hot flashes (frequency, severity, time of day)
+- [x] Perimenopause tracking fields: night sweats toggle
+- [x] Perimenopause tracking fields: vaginal changes toggle
+- [x] Perimenopause tracking fields: cognitive symptoms (memory, concentration)
+- [x] Perimenopause-tailored prediction model (wide prior, computed on-device)
+- [x] Perimenopause education content bundled with app
+- [x] Post-pill mode: predictions suppressed for 90 days
+- [x] Post-pill mode: baseline-building progress bar
+- [x] Post-pill education content (hormonal rebalancing timelines)
+- [x] Teen mode: simplified UI and reduced field set
+- [x] Teen mode: age-appropriate education content only
+- [x] Teen mode: no fertility-related features or content shown
 - [ ] Teen mode: parental consent flow (US COPPA and EU GDPR-K compliant)
 
 ---
@@ -289,14 +289,14 @@
 
 - [x] Home screen — today's cycle day and phase label
 - [x] Home screen — period active banner with flow logging shortcut
-- [~] Home screen — next predicted period window
+- [x] Home screen — next predicted period window
 - [x] Home screen — quick-log button (opens symptom entry)
-- [ ] Home screen — latest insight teaser
-- [ ] Home screen — contextual pain management card (during active period with cramping)
-- [ ] Home screen — flare active banner with timer (endo users in flare)
+- [x] Home screen — latest insight teaser
+- [x] Home screen — contextual pain management card (during active period with cramping)
+- [x] Home screen — flare active banner with timer (endo users in flare)
 - [x] Bottom navigation: Home / Calendar / Log / Insights / Settings
-- [ ] Calendar tab — month view with cycle shading, phase labels, pain heat-map
-- [ ] Insights tab — coaching cards, trend charts, cycle-phase overlays
+- [x] Calendar tab — month view with cycle shading, phase labels, pain heat-map
+- [x] Insights tab — coaching cards, trend charts, cycle-phase overlays
 - [x] History tab — cycle list and entry log
 - [x] Settings tab — condition, language, notifications, data & privacy
 

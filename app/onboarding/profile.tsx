@@ -31,7 +31,8 @@ export default function ProfileSetupScreen() {
       return;
     }
 
-    setProfileInfo(parsedAge, gender, language, true, false);
+    const isTeenMode = parsedAge < 18;
+    setProfileInfo(parsedAge, gender, language, true, false, isTeenMode);
     router.push("notify" as any);
   };
 

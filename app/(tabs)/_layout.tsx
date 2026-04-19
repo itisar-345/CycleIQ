@@ -25,7 +25,7 @@ export default function TabLayout() {
         name="index"
         options={{
           title: "Home",
-          tabBarIcon: ({ color }) => (
+          tabBarIcon: ({ color }: { color: string }) => (
             <IconSymbol size={28} name="house.fill" color={color} />
           ),
         }}
@@ -34,8 +34,7 @@ export default function TabLayout() {
         name="log"
         options={{
           title: "Log Hub",
-          // Note: using chevron.right since plus.circle might not be mapped in default template
-          tabBarIcon: ({ color }) => (
+          tabBarIcon: ({ color }: { color: string }) => (
             <IconSymbol size={28} name="paperplane.fill" color={color} />
           ),
         }}
@@ -44,8 +43,17 @@ export default function TabLayout() {
         name="calendar"
         options={{
           title: "Calendar",
-          tabBarIcon: ({ color }) => (
+          tabBarIcon: ({ color }: { color: string }) => (
             <IconSymbol size={28} name="calendar" color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="education"
+        options={{
+          title: "Education",
+          tabBarIcon: ({ color }: { color: string }) => (
+            <IconSymbol size={28} name="books.vertical.fill" color={color} />
           ),
         }}
       />
@@ -53,7 +61,7 @@ export default function TabLayout() {
         name="history"
         options={{
           title: "History",
-          tabBarIcon: ({ color }) => (
+          tabBarIcon: ({ color }: { color: string }) => (
             <IconSymbol size={28} name="clock.fill" color={color} />
           ),
         }}
@@ -62,7 +70,7 @@ export default function TabLayout() {
         name="analytics"
         options={{
           title: "Insights",
-          tabBarIcon: ({ color }) => (
+          tabBarIcon: ({ color }: { color: string }) => (
             <IconSymbol size={28} name="chevron.right" color={color} />
           ),
         }}
@@ -71,7 +79,7 @@ export default function TabLayout() {
         name="profile"
         options={{
           title: "Profile",
-          tabBarIcon: ({ color }) => (
+          tabBarIcon: ({ color }: { color: string }) => (
             <IconSymbol size={28} name="chevron.right" color={color} />
           ),
         }}

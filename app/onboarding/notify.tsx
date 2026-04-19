@@ -5,6 +5,7 @@ import { router } from "expo-router";
 import React from "react";
 import { Alert, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { requestNotificationPermission } from "@/utils/notifications";
 
 export default function NotificationPermissionScreen() {
   const colorScheme = useColorScheme() ?? "light";
@@ -12,23 +13,16 @@ export default function NotificationPermissionScreen() {
   const { setProfileInfo, age, gender, language } = useAppStore();
 
   const requestPermission = async () => {
-    // Placeholder: use expo-notifications APIs in real app.
-    Alert.alert(
-      "Notifications enabled",
-      "We will send you cycle reminders and wellbeing check-ins.",
-    );
-    setProfileInfo(age ?? 0, gender ?? "female", language ?? "en", true, false);
+    const granted = await requestNotificationPermission();
+    if (!granted) {
+      Alert.alert("Notifications blocked", "You can enable them later in device Settings.");
+    }
+    setProfileInfo(age ?? 0, gender ?? "female", language ?? "en", granted, false, false);
     router.push("consent" as any);
   };
 
   const skipPermission = () => {
-    setProfileInfo(
-      age ?? 0,
-      gender ?? "female",
-      language ?? "en",
-      false,
-      false,
-    );
+    setProfileInfo(age ?? 0, gender ?? "female", language ?? "en", false, false, false);
     router.push("consent" as any);
   };
 

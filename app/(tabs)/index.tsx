@@ -1,8 +1,10 @@
 import { Colors } from "@/constants/theme";
-import { closeCycle, createCycle, getLatestCycle } from "@/database";
+import { closeCycle, createCycle, getLatestCycle, getDayOfCycle, getPhaseForDay, getCyclePredictions, generateInsights, CycleInsight } from "@/database";
+import { PredictionResult } from "@/utils/predictions";
+import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useAppStore } from "@/store";
-import { addDays, differenceInDays, format, parseISO } from "date-fns";
+import { differenceInDays, format, parseISO } from "date-fns";
 import { router } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
@@ -24,8 +26,29 @@ export default function HomeScreen() {
     activePeriodId,
     activePeriodStartDate,
     setActivePeriod,
+    inFlare,
+    flareStartDate,
+    setInFlare,
+    checkPCOSPromptCooldown,
+    setLastPCOSPrompt,
+    postPillMode,
+    postPillStartDate,
+    isTeen,
+    dismissedInsights,
+    languagePreset,
+    customTerms
   } = useAppStore();
   const [cycleLength, setCycleLength] = useState<number>(28);
+  const [latestStartDate, setLatestStartDate] = useState<string | null>(null);
+  const [currentCycleDay, setCurrentCycleDay] = useState<number>(1);
+  const [currentPhase, setCurrentPhase] = useState<string>("menstrual");
+  const [predictionStats, setPredictionStats] = useState<PredictionResult | null>(null);
+  const [latestInsight, setLatestInsight] = useState<CycleInsight | null>(null);
+  const [medicationLoggedToday, setMedicationLoggedToday] = useState(false);
+
+  // Dynamic terminology
+  const flowTerm = languagePreset === 'custom' ? customTerms.flow : 'flow';
+  const cycleTerm = languagePreset === 'custom' ? customTerms.cycle : languagePreset === 'inclusive' ? 'cycle' : 'period';
 
   useEffect(() => {
     const loadLatestCycle = async () => {
@@ -34,12 +57,54 @@ export default function HomeScreen() {
         if (latest && latest.cycle_length) {
           setCycleLength(latest.cycle_length);
         }
+        
+        if (latest && latest.start_date) {
+            setLatestStartDate(latest.start_date);
+            const cycleDay = getDayOfCycle(new Date().toISOString(), latest.start_date);
+            setCurrentCycleDay(cycleDay);
+            setCurrentPhase(getPhaseForDay(cycleDay, latest.cycle_length || 28));
+        }
+        
+        const stats = await getCyclePredictions(currentMode, postPillMode, postPillStartDate ?? null);
+        setPredictionStats(stats);
+        
+        const generatedInsights = await generateInsights(currentMode);
+        const validInsights = generatedInsights.filter((i: CycleInsight) => !dismissedInsights.includes(i.title));
+        validInsights.sort((a: CycleInsight, b: CycleInsight) => Math.abs(b.correlation || 0) - Math.abs(a.correlation || 0));
+        if (validInsights.length > 0) {
+          setLatestInsight(validInsights[0]);
+        }
+
+        // Check if medication was already logged today
+        const { getAllEntries } = await import("@/database");
+        const todayStr = new Date().toISOString().split("T")[0];
+        const allEntries = await getAllEntries();
+        const todayEntry = allEntries.find((e: any) => e.logged_date?.startsWith(todayStr));
+        setMedicationLoggedToday(!!(todayEntry?.medication_log_encrypted));
+        
+        if (latest && currentMode === "pcos" && !activePeriodId && latest.start_date) {
+          const daysSinceStart = differenceInDays(new Date(), parseISO(latest.start_date));
+          if (daysSinceStart >= 90) {
+            const is120 = daysSinceStart >= 120;
+            if (checkPCOSPromptCooldown()) {
+              setLastPCOSPrompt(new Date().toISOString());
+              const title = is120 ? "Time to check in?" : "It's been a while";
+              const message = is120 
+                ? `It's been ${daysSinceStart} days since your last period. It might be a good idea to chat with a healthcare provider just to be safe.`
+                : `It's been ${daysSinceStart} days since your last period — is everything okay? Remember to log any symptoms.`;
+              // Small timeout to allow UI to render first
+              setTimeout(() => {
+                Alert.alert(title, message, [{ text: "Got it" }]);
+              }, 500);
+            }
+          }
+        }
       } catch (error) {
         console.error("Unable to load latest cycle length", error);
       }
     };
     loadLatestCycle();
-  }, [activePeriodId]);
+  }, [activePeriodId, currentMode, dismissedInsights]);
 
   const handleStartPeriod = () => {
     Alert.alert("Log Period", "Is today the first day of your period?", [
@@ -51,6 +116,9 @@ export default function HomeScreen() {
             const startDate = new Date().toISOString();
             const newId = await createCycle(startDate);
             setActivePeriod(newId, startDate);
+            // Refresh prediction immediately after new cycle is created
+            const stats = await getCyclePredictions(currentMode, postPillMode, postPillStartDate ?? null);
+            setPredictionStats(stats);
           } catch (error) {
             console.error("Failed starting period", error);
             Alert.alert(
@@ -69,6 +137,9 @@ export default function HomeScreen() {
       const endDate = new Date().toISOString();
       await closeCycle(activePeriodId, endDate);
       setActivePeriod(null, null);
+      // Immediately refresh prediction after cycle is confirmed
+      const stats = await getCyclePredictions(currentMode, postPillMode, postPillStartDate ?? null);
+      setPredictionStats(stats);
     } catch (error) {
       console.error("Failed closing period", error);
       Alert.alert("Error", "Could not close period. Please try again.");
@@ -80,17 +151,46 @@ export default function HomeScreen() {
     return differenceInDays(new Date(), parseISO(activePeriodStartDate)) + 1;
   };
 
+  const getFlareDuration = () => {
+    if (!flareStartDate) return 1;
+    return differenceInDays(new Date(), parseISO(flareStartDate)) + 1;
+  };
+
   const generatePrediction = () => {
-    const today = new Date();
-    if (currentMode === "pcos" || currentMode === "peri") {
-      const startWindow = addDays(today, 12);
-      const endWindow = addDays(today, 26);
-      return `Your next period is likely between ${format(startWindow, "MMM d")}–${format(endWindow, "d")} (based on high variance history).`;
-    } else {
-      const startWindow = addDays(today, 14);
-      const endWindow = addDays(today, 16);
-      return `Your next period is likely between ${format(startWindow, "MMM d")}–${format(endWindow, "d")}.`;
+    if (!latestStartDate) return "Log your first period to start getting predictions.";
+    if (!predictionStats) return "Loading prediction...";
+    if (predictionStats.model === "none") return predictionStats.label;
+
+    const lines: string[] = [];
+
+    // Window
+    if (predictionStats.windowStartISO && predictionStats.windowEndISO) {
+      const start = format(parseISO(predictionStats.windowStartISO), "MMM d");
+      const end = format(parseISO(predictionStats.windowEndISO), "MMM d");
+      const center = predictionStats.predictedStartISO
+        ? format(parseISO(predictionStats.predictedStartISO), "MMM d")
+        : null;
+      lines.push(`Next ${cycleTerm}: likely ${start}–${end}${center ? ` (centre ${center})` : ""}`);
     }
+
+    // Confidence
+    const pct = Math.round(predictionStats.confidence * 100);
+    const modelLabel =
+      predictionStats.model === "full-rules" ? "Full rules" :
+      predictionStats.model === "weighted-average" ? "Weighted avg" : "Median";
+    lines.push(`${modelLabel} · ${pct}% confidence`);
+
+    // MAE
+    if (predictionStats.mae !== null) {
+      lines.push(`Historical accuracy: ±${predictionStats.mae} days`);
+    }
+
+    // Outlier warning
+    if (predictionStats.outlierFlagged) {
+      lines.push("⚠️ Last cycle was unusually long — window is wider than normal.");
+    }
+
+    return lines.join("\n");
   };
 
   return (
@@ -107,7 +207,7 @@ export default function HomeScreen() {
           <View
             style={[
               styles.badge,
-              { backgroundColor: theme[currentMode] || theme.tint },
+              { backgroundColor: (theme as any)[currentMode] || theme.tint },
             ]}
           >
             <Text style={styles.badgeText}>
@@ -115,6 +215,36 @@ export default function HomeScreen() {
             </Text>
           </View>
         </View>
+
+        {/* Post-pill progress bar */}
+        {postPillMode && postPillStartDate && (() => {
+          const elapsed = differenceInDays(new Date(), parseISO(postPillStartDate));
+          const progress = Math.min(elapsed, 90);
+          const remaining = Math.max(0, 90 - elapsed);
+          return (
+            <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.tint, borderWidth: 1, alignItems: 'flex-start' }]}>
+              <Text style={[styles.cardTitle, { color: theme.text }]}>Post-Pill Baseline</Text>
+              <Text style={{ color: theme.textSecondary, marginBottom: 8 }}>
+                Day {progress} of 90 — {remaining > 0 ? `${remaining} days until predictions unlock` : 'Baseline complete — predictions now active'}
+              </Text>
+              <View style={{ width: '100%', height: 8, borderRadius: 4, backgroundColor: theme.border, overflow: 'hidden' }}>
+                <View style={{ width: `${(progress / 90) * 100}%`, height: 8, borderRadius: 4, backgroundColor: theme.tint }} />
+              </View>
+            </View>
+          );
+        })()}
+
+        {currentMode === "endo" && inFlare && (
+          <View style={[styles.periodBanner, { backgroundColor: theme.endo + '15', borderColor: theme.endo }]}>
+             <Text style={[styles.bannerTitle, { color: theme.endo }]}>Endo Flare Active</Text>
+             <Text style={{ marginTop: 8, color: theme.textSecondary }}>
+                 Day {getFlareDuration()} of active flare. Ensure you log your symptoms daily to generate accurate reports.
+             </Text>
+             <TouchableOpacity style={[styles.bannerBtn, { backgroundColor: theme.endo, marginTop: 16 }]} onPress={() => router.push('/log')}>
+                 <Text style={styles.bannerBtnText}>Log Flare Details</Text>
+             </TouchableOpacity>
+          </View>
+        )}
 
         {/* 3.1.2 Active Period Banner */}
         {activePeriodId ? (
@@ -125,7 +255,7 @@ export default function HomeScreen() {
             ]}
           >
             <Text style={[styles.bannerTitle, { color: theme.error }]}>
-              Day {getDayOfPeriod()} of your period
+              Day {getDayOfPeriod()} of your {cycleTerm}
             </Text>
 
             <View style={{ flexDirection: "row", gap: 10, marginTop: 16 }}>
@@ -133,7 +263,7 @@ export default function HomeScreen() {
                 style={[styles.bannerBtn, { backgroundColor: theme.error }]}
                 onPress={() => router.push("/log")}
               >
-                <Text style={styles.bannerBtnText}>Log Flow & Pain</Text>
+                <Text style={styles.bannerBtnText}>Log {flowTerm.charAt(0).toUpperCase() + flowTerm.slice(1)} & Pain</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.bannerBtnOutline, { borderColor: theme.error }]}
@@ -168,10 +298,13 @@ export default function HomeScreen() {
           <View style={styles.circleContainer}>
             <View style={[styles.cycleCircle, { borderColor: theme.tint }]}>
               <Text style={[styles.dayText, { color: theme.tint }]}>
-                Day 14
+                Day {currentCycleDay}
               </Text>
               <Text style={[styles.subDayText, { color: theme.textSecondary }]}>
                 of approx. {cycleLength}
+              </Text>
+              <Text style={{ color: theme.text, marginTop: 8, fontWeight: 'bold' }}>
+                {currentPhase.toUpperCase()} PHASE
               </Text>
             </View>
           </View>
@@ -179,6 +312,31 @@ export default function HomeScreen() {
             {generatePrediction()}
           </Text>
         </View>
+
+        {/* Pain management card — suppressed if medication already logged today */}
+        {activePeriodId && !medicationLoggedToday && (
+          <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.error, borderWidth: 2 }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8, gap: 8 }}>
+              <IconSymbol name="heart.fill" size={20} color={theme.error} />
+              <Text style={[styles.cardTitle, { color: theme.error, flex: 1 }]}>Pain Management</Text>
+            </View>
+            <Text style={{ color: theme.text, marginBottom: 12 }}>Applying heat therapy directly to your lower abdomen or lower back can significantly reduce muscle tension and cramping.</Text>
+            <TouchableOpacity onPress={() => router.push('/education' as any)} style={[styles.bannerBtn, { backgroundColor: theme.error }]}>
+              <Text style={styles.bannerBtnText}>View Protocols</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {latestInsight && (
+          <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.tint, borderWidth: 1 }]}>
+            <Text style={[styles.cardTitle, { color: theme.text }]}>Latest Insight</Text>
+            <Text style={{ color: theme.textSecondary, fontWeight: 'bold', marginBottom: 4 }}>{latestInsight.title}</Text>
+            <Text style={{ color: theme.text, marginBottom: 12 }}>{latestInsight.description}</Text>
+            <TouchableOpacity onPress={() => router.push('/analytics' as any)} style={[styles.bannerBtnOutline, { borderColor: theme.tint }]}>
+              <Text style={[styles.bannerBtnText, { color: theme.tint }]}>Explore Analytics</Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
         {/* Quick Log Action */}
         <TouchableOpacity

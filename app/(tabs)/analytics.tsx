@@ -1,8 +1,9 @@
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { Colors } from "@/constants/theme";
-import { getAllCycles, getPhaseAverages } from "@/database";
+import { getAllCycles, getPhaseAverages, generateInsights, persistAndRetireInsights, CycleInsight, PhaseAverage } from "@/database";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useAppStore } from "@/store";
+import { scheduleInsightNotification, scheduleFlareWarning } from "@/utils/notifications";
 import React, { useEffect, useState } from "react";
 import {
   Alert,
@@ -17,54 +18,65 @@ import { SafeAreaView } from "react-native-safe-area-context";
 export default function AnalyticsScreen() {
   const colorScheme = useColorScheme() ?? "light";
   const theme = Colors[colorScheme];
-  const { currentMode } = useAppStore();
+  const { currentMode, dismissedInsights, dismissInsight: storeDismissInsight, notificationPrefs } = useAppStore();
 
-  const [dismissedInsights, setDismissedInsights] = useState<number[]>([]);
   const [cycles, setCycles] = useState<any[]>([]);
+  const [phaseAverages, setPhaseAverages] = useState<PhaseAverage[]>([]);
+  const [insights, setInsights] = useState<CycleInsight[]>([]);
 
   useEffect(() => {
-    const loadCycles = async () => {
+    const loadData = async () => {
       const allCycles = await getAllCycles();
       setCycles(allCycles);
       if (allCycles.length > 0) {
         const avgs = await getPhaseAverages(allCycles[0].id);
-        // Add phase data to insights or new section
-        console.log("Phase averages:", avgs); // Temp, UI below
+        setPhaseAverages(avgs);
+      }
+      const fetchedInsights = await generateInsights(currentMode);
+      fetchedInsights.sort((a, b) => Math.abs(b.correlation || 0) - Math.abs(a.correlation || 0));
+      setInsights(fetchedInsights);
+      // Persist correlations and retire stale ones (90-day re-evaluation)
+      await persistAndRetireInsights(fetchedInsights);
+      // Fire notification for any new strong insight (|r| > 0.5)
+      const strongNew = fetchedInsights.find(
+        (i) => i.correlation !== undefined && Math.abs(i.correlation) > 0.5
+      );
+      if (strongNew && notificationPrefs.insights) {
+        await scheduleInsightNotification(strongNew.title, true);
+      }
+      // Schedule flare warning for endo users if a flare onset pattern exists
+      if (currentMode === "endo" && notificationPrefs.flares && allCycles.length > 0) {
+        const flareInsight = fetchedInsights.find((i) => i.title === "Flare Onset Pattern");
+        if (flareInsight?.description) {
+          const match = flareInsight.description.match(/Cycle Day (\d+)/);
+          if (match) {
+            const avgOnsetDay = parseInt(match[1], 10);
+            const latestStart = new Date(allCycles[0].start_date);
+            const avgCycleLen = allCycles[0].cycle_length || 28;
+            // Predict flare date in the current cycle
+            const predictedFlare = new Date(latestStart);
+            predictedFlare.setDate(predictedFlare.getDate() + avgOnsetDay - 1);
+            // If it's in the future, schedule warning
+            if (predictedFlare > new Date()) {
+              await scheduleFlareWarning(predictedFlare, 0.75, true);
+            } else {
+              // Try next cycle
+              const nextCycleStart = new Date(latestStart);
+              nextCycleStart.setDate(nextCycleStart.getDate() + avgCycleLen);
+              const nextFlare = new Date(nextCycleStart);
+              nextFlare.setDate(nextFlare.getDate() + avgOnsetDay - 1);
+              await scheduleFlareWarning(nextFlare, 0.75, true);
+            }
+          }
+        }
       }
     };
-    loadCycles();
-  }, []);
-  // 4.6.3 Mocked Generated Insight Strings mapping actual correlations
-  const insights = [
-    {
-      id: 1,
-      text: "Your pain scores are 40% higher on days when you sleep fewer than 6 hours. This pattern has held across 8 weeks.",
-      sampleSize: 45,
-      correlation: -0.62,
-      type: "lifestyle",
-    },
-    {
-      id: 2,
-      text: "You tend to log better mood on days with 30+ minutes of exercise.",
-      sampleSize: 24,
-      correlation: 0.44,
-      type: "lifestyle",
-      mentalHealthWarning: true,
-    },
-    {
-      id: 3,
-      text:
-        currentMode === "endo"
-          ? "Your flares most often begin on cycle days 1–3. You have had 7 flares — 6 of them started in this window."
-          : "Your cycles have been longer in months where you logged high-stress weeks.",
-      sampleSize: currentMode === "endo" ? 7 : 6,
-      correlation: 0.71,
-      type: "condition",
-    },
-  ].filter((i) => !dismissedInsights.includes(i.id));
+    loadData();
+  }, [currentMode]);
+  const visibleInsights = insights.filter((i) => !dismissedInsights.includes(i.title));
 
-  const dismissInsight = (id: number) => {
-    setDismissedInsights([...dismissedInsights, id]);
+  const dismissInsight = (title: string) => {
+    storeDismissInsight(title);
   };
 
   return (
@@ -125,9 +137,9 @@ export default function AnalyticsScreen() {
           </Text>
         )}
 
-        {insights.map((insight) => (
+        {visibleInsights.map((insight, idx) => (
           <View
-            key={insight.id}
+            key={idx}
             style={[
               styles.insightCard,
               { backgroundColor: theme.surface, borderColor: theme.border },
@@ -135,74 +147,56 @@ export default function AnalyticsScreen() {
           >
             <View style={styles.cardHeader}>
               <View style={styles.correlationBadge}>
-                <Text
-                  style={{
-                    color: theme.tint,
-                    fontWeight: "bold",
-                    fontSize: 12,
-                  }}
-                >
-                  |r| = {Math.abs(insight.correlation)}
+                <Text style={{ color: theme.tint, fontWeight: "bold", fontSize: 12 }}>
+                  {insight.correlation !== undefined
+                    ? `|r| = ${Math.abs(insight.correlation)} (n=${insight.n || "?"})`
+                    : "Pattern"}
                 </Text>
               </View>
-              <TouchableOpacity onPress={() => dismissInsight(insight.id)}>
-                <Text style={{ color: theme.textSecondary, fontSize: 12 }}>
-                  Not useful ×
-                </Text>
+              <TouchableOpacity onPress={() => dismissInsight(insight.title)}>
+                <Text style={{ color: theme.textSecondary, fontSize: 12 }}>Not useful ×</Text>
               </TouchableOpacity>
             </View>
 
-            <Text style={[styles.insightText, { color: theme.text }]}>
-              {insight.text}
+            {/* Sec 9: "Patterns we've noticed" label on every card */}
+            <Text style={[styles.patternLabel, { color: theme.textSecondary }]}>
+              Pattern we’ve noticed
             </Text>
 
+            <Text style={[styles.insightTitle, { color: theme.text }]}>{insight.title}</Text>
+            <Text style={[styles.insightText, { color: theme.text }]}>{insight.description}</Text>
+
+            {/* Sec 9: Mental health disclaimer on relevant cards */}
+            {insight.isMentalHealth && (
+              <View style={[styles.mhDisclaimer, { backgroundColor: theme.border + "60" }]}>
+                <Text style={{ color: theme.textSecondary, fontSize: 12, lineHeight: 18 }}>
+                  ⚠️ Mood and stress patterns can have many contributing factors. This is not a clinical assessment — if you’re struggling, please reach out to a healthcare professional.
+                </Text>
+              </View>
+            )}
+
             <View style={styles.cardFooter}>
-              <Text style={{ color: theme.textSecondary, fontSize: 12 }}>
-                Based on {insight.sampleSize} data points.
+              <Text style={{ color: theme.textSecondary, fontSize: 11 }}>
+                Not medical advice · 90-day history
               </Text>
               <TouchableOpacity
                 onPress={() =>
                   Alert.alert(
                     "How we calculated this",
-                    "We run a Spearman correlation pipeline across 90 days of your logged data requiring a minimum of 20 points and |r| > 0.3.",
+                    "We run a Spearman correlation across 90 days of your logged data. Patterns require n≥20 days and p<0.05. This shows association only — not causation."
                   )
                 }
               >
-                <IconSymbol
-                  name="info.circle"
-                  size={16}
-                  color={theme.textSecondary}
-                />
+                <IconSymbol name="info.circle" size={16} color={theme.textSecondary} />
               </TouchableOpacity>
             </View>
-
-            {insight.mentalHealthWarning && (
-              <View
-                style={[
-                  styles.disclaimer,
-                  { backgroundColor: theme.error + "10" },
-                ]}
-              >
-                <Text
-                  style={{
-                    color: theme.error,
-                    fontSize: 11,
-                    fontStyle: "italic",
-                  }}
-                >
-                  This is a data pattern, not a diagnosis. If you&apos;re
-                  concerned about your mental health, speaking to a doctor or
-                  therapist is always a good idea.
-                </Text>
-              </View>
-            )}
           </View>
         ))}
 
-        {insights.length === 0 && (
+        {visibleInsights.length === 0 && cycles.length >= 3 && (
           <View style={{ alignItems: "center", marginTop: 40 }}>
             <Text style={{ color: theme.textSecondary }}>
-              No new insights. Keep logging!
+              No new insights right now. Keep logging!
             </Text>
           </View>
         )}
@@ -258,4 +252,10 @@ const styles = StyleSheet.create({
   },
   placeholderTitle: { fontSize: 18, fontWeight: "bold", marginBottom: 8 },
   placeholderText: { fontSize: 14, textAlign: "center" },
+  sectionCard: { padding: 20, borderRadius: 16, marginBottom: 16 },
+  sectionTitle: { fontSize: 20, fontWeight: "bold", marginBottom: 12 },
+  avgRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: "#eee" },
+  insightTitle: { fontSize: 18, fontWeight: "bold", marginBottom: 8 },
+  patternLabel: { fontSize: 11, fontWeight: "600", letterSpacing: 0.5, marginBottom: 6, textTransform: "uppercase" },
+  mhDisclaimer: { padding: 10, borderRadius: 8, marginBottom: 12 },
 });

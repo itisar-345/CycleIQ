@@ -1,7 +1,8 @@
 import { Colors } from "@/constants/theme";
-import { createSymptomEntry, getAllEntries } from "@/database";
+import { createSymptomEntry, getAllEntries, saveFlareEnd } from "@/database";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useAppStore } from "@/store";
+import { encryptField, decryptField } from "@/utils/fieldEncryption";
 import { router } from "expo-router";
 import React, { useState, useEffect } from "react";
 import {
@@ -27,6 +28,11 @@ export default function LogScreen() {
     consecutiveLowMoodDays,
     incrementLowMood,
     resetLowMood,
+    setFlareEnd,
+    flareStartDate,
+    isTeen,
+    languagePreset,
+    customTerms
   } = useAppStore();
 
   const [pain, setPain] = useState<number>(0);
@@ -80,6 +86,22 @@ export default function LogScreen() {
   const [flareModeMovement, setFlareModeMovement] = useState<string>('normal');
   const [flareReflection, setFlareReflection] = useState<string>('');
 
+  // Peri Sec14 extended
+  const [hotFlashes, setHotFlashes] = useState<boolean>(false);
+  const [hotFlashFrequency, setHotFlashFrequency] = useState<number>(0);
+  const [hotFlashSeverity, setHotFlashSeverity] = useState<number>(0);
+  const [hotFlashTimeOfDay, setHotFlashTimeOfDay] = useState<string | null>(null);
+  const [nightSweats, setNightSweats] = useState<boolean>(false);
+  const [vaginalChanges, setVaginalChanges] = useState<boolean>(false);
+  const [memoryIssues, setMemoryIssues] = useState<boolean>(false);
+
+  // Dynamic terminology tokens
+  const term = {
+    cycle: languagePreset === 'inclusive' ? 'cycle' : languagePreset === 'custom' ? customTerms.cycle : 'cycle',
+    flow: languagePreset === 'inclusive' ? 'flow' : languagePreset === 'custom' ? customTerms.flow : 'flow',
+    body: languagePreset === 'inclusive' ? 'body' : languagePreset === 'custom' ? customTerms.body : 'body',
+  };
+
   useEffect(() => {
     const populateYesterday = async () => {
       if (!autoFillYesterday) return;
@@ -107,8 +129,8 @@ export default function LogScreen() {
         setSleepQuality(latest.sleep_quality ?? 3);
         setExerciseType(latest.exercise_type ?? "None");
         setExerciseDuration(latest.exercise_duration ?? 0);
-        setDietNotes(latest.diet_notes_encrypted ?? "");
-        setMedicationLog(latest.medication_log_encrypted ?? "");
+        setDietNotes(latest.diet_notes_encrypted ? await decryptField(latest.diet_notes_encrypted) : "");
+        setMedicationLog(latest.medication_log_encrypted ? await decryptField(latest.medication_log_encrypted) : "");
       }
     };
     populateYesterday();
@@ -152,8 +174,34 @@ export default function LogScreen() {
       resetLowMood();
     }
 
+    // Endo Red Flags
+    if (currentMode === "endo") {
+      const needsRedFlagCooldown = useAppStore.getState().checkRedFlagCooldown();
+      if (needsRedFlagCooldown) {
+        let triggerPrompt = false;
+        let promptMessage = "";
+
+        if (bowelSymptoms.length > 0 && !!shoulderSide && shoulderSide !== "None" && shoulderSide !== null && (flow === "Heavy" || flow === "Very Heavy")) {
+          triggerPrompt = true;
+          promptMessage = "You've logged complex symptoms (bowel + shoulder pain + heavy flow) on the same day. This combination warrants medical attention.";
+        } else if (pain >= 8) {
+          const entries = await getAllEntries();
+          const recentDays = entries.slice(0, 2);
+          if (recentDays.length >= 2 && recentDays.every(e => e.pain_score && e.pain_score >= 8)) {
+            triggerPrompt = true;
+            promptMessage = "You've logged severe pain (8+) for 3 consecutive days. We strongly recommend contacting your healthcare provider.";
+          }
+        }
+
+        if (triggerPrompt) {
+          useAppStore.getState().setLastRedFlagPrompt(new Date().toISOString());
+          Alert.alert("Red Flag Notice", promptMessage, [{ text: "Got it" }]);
+        }
+      }
+    }
+
     try {
-      const extended = {};
+      const extended: Record<string, any> = {};
       if (currentMode === 'pcos') {
         extended.pcos = {
           acne: {severity: acneSeverity, locations: acneLocations},
@@ -174,6 +222,8 @@ export default function LogScreen() {
           dyspareunia,
           nausea: nauseaSeverity
         };
+      } else if (currentMode === 'peri') {
+        extended.peri = { hotFlashes, hotFlashFrequency, hotFlashSeverity, hotFlashTimeOfDay, nightSweats, vaginalChanges, memoryIssues };
       }
       if (inFlare) {
         extended.flare = {start: new Date().toISOString(), mode: {pain: flareModePain, nausea: flareModeNausea, movement: flareModeMovement}};
@@ -201,8 +251,8 @@ export default function LogScreen() {
         sleep_quality: sleepQuality,
         exercise_type: exerciseType,
         exercise_duration: exerciseDuration,
-        diet_notes_encrypted: dietNotes || null,
-        medication_log_encrypted: medicationLog || null,
+        diet_notes_encrypted: dietNotes ? await encryptField(dietNotes) : undefined,
+        medication_log_encrypted: medicationLog ? await encryptField(medicationLog) : undefined,
       });
       Alert.alert("Saved", "Log saved securely to local database.");
       router.push("/");
@@ -214,6 +264,37 @@ export default function LogScreen() {
 
   const toggleArrayItem = (setter: any, arr: string[], item: string) => {
     setter(arr.includes(item) ? arr.filter((i) => i !== item) : [...arr, item]);
+  };
+
+  const handleFlareToggle = (val: boolean) => {
+    if (!val && inFlare) {
+      Alert.prompt(
+        "Flare Ended",
+        "What helped you during this flare? (Optional)",
+        [
+          { text: "Skip", onPress: () => setInFlare(false), style: "cancel" },
+          {
+            text: "Save",
+            onPress: async (reflection?: string) => {
+              const endDate = new Date().toISOString();
+              const { flareStartDate: startISO, flareDurationDays } = useAppStore.getState();
+              setFlareEnd(endDate, reflection || "");
+              // Persist to SQLite
+              await saveFlareEnd(
+                activePeriodId ?? null,
+                startISO ?? endDate,
+                endDate,
+                reflection || "",
+                flareDurationDays ?? 1
+              );
+            }
+          }
+        ],
+        "plain-text"
+      );
+    } else {
+      setInFlare(val);
+    }
   };
 
   const renderMultiSelect = (
@@ -370,38 +451,55 @@ export default function LogScreen() {
       <Switch value={value} onValueChange={setter} trackColor={{ true: theme.tint }} />
     </View>
   );
-    <View style={styles.toggleRow}>
-      <Text style={[styles.label, { color: theme.text, marginBottom: 0 }]}>
-        {label}
-      </Text>
-      <Switch
-        value={value}
-        onValueChange={setter}
-        trackColor={{ true: theme.tint }}
-      />
-    </View>
-  );
+
 
   return (
-    <SafeAreaView
-      style={[styles.container, { backgroundColor: theme.background }]}
-    >
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={[styles.title, { color: theme.text }]}>
-          Daily Core Log
-        </Text>
-        <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
-          Under 30 seconds to lock in data.
-        </Text>
+        <Text style={[styles.title, { color: theme.text }]}>Daily Log</Text>
+        <Text style={[styles.subtitle, { color: theme.textSecondary }]}>Under 30 seconds to lock in data.</Text>
+
+        {/* Teen simplified view — only core fields */}
+        {isTeen ? (
+          <>
+            <View style={styles.card}>
+              <Text style={[styles.sectionTitle, { color: theme.text }]}>How are you feeling?</Text>
+              {renderMoodFaces()}
+            </View>
+            <View style={styles.card}>
+              <Text style={[styles.sectionTitle, { color: theme.text }]}>Pain (0-10)</Text>
+              {renderSlider10(pain, setPain)}
+            </View>
+            <View style={styles.card}>
+              <Text style={[styles.sectionTitle, { color: theme.text }]}>Energy (0-10)</Text>
+              {renderSlider10(energy, setEnergy)}
+            </View>
+            {activePeriodId && (
+              <View style={[styles.card, { borderColor: theme.error, borderWidth: 2 }]}>
+                <Text style={[styles.sectionTitle, { color: theme.error }]}>Flow</Text>
+                {renderRadio(["None", "Light", "Medium", "Heavy"], flow, setFlow)}
+              </View>
+            )}
+            <View style={styles.card}>
+              <Text style={[styles.sectionTitle, { color: theme.text }]}>Sleep Hours</Text>
+              <View style={styles.sliderContainer}>
+                <Text style={[styles.sliderHint, { color: theme.textSecondary }]}>0</Text>
+                <View style={{ flex: 1, flexDirection: "row", justifyContent: "space-between", paddingHorizontal: 10 }}>
+                  {[...Array(13).keys()].map((num) => (
+                    <TouchableOpacity key={num} onPress={() => setSleepHours(num)} style={{ paddingVertical: 10, alignItems: "center", width: 25 }}>
+                      <View style={[styles.dot, { backgroundColor: sleepHours >= num ? theme.tint : theme.border, width: sleepHours === num ? 14 : 10, height: sleepHours === num ? 14 : 10 }]} />
+                    </TouchableOpacity>
+                  ))}
+                </View>
+                <Text style={[styles.sliderHint, { color: theme.textSecondary }]}>12</Text>
+              </View>
+            </View>
+          </>
+        ) : (
+          <>
         <View style={[styles.toggleRow, { marginVertical: 12 }]}>
-          <Text style={[styles.label, { color: theme.text, marginBottom: 0 }]}>
-            Auto-fill yesterday's values
-          </Text>
-          <Switch
-            value={autoFillYesterday}
-            onValueChange={setAutoFillYesterday}
-            trackColor={{ true: theme.tint }}
-          />
+          <Text style={[styles.label, { color: theme.text, marginBottom: 0 }]}>Auto-fill yesterday’s values</Text>
+          <Switch value={autoFillYesterday} onValueChange={setAutoFillYesterday} trackColor={{ true: theme.tint }} />
         </View>
         <View style={styles.card}>
           <Text style={[styles.sectionTitle, { color: theme.text }]}>
@@ -533,7 +631,7 @@ export default function LogScreen() {
               paddingTop: 16,
             }}
           >
-            {renderToggle("Spotting", spotting, setSpotting)}
+            {!isTeen && renderToggle("Spotting", spotting, setSpotting)}
             {renderToggle("Headache", headache, setHeadache)}
             {renderToggle("Nausea", nausea, setNausea)}
           </View>
@@ -544,19 +642,21 @@ export default function LogScreen() {
             style={[styles.card, { borderColor: theme.error, borderWidth: 2 }]}
           >
             <Text style={[styles.sectionTitle, { color: theme.error }]}>
-              Active Period Attributes
+              Active {term.cycle.charAt(0).toUpperCase() + term.cycle.slice(1)} — {term.flow.charAt(0).toUpperCase() + term.flow.slice(1)} & Clots
             </Text>
             <Text style={[styles.label, { color: theme.textSecondary }]}>
-              Flow Intensity
+              {term.flow.charAt(0).toUpperCase() + term.flow.slice(1)} Intensity
             </Text>
             {renderRadio(
               ["None", "Spotting", "Light", "Medium", "Heavy", "Very Heavy"],
               flow,
               setFlow,
             )}
-            <View style={{ marginTop: 16 }}>
-              {renderToggle("Clotting Present", clots, setClots)}
-            </View>
+            {!isTeen && (
+              <View style={{ marginTop: 16 }}>
+                {renderToggle("Clotting Present", clots, setClots)}
+              </View>
+            )}
           </View>
         )}
 
@@ -583,26 +683,80 @@ export default function LogScreen() {
           </View>
         )}
 
+        {currentMode === "peri" && (
+          <View style={[styles.card, { borderColor: theme.tint, borderWidth: 2 }]}>
+            <Text style={[styles.sectionTitle, { color: theme.text }]}>
+              {languagePreset === 'inclusive' ? 'Body Changes (Peri)' : 'Perimenopause Tracking'}
+            </Text>
+            {renderToggle("Hot Flashes", hotFlashes, setHotFlashes)}
+            {hotFlashes && (
+              <View style={{ marginTop: 8 }}>
+                <Text style={[styles.label, { color: theme.textSecondary }]}>Frequency today (episodes)</Text>
+                <View style={styles.durationRow}>
+                  <TouchableOpacity style={[styles.adjustBtn, { borderColor: theme.tint }]} onPress={() => setHotFlashFrequency(Math.max(0, hotFlashFrequency - 1))}>
+                    <Text style={{ color: theme.tint }}>-1</Text>
+                  </TouchableOpacity>
+                  <Text style={[styles.valueText, { color: theme.text }]}>{hotFlashFrequency}</Text>
+                  <TouchableOpacity style={[styles.adjustBtn, { borderColor: theme.tint }]} onPress={() => setHotFlashFrequency(hotFlashFrequency + 1)}>
+                    <Text style={{ color: theme.tint }}>+1</Text>
+                  </TouchableOpacity>
+                </View>
+                <Text style={[styles.label, { color: theme.textSecondary, marginTop: 12 }]}>Severity (0-3)</Text>
+                {renderSlider4(hotFlashSeverity, setHotFlashSeverity)}
+                <Text style={[styles.label, { color: theme.textSecondary, marginTop: 12 }]}>Time of day</Text>
+                {renderRadio(['Morning', 'Afternoon', 'Evening', 'Night'], hotFlashTimeOfDay, setHotFlashTimeOfDay)}
+              </View>
+            )}
+            {renderToggle("Night Sweats", nightSweats, setNightSweats)}
+            {renderToggle("Vaginal Dryness/Changes", vaginalChanges, setVaginalChanges)}
+            {renderToggle("Cognitive / Memory Blanks", memoryIssues, setMemoryIssues)}
+          </View>
+        )}
+
         {currentMode === "endo" && (
           <View
             style={[styles.card, { borderColor: theme.endo, borderWidth: 2 }]}
           >
             <Text style={[styles.sectionTitle, { color: theme.text }]}>
-              Endo Extended
+              Endo Extended Symptoms
             </Text>
-            {renderToggle("Declare Endo Flare", inFlare, setInFlare)}
-            <View style={{ marginTop: 10 }}>
-              {renderMultiSelect(
-                [
-                  "Bowel symptoms",
-                  "Bladder symptoms",
-                  "Shoulder/referred pain",
-                  "Dyspareunia",
-                ],
-                endoLog,
-                setEndoLog,
-              )}
-            </View>
+            {renderToggle("Declare Endo Flare", inFlare, handleFlareToggle)}
+
+            {inFlare ? (
+              // Condensed 3-field flare mode
+              <View style={{ marginTop: 12 }}>
+                <Text style={[styles.label, { color: theme.endo, fontWeight: 'bold', marginBottom: 8 }]}>⚡ Flare Mode — Quick Log</Text>
+                <Text style={[styles.label, { color: theme.textSecondary }]}>Flare Pain (0-10)</Text>
+                {renderSlider10(flareModePain, setFlareModePain)}
+                {renderToggle("Nausea", flareModeNausea, setFlareModeNausea)}
+                <Text style={[styles.label, { color: theme.textSecondary, marginTop: 12 }]}>Movement Ability</Text>
+                {renderRadio(["Normal", "Limited", "Bed-bound"], flareModeMovement, setFlareModeMovement)}
+              </View>
+            ) : (
+              // Full endo symptom palette
+              <View>
+                <Text style={[styles.label, { color: theme.textSecondary, marginTop: 16 }]}>Clot Size</Text>
+                {renderRadio(["None", "Small", "Medium", "Large"], clotsSize, setClotsSize)}
+
+                <Text style={[styles.label, { color: theme.textSecondary, marginTop: 16 }]}>Bowel Symptoms</Text>
+                {renderMultiSelect(["Constipation", "Diarrhoea", "Pain", "Bleeding"], bowelSymptoms, setBowelSymptoms)}
+
+                <Text style={[styles.label, { color: theme.textSecondary, marginTop: 16 }]}>Bladder Symptoms</Text>
+                {renderMultiSelect(["Pain", "Frequency", "Urgency", "Blood"], bladderSymptoms, setBladderSymptoms)}
+
+                <Text style={[styles.label, { color: theme.textSecondary, marginTop: 16 }]}>Shoulder/Referred Pain</Text>
+                {renderRadio(["None", "Left", "Right", "Both"], shoulderSide, setShoulderSide)}
+
+                <Text style={[styles.label, { color: theme.textSecondary, marginTop: 16 }]}>Nausea Severity (0-3)</Text>
+                {renderSlider4(nauseaSeverity, setNauseaSeverity)}
+
+                {!isTeen && (
+                  <View style={{ marginTop: 16 }}>
+                    {renderToggle("Dyspareunia (Pain during sex)", dyspareunia, setDyspareunia)}
+                  </View>
+                )}
+              </View>
+            )}
           </View>
         )}
 
@@ -723,9 +877,19 @@ export default function LogScreen() {
             multiline
           />
         </View>
+        </> /* end non-teen */
+        )}
+
+        <TouchableOpacity
+          style={[styles.saveButton, { backgroundColor: theme.tint }]}
+          onPress={handleSave}
+        >
+          <Text style={styles.saveButtonText}>Save Log</Text>
+        </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
   );
+}
 
 const styles = StyleSheet.create({
   container: { flex: 1 },

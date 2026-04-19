@@ -32,7 +32,7 @@ export default function CycleHistoryInputScreen() {
     }
 
     setCycleHistory(parsed, lastPeriodDate);
-    setProfileInfo(0, "female", "en", true, postPill);
+    setProfileInfo(0, "female", "en", true, postPill, false);
 
     router.push("profile" as any);
   };

@@ -40,7 +40,7 @@ const theme = Colors[colorScheme];
         </Text>
         <View style={[styles.infoCard, { backgroundColor: theme.surface }]}>
           <Text style={[styles.label, { color: theme.textSecondary }]}>Period Length</Text>
-          <Text style={[styles.value, { color: theme.text }}>{cycle.period_length || '—'} days</Text>
+          <Text style={[styles.value, { color: theme.text }]}>{cycle.period_length || '—'} days</Text>
           <Text style={[styles.label, { color: theme.textSecondary }]}>Cycle Length</Text>
           <Text style={[styles.value, { color: theme.text }]}>{cycle.cycle_length || '—'} days</Text>
         </View>

@@ -1,5 +1,5 @@
 import { Colors } from '@/constants/theme';
-import { getAllCycles, getAllEntries, getCyclePhases, getPhaseAverages, getDayOfCycle, getPhaseForDay } from '@/database';
+import { getAllCycles, getAllEntries, getCyclePredictions, getPhaseAverages, getDayOfCycle, getPhaseForDay } from '@/database';
 import { differenceInDays, parseISO } from "date-fns";
 import { useAppStore } from '@/store';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -7,7 +7,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
-import { runPredictionEngine } from '@/utils/predictions';
+import { PredictionResult } from '@/utils/predictions';
 
 export default function CalendarScreen() {
   const colorScheme = useColorScheme() ?? 'light';
@@ -37,14 +37,15 @@ export default function CalendarScreen() {
       });
       setEntriesByDate(entriesMap);
       
-      generateMonth(year, month, allCycles, entriesMap);
+      const prediction = await getCyclePredictions(currentMode, postPillMode, postPillStartDate ?? null);
+      generateMonth(year, month, allCycles, entriesMap, prediction);
       if (allCycles.length > 0) {
         const avgs = await getPhaseAverages(allCycles[0].id);
         setPhaseAverages(avgs);
       }
     };
     load();
-  }, []);
+  }, [currentMode, postPillMode, postPillStartDate]);
 
   // Reload when screen comes back into focus (e.g. after cycle edit)
   useFocusEffect(
@@ -59,17 +60,24 @@ export default function CalendarScreen() {
           if (!entriesMap[d]) entriesMap[d] = e;
         });
         setEntriesByDate(entriesMap);
-        generateMonth(year, month, allCycles, entriesMap);
+        const prediction = await getCyclePredictions(currentMode, postPillMode, postPillStartDate ?? null);
+        generateMonth(year, month, allCycles, entriesMap, prediction);
         if (allCycles.length > 0) {
           const avgs = await getPhaseAverages(allCycles[0].id);
           setPhaseAverages(avgs);
         }
       };
       reload();
-    }, [])
+    }, [currentMode, postPillMode, postPillStartDate])
   );
 
-  const generateMonth = (y: number, m: number, loadedCycles: any[], loadedEntriesMap: Record<string, any>) => {
+  const generateMonth = (
+    y: number,
+    m: number,
+    loadedCycles: any[],
+    loadedEntriesMap: Record<string, any>,
+    prediction: PredictionResult | null,
+  ) => {
     const days = [];
     const firstDay = new Date(y, m, 1).getDay();
     const daysInMonth = new Date(y, m + 1, 0).getDate();
@@ -87,7 +95,8 @@ export default function CalendarScreen() {
         painScore: 0,
         flare: false,
         phase: null as string | null,
-        predictionConfidence: 0
+        predictionConfidence: 0,
+        predictionEdgeFade: 0,
       };
 
       // Check periods
@@ -98,13 +107,7 @@ export default function CalendarScreen() {
       });
 
       // Prediction window — use engine's ISO window dates directly
-      if (loadedCycles.length > 0) {
-        const prediction = runPredictionEngine({
-          cycles: loadedCycles,
-          currentMode,
-          postPillMode,
-          postPillStartDate: postPillStartDate ?? null,
-        });
+      if (loadedCycles.length > 0 && prediction) {
         if (prediction.windowStartISO && prediction.windowEndISO && prediction.predictedStartISO) {
           const winStart = parseISO(prediction.windowStartISO);
           const winEnd = parseISO(prediction.windowEndISO);
@@ -114,6 +117,7 @@ export default function CalendarScreen() {
             const halfSpan = Math.max(differenceInDays(winEnd, winStart) / 2, 1);
             const distFromCenter = Math.abs(differenceInDays(thisDayDate, center));
             dayData.predictionConfidence = Math.max(0, 1 - distFromCenter / halfSpan);
+            dayData.predictionEdgeFade = Math.max(0.12, dayData.predictionConfidence * 0.34);
           }
         }
       }
@@ -166,12 +170,18 @@ export default function CalendarScreen() {
             <TouchableOpacity key={i} style={styles.dayCell} onPress={() => day && setSelectedCycle(day)}>
               {day ? (
                 <View style={styles.dayContent}>
+                  {day.predictionConfidence > 0 && (
+                    <View style={styles.predictionLayer}>
+                      <View style={[styles.predictionFade, { backgroundColor: theme.tint, opacity: Math.max(day.predictionEdgeFade * 0.35, 0.04) }]} />
+                      <View style={[styles.predictionCore, { backgroundColor: theme.tint, opacity: day.predictionEdgeFade }]} />
+                      <View style={[styles.predictionFade, { backgroundColor: theme.tint, opacity: Math.max(day.predictionEdgeFade * 0.35, 0.04) }]} />
+                    </View>
+                  )}
                   <Text style={[styles.dayNum, { color: theme.text }]}>{day.dayNum}</Text>
                   {day.periodScore > 0 && <View style={[styles.periodDot, { backgroundColor: '#FF6B9D' }]} />}
                   {day.painScore > 5 && <View style={[styles.painDot, { backgroundColor: '#FF4757' }]} />}
                   {day.flare && <View style={[styles.flareDot, { backgroundColor: '#FF3838' }]} />}
                   {day.phase && <Text style={[styles.phaseLabel, { color: getPhaseColor(day.phase) }]}>{day.phase[0].toUpperCase()}</Text>}
-                  {day.predictionConfidence > 0 && <View style={[styles.predictionBg, { backgroundColor: theme.tint, opacity: day.predictionConfidence * 0.3 }]} />}
                 </View>
               ) : (
                 <View style={styles.emptyCell} />
@@ -233,13 +243,15 @@ const styles = StyleSheet.create({
   monthGrid: { flexDirection: 'row', flexWrap: 'wrap' },
   dayCell: { width: '14.28%', aspectRatio: 1, justifyContent: 'center', alignItems: 'center', padding: 4 },
   emptyCell: { width: '100%', height: '100%' },
-  dayContent: { alignItems: 'center' },
+  dayContent: { width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center', position: 'relative', overflow: 'hidden', borderRadius: 8 },
   dayNum: { fontSize: 16, fontWeight: 'bold', marginBottom: 2 },
   periodDot: { width: 8, height: 8, borderRadius: 4, marginTop: 2 },
   painDot: { width: 6, height: 6, borderRadius: 3, marginLeft: 2 },
   flareDot: { width: 10, height: 10, borderRadius: 5 },
   phaseLabel: { fontSize: 10, marginTop: 1, zIndex: 2 },
-  predictionBg: { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, borderRadius: 8, zIndex: 0 },
+  predictionLayer: { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, borderRadius: 8, overflow: 'hidden', flexDirection: 'row' },
+  predictionFade: { flex: 1 },
+  predictionCore: { flex: 2 },
   legend: { flexDirection: 'row', justifyContent: 'space-around', marginTop: 24, paddingVertical: 16 },
   legendItem: { alignItems: 'center', gap: 4 },
   legendDot: { width: 12, height: 12, borderRadius: 6 },

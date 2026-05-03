@@ -3,7 +3,8 @@ import { CyclePhase, getPhaseForDay } from "../database";
 export const generateSpecialistReportHtml = (
   cycles: any[],
   entries: any[],
-  currentMode: string
+  currentMode: string,
+  redFlagPromptLogs: any[] = []
 ): string => {
   let html = `
     <html>
@@ -145,12 +146,16 @@ export const generateSpecialistReportHtml = (
     if (complexSymptoms.length === 0) html += `<tr><td colspan="4">No complex symptoms recorded.</td></tr>`;
     html += `</table>`;
 
-    html += `<h3>Red-Flag Trigger History</h3><table><tr><th>Date</th><th>Event</th></tr>`;
-    const redFlags = entries.filter(e => e.pain_score >= 8);
-    redFlags.slice(0, 10).forEach(e => {
-       html += `<tr><td>${e.logged_date.split("T")[0]}</td><td><span class="highlight">Severe Pain (${e.pain_score}/10)</span> Recorded</td></tr>`;
+    html += `<h3>Red-Flag Prompt History</h3><table><tr><th>Date</th><th>Trigger</th><th>Prompt</th></tr>`;
+    redFlagPromptLogs.slice(0, 15).forEach(log => {
+       const trigger = String(log.trigger_type || "").replace(/_/g, " ");
+       html += `<tr>
+         <td>${String(log.logged_date || log.triggered_at).split("T")[0]}</td>
+         <td style="text-transform:capitalize">${trigger}</td>
+         <td><span class="highlight">${log.message}</span></td>
+       </tr>`;
     });
-    if (redFlags.length === 0) html += `<tr><td colspan="2">No severe pain red-flags this quarter.</td></tr>`;
+    if (redFlagPromptLogs.length === 0) html += `<tr><td colspan="3">No red-flag prompts were shown during this report period.</td></tr>`;
     html += `</table>`;
 
     html += `<h3>Pain Score Trajectory</h3><table><tr><th>Month</th><th>Avg Pain (0-10)</th></tr>`;

@@ -1,5 +1,5 @@
 import { Colors } from "@/constants/theme";
-import { createSymptomEntry, getAllEntries, saveFlareEnd } from "@/database";
+import { createRedFlagPromptLog, createSymptomEntry, getAllEntries, saveFlareEnd } from "@/database";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useAppStore } from "@/store";
 import { encryptField, decryptField } from "@/utils/fieldEncryption";
@@ -164,21 +164,37 @@ export default function LogScreen() {
       if (needsRedFlagCooldown) {
         let triggerPrompt = false;
         let promptMessage = "";
+        let triggerType = "";
 
         if (bowelSymptoms.length > 0 && !!shoulderSide && shoulderSide !== "None" && shoulderSide !== null && (flow === "Heavy" || flow === "Very Heavy")) {
           triggerPrompt = true;
+          triggerType = "bowel_shoulder_heavy_flow";
           promptMessage = "You've logged complex symptoms (bowel + shoulder pain + heavy flow) on the same day. This combination warrants medical attention.";
         } else if (pain >= 8) {
           const entries = await getAllEntries();
           const recentDays = entries.slice(0, 2);
           if (recentDays.length >= 2 && recentDays.every(e => e.pain_score && e.pain_score >= 8)) {
             triggerPrompt = true;
+            triggerType = "severe_pain_3_days";
             promptMessage = "You've logged severe pain (8+) for 3 consecutive days. We strongly recommend contacting your healthcare provider.";
           }
         }
 
         if (triggerPrompt) {
           useAppStore.getState().setLastRedFlagPrompt(new Date().toISOString());
+          await createRedFlagPromptLog({
+            trigger_type: triggerType,
+            logged_date: new Date().toISOString(),
+            message: promptMessage,
+            severity: pain,
+            cycle_id: activePeriodId ?? null,
+            entry_context: {
+              pain_score: pain,
+              bowel_symptoms: bowelSymptoms,
+              shoulder_side: shoulderSide,
+              flow_intensity: flow,
+            },
+          });
           Alert.alert("Red Flag Notice", promptMessage, [{ text: "Got it" }]);
         }
       }
@@ -570,7 +586,7 @@ export default function LogScreen() {
             Physical & Cognitive
           </Text>
           <Text style={[styles.label, { color: theme.textSecondary }]}>
-            Brain Fog (0-10) "How clear is your thinking?"
+            Brain Fog (0-10) &quot;How clear is your thinking?&quot;
           </Text>
           {renderSlider10(brainFog, setBrainFog)}
 

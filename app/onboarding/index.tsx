@@ -13,7 +13,7 @@ export default function ConditionSelection() {
 
   const handleSelect = (mode: AppMode, path: string) => {
     setMode(mode);
-    router.push(path);
+    router.push(path as any);
   };
 
   const ConditionCard = ({

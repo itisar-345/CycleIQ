@@ -1,6 +1,7 @@
 import { differenceInDays } from "date-fns";
 import * as SQLite from "expo-sqlite";
 import { v4 as uuidv4 } from "uuid";
+import type { AppMode, NotificationPrefs } from "../store";
 
 export const dbName = "cycleiq.sqlite";
 
@@ -91,6 +92,39 @@ export const initDb = async () => {
       error_days REAL NOT NULL,
       recorded_at TEXT NOT NULL
     )`);
+    await database.runAsync(`CREATE TABLE IF NOT EXISTS cycle_predictions (
+      id TEXT PRIMARY KEY,
+      generated_at TEXT NOT NULL,
+      model_version TEXT NOT NULL,
+      current_mode TEXT NOT NULL,
+      predicted_start TEXT,
+      window_start TEXT,
+      window_end TEXT,
+      mean REAL,
+      std_dev REAL,
+      confidence REAL,
+      mae REAL,
+      model TEXT,
+      label TEXT,
+      payload_json TEXT NOT NULL
+    )`);
+    await database.runAsync(`CREATE INDEX IF NOT EXISTS idx_cycle_predictions_generated ON cycle_predictions(generated_at DESC)`);
+    await database.runAsync(`CREATE TABLE IF NOT EXISTS red_flag_prompt_logs (
+      id TEXT PRIMARY KEY,
+      trigger_type TEXT NOT NULL,
+      triggered_at TEXT NOT NULL,
+      logged_date TEXT NOT NULL,
+      message TEXT NOT NULL,
+      severity INTEGER,
+      cycle_id TEXT,
+      entry_context_json TEXT
+    )`);
+    await database.runAsync(`CREATE INDEX IF NOT EXISTS idx_red_flag_prompt_logs_date ON red_flag_prompt_logs(triggered_at DESC)`);
+    await database.runAsync(`CREATE TABLE IF NOT EXISTS app_settings (
+      key TEXT PRIMARY KEY,
+      value_json TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    )`);
   });
   return database;
 };
@@ -153,6 +187,7 @@ export const createCycle = async (startDate: string) => {
     }
   }
 
+  await retrainAndStoreCyclePrediction();
   return id;
 };
 
@@ -168,6 +203,7 @@ export const closeCycle = async (cycleId: string, endDate: string) => {
     `UPDATE cycles SET end_date = ?, period_length = ?, is_confirmed = 1 WHERE id = ?;`,
     [endDate, periodLength, cycleId],
   );
+  await retrainAndStoreCyclePrediction();
   return periodLength;
 };
 
@@ -258,7 +294,7 @@ export const getAllCycles = async () => {
   return cycles;
 };
 
-import { computeCyclePrediction, runPredictionEngine, PredictionResult } from "../utils/predictions";
+import { runPredictionEngine, PredictionResult } from "../utils/predictions";
 
 /**
  * Returns the mean signed error (actual - predicted) over the last N feedback records.
@@ -283,11 +319,68 @@ export const getCyclePredictions = async (
   postPillMode = false,
   postPillStartDate: string | null = null
 ): Promise<PredictionResult> => {
+  return retrainAndStoreCyclePrediction(currentMode, postPillMode, postPillStartDate);
+};
+
+export const retrainAndStoreCyclePrediction = async (
+  currentMode: string = "standard",
+  postPillMode = false,
+  postPillStartDate: string | null = null
+): Promise<PredictionResult> => {
   const result = await execSql(`SELECT * FROM cycles ORDER BY start_date DESC;`);
   const cycles: any[] = [];
   for (let i = 0; i < result.rows.length; i++) cycles.push(result.rows.item(i));
   const biasCorrection = await getPredictionBias();
-  return runPredictionEngine({ cycles, currentMode, postPillMode, postPillStartDate, biasCorrection });
+  const prediction = runPredictionEngine({ cycles, currentMode, postPillMode, postPillStartDate, biasCorrection });
+  await saveCyclePrediction(prediction, currentMode);
+  return prediction;
+};
+
+export const saveCyclePrediction = async (
+  prediction: PredictionResult,
+  currentMode: string = "standard",
+): Promise<void> => {
+  await execSql(
+    `INSERT INTO cycle_predictions (
+      id, generated_at, model_version, current_mode, predicted_start, window_start, window_end,
+      mean, std_dev, confidence, mae, model, label, payload_json
+    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?);`,
+    [
+      uuidv4(),
+      new Date().toISOString(),
+      "cycleiq-prediction-v3",
+      currentMode,
+      prediction.predictedStartISO,
+      prediction.windowStartISO,
+      prediction.windowEndISO,
+      prediction.mean,
+      prediction.stdDev,
+      prediction.confidence,
+      prediction.mae,
+      prediction.model,
+      prediction.label,
+      JSON.stringify(prediction),
+    ],
+  );
+};
+
+export const getLatestStoredCyclePrediction = async (
+  currentMode?: string,
+): Promise<PredictionResult | null> => {
+  const result = currentMode
+    ? await execSql(
+        `SELECT payload_json FROM cycle_predictions WHERE current_mode = ? ORDER BY generated_at DESC LIMIT 1;`,
+        [currentMode],
+      )
+    : await execSql(
+        `SELECT payload_json FROM cycle_predictions ORDER BY generated_at DESC LIMIT 1;`,
+      );
+  if (result.rows.length === 0) return null;
+  try {
+    return JSON.parse(result.rows.item(0).payload_json) as PredictionResult;
+  } catch {
+    return null;
+  }
 };
 
 export const getCycleEntries = async (cycleId: string) => {
@@ -366,6 +459,88 @@ export const updateCycle = async (
     `UPDATE cycles SET ${updates.join(", ")} WHERE id = ?;`,
     params,
   );
+  await retrainAndStoreCyclePrediction();
+};
+
+export interface RedFlagPromptLogInput {
+  trigger_type: "severe_pain_3_days" | "bowel_shoulder_heavy_flow" | string;
+  logged_date: string;
+  message: string;
+  severity?: number | null;
+  cycle_id?: string | null;
+  entry_context?: Record<string, any>;
+}
+
+export const createRedFlagPromptLog = async (log: RedFlagPromptLogInput): Promise<string> => {
+  const id = uuidv4();
+  await execSql(
+    `INSERT INTO red_flag_prompt_logs (
+      id, trigger_type, triggered_at, logged_date, message, severity, cycle_id, entry_context_json
+    ) VALUES (?,?,?,?,?,?,?,?);`,
+    [
+      id,
+      log.trigger_type,
+      new Date().toISOString(),
+      log.logged_date,
+      log.message,
+      log.severity ?? null,
+      log.cycle_id ?? null,
+      log.entry_context ? JSON.stringify(log.entry_context) : null,
+    ],
+  );
+  return id;
+};
+
+export const getRedFlagPromptLogs = async (): Promise<any[]> => {
+  const result = await execSql(
+    `SELECT * FROM red_flag_prompt_logs ORDER BY triggered_at DESC;`,
+  );
+  const logs: any[] = [];
+  for (let i = 0; i < result.rows.length; i++) logs.push(result.rows.item(i));
+  return logs;
+};
+
+export const saveAppSetting = async (key: string, value: any): Promise<void> => {
+  await execSql(
+    `INSERT INTO app_settings (key, value_json, updated_at)
+     VALUES (?, ?, ?)
+     ON CONFLICT(key) DO UPDATE SET value_json = excluded.value_json, updated_at = excluded.updated_at;`,
+    [key, JSON.stringify(value), new Date().toISOString()],
+  );
+};
+
+export const getAppSettings = async (): Promise<Record<string, any>> => {
+  const result = await execSql(`SELECT key, value_json FROM app_settings;`);
+  const settings: Record<string, any> = {};
+  for (let i = 0; i < result.rows.length; i++) {
+    const row = result.rows.item(i);
+    try {
+      settings[row.key] = JSON.parse(row.value_json);
+    } catch {
+      settings[row.key] = row.value_json;
+    }
+  }
+  return settings;
+};
+
+export const persistAppSettingsSnapshot = async (settings: {
+  currentMode: AppMode;
+  language: string;
+  languagePreset: string;
+  customTerms: Record<string, string>;
+  notificationsEnabled: boolean;
+  notificationPrefs: NotificationPrefs;
+  dismissedInsights: string[];
+  tier?: string;
+}): Promise<void> => {
+  await saveAppSetting("current_mode", settings.currentMode);
+  await saveAppSetting("language", settings.language);
+  await saveAppSetting("language_preset", settings.languagePreset);
+  await saveAppSetting("custom_terms", settings.customTerms);
+  await saveAppSetting("notifications_enabled", settings.notificationsEnabled);
+  await saveAppSetting("notification_prefs", settings.notificationPrefs);
+  await saveAppSetting("dismissed_insights", settings.dismissedInsights);
+  await saveAppSetting("tier", settings.tier ?? "free");
 };
 
 export const saveFlareEnd = async (

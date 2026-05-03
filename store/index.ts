@@ -30,6 +30,7 @@ export interface NotificationPrefs {
   periodDayTips: boolean;    // all 5-day morning + evening notifications
   endoDayTips: boolean;      // endo-specific full-cycle notifications
   pcosNotifications: boolean; // pcos-specific cycle & symptom notifications
+  redFlagAlerts: boolean;
   moodCheckIn: boolean;
   dailyLogHour: number;
   quietHoursStart: number;
@@ -103,6 +104,24 @@ interface AppState {
   dismissInsight: (title: string) => void;
 }
 
+const persistSettingsToSqlite = (state: AppState) => {
+  void import("@/database")
+    .then(({ persistAppSettingsSnapshot }) =>
+      persistAppSettingsSnapshot({
+        currentMode: state.currentMode,
+        language: state.language,
+        languagePreset: state.languagePreset,
+        customTerms: state.customTerms,
+        notificationsEnabled: state.notificationsEnabled,
+        notificationPrefs: state.notificationPrefs,
+        dismissedInsights: state.dismissedInsights,
+      }),
+    )
+    .catch((error) => {
+      console.warn("Unable to persist settings snapshot to SQLite", error);
+    });
+};
+
 export const useAppStore = create<AppState>()(
   persist(
     (set, get) => ({
@@ -147,6 +166,7 @@ export const useAppStore = create<AppState>()(
         periodDayTips: true,
         endoDayTips: true,
         pcosNotifications: true,
+        redFlagAlerts: true,
         moodCheckIn: true,
         dailyLogHour: 20,
         quietHoursStart: 22,
@@ -155,7 +175,10 @@ export const useAppStore = create<AppState>()(
       dismissedInsights: [] as string[],
 
       setOnboarded: (status) => set({ isOnboarded: status }),
-      setMode: (mode) => set({ currentMode: mode }),
+      setMode: (mode) => {
+        set({ currentMode: mode });
+        persistSettingsToSqlite(get());
+      },
       setUserName: (name) => set({ userName: name }),
       setPCOSData: (data) => set({ pcosData: data }),
       setEndoData: (data) => set({ endoData: data }),
@@ -174,9 +197,12 @@ export const useAppStore = create<AppState>()(
         notificationsEnabled,
         postPillMode,
         isTeen,
-      ) => set({ age, gender, language, notificationsEnabled, postPillMode, isTeen,
-        postPillStartDate: postPillMode ? new Date().toISOString() : null
-      }),
+      ) => {
+        set({ age, gender, language, notificationsEnabled, postPillMode, isTeen,
+          postPillStartDate: postPillMode ? new Date().toISOString() : null
+        });
+        persistSettingsToSqlite(get());
+      },
 
       incrementLowMood: () =>
         set((state) => ({
@@ -200,16 +226,24 @@ export const useAppStore = create<AppState>()(
         set({ lastRedFlagPrompt: date }),
       setLastPCOSPrompt: (date: string | null) =>
         set({ lastPCOSPrompt: date }),
-      setLanguagePreset: (preset) =>
-        set({ languagePreset: preset }),
-      setCustomTerms: (terms) =>
-        set((state) => ({ customTerms: { ...state.customTerms, ...terms } })),
-      setNotificationPrefs: (prefs) => 
-        set((state) => ({ notificationPrefs: { ...state.notificationPrefs, ...prefs } })),
+      setLanguagePreset: (preset) => {
+        set({ languagePreset: preset });
+        persistSettingsToSqlite(get());
+      },
+      setCustomTerms: (terms) => {
+        set((state) => ({ customTerms: { ...state.customTerms, ...terms } }));
+        persistSettingsToSqlite(get());
+      },
+      setNotificationPrefs: (prefs) => {
+        set((state) => ({ notificationPrefs: { ...state.notificationPrefs, ...prefs } }));
+        persistSettingsToSqlite(get());
+      },
       dismissInsight: (title) => 
         set((state) => {
           if (!state.dismissedInsights.includes(title)) {
-            return { dismissedInsights: [...state.dismissedInsights, title] };
+            const next = { dismissedInsights: [...state.dismissedInsights, title] };
+            setTimeout(() => persistSettingsToSqlite(get()), 0);
+            return next;
           }
           return state;
         }),

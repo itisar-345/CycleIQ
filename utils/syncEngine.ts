@@ -1,7 +1,7 @@
 import { getUnsyncedEntries, markEntriesSynced } from "@/database";
 import { AppState, AppStateStatus } from "react-native";
 
-let syncInterval: NodeJS.Timeout | null = null;
+let syncInterval: ReturnType<typeof setInterval> | null = null;
 let dbReady = false;
 
 export const markDbReady = () => { dbReady = true; };

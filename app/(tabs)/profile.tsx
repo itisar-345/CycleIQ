@@ -105,7 +105,7 @@ export default function ProfileScreen() {
               {(['cycle', 'flow', 'body'] as const).map((field) => (
                 <View key={field}>
                   <Text style={[styles.description, { color: theme.textSecondary }]}>
-                    Term for "{field}"
+                    Term for &quot;{field}&quot;
                   </Text>
                   <TextInput
                     style={[styles.termInput, { borderColor: theme.border, color: theme.text }]}

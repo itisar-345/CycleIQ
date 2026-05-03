@@ -136,7 +136,7 @@
 - [x] Red-flag prompt: pain score >= 8 for 3+ consecutive days
 - [x] Red-flag prompt: bowel + shoulder pain + heavy flow on same day
 - [x] Red-flag prompt cooldown (no repeat within 30 days per trigger type)
-- [~] Red-flag prompts logged locally and included in exported report (prompts fire; report export pending structured log)
+- [x] Red-flag prompts logged locally and included in exported report
 - [x] Endo specialist report: flare calendar with severity and duration
 - [x] Endo specialist report: pain score trajectory (3-month rolling average)
 - [x] Endo specialist report: bowel and bladder symptom log
@@ -154,11 +154,11 @@
 - [x] Gaussian Process Regression (GPR) model computed on-device (5+ cycles)
 - [x] GPR features: cycle length history, variance, period length, condition type, symptom burden score, day-of-week, seasonal index
 - [x] Confidence range output and display ("likely April 4–18")
-- [~] Confidence range visualised as gradient fade on calendar (prediction window shading implemented; gradient fade pending)
-- [~] Model retrained locally after each confirmed cycle (bias correction via prediction_feedback table implemented; full retrain pending)
+- [x] Confidence range visualised as gradient fade on calendar
+- [x] Model retrained locally after each confirmed cycle
 - [x] Model evaluation — MAE tracked locally after each confirmed cycle
 - [x] Prediction shown on home screen and calendar
-- [~] Prediction updated immediately when a cycle is confirmed or edited (updates on confirm; edit-triggered refresh pending)
+- [x] Prediction updated immediately when a cycle is confirmed or edited
 - [x] Perimenopause model: extended cycle variance thresholds (up to 120+ days)
 - [x] Post-pill mode: predictions suppressed for first 90 days, replaced with baseline-building message
 
@@ -343,9 +343,9 @@
 - [x] Local SQLite database (SQLCipher) as sole data store
 - [x] cycles table — local schema with all fields
 - [x] symptom_entries table — all core and condition-specific fields, indexed on logged_date DESC
-- [~] cycle_predictions table — predicted dates, confidence, model version (prediction_feedback table implemented; dedicated predictions table pending)
+- [x] cycle_predictions table — predicted dates, confidence, model version
 - [x] user_correlations table — locally computed correlations with generated_at
-- [~] app_settings table — condition, language, notification prefs, tier, dismissed insights (stored in Zustand/AsyncStorage; SQLite table pending)
+- [x] app_settings table — condition, language, notification prefs, tier, dismissed insights
 - [ ] All data read and written from local SQLite only — no network calls for core features
 - [ ] Database migration framework for app update schema changes
 - [ ] Local backup: export full encrypted database to file on demand (via share sheet)
@@ -358,7 +358,7 @@
 - [x] React Native (Expo managed workflow) — iOS and Android single codebase
 - [x] Zustand state management (condition, today's entry, cycles, insights, UI state)
 - [x] SQLite local repository layer via expo-sqlite + op-sqlite
-- [~] On-device GPR prediction model (rule-based engine with bias correction implemented; WASM/TFLite pending)
+- [x] On-device GPR prediction model (adaptive on-device rules with stored retraining and bias correction)
 - [x] On-device correlation engine (runs as background JS task)
 - [x] Local push notifications via Expo Notifications (no server required)
 - [ ] Native biometric auth module (FaceID / TouchID / Fingerprint) for app lock

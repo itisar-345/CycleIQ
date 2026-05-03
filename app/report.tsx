@@ -6,7 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { getAllCycles, getAllEntries } from '@/database';
+import { getAllCycles, getAllEntries, getRedFlagPromptLogs } from '@/database';
 import { generateSpecialistReportHtml } from '@/utils/reportGenerator';
 import { Alert } from 'react-native';
 import * as Print from 'expo-print';
@@ -31,13 +31,15 @@ export default function ReportScreen() {
     entriesCount: 0,
     flares: 0,
     rawCycles: [],
-    rawEntries: []
+    rawEntries: [],
+    redFlagPromptLogs: []
   });
 
   useEffect(() => {
     const loadReportData = async () => {
       const cycles = await getAllCycles();
       const entries = await getAllEntries();
+      const redFlagPromptLogs = await getRedFlagPromptLogs();
       
       let totalLength = 0;
       let validCycles = 0;
@@ -67,7 +69,8 @@ export default function ReportScreen() {
         flares,
         entriesCount: entries.length,
         rawCycles: cycles,
-        rawEntries: entries
+        rawEntries: entries,
+        redFlagPromptLogs
       });
       
       setLoading(false);
@@ -77,7 +80,7 @@ export default function ReportScreen() {
 
   const handleExport = async () => {
     try {
-      const html = generateSpecialistReportHtml(data.rawCycles, data.rawEntries, currentMode);
+      const html = generateSpecialistReportHtml(data.rawCycles, data.rawEntries, currentMode, data.redFlagPromptLogs);
       const { uri: tempUri } = await Print.printToFileAsync({ html });
       // Persist to permanent local storage
       const reportsDir = (FileSystem as any).documentDirectory + 'cycleiq_reports/';

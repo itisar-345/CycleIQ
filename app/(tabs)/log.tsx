@@ -146,27 +146,11 @@ export default function LogScreen() {
           "We're here for you",
           "It looks like you've been having a tough few days. You don't have to manage this alone — would it help to look at some resources?",
           [
-            {
-              text: "Dismiss",
-              style: "cancel",
-              onPress: () => {
-                router.push("/");
-                resetLowMood();
-              },
-            },
-            {
-              text: "View Resources",
-              onPress: () => {
-                router.push("/education/resources");
-                resetLowMood();
-              },
-            },
+            { text: "Dismiss", style: "cancel" },
+            { text: "View Resources", onPress: () => router.push("/education/resources") },
           ],
         );
-        return;
-      } else if (!needsCooldown) {
-        Alert.alert('Support Notice', 'You recently saw this message. Keep logging — resources available anytime in Education tab.');
-        return;
+        resetLowMood();
       } else {
         incrementLowMood();
       }
@@ -268,29 +252,30 @@ export default function LogScreen() {
 
   const handleFlareToggle = (val: boolean) => {
     if (!val && inFlare) {
-      Alert.prompt(
+      Alert.alert(
         "Flare Ended",
-        "What helped you during this flare? (Optional)",
+        "What helped you during this flare? (Optional — tap Save to record)",
         [
-          { text: "Skip", onPress: () => setInFlare(false), style: "cancel" },
           {
-            text: "Save",
-            onPress: async (reflection?: string) => {
+            text: "Skip",
+            style: "cancel",
+            onPress: async () => {
               const endDate = new Date().toISOString();
               const { flareStartDate: startISO, flareDurationDays } = useAppStore.getState();
-              setFlareEnd(endDate, reflection || "");
-              // Persist to SQLite
-              await saveFlareEnd(
-                activePeriodId ?? null,
-                startISO ?? endDate,
-                endDate,
-                reflection || "",
-                flareDurationDays ?? 1
-              );
+              setFlareEnd(endDate, "");
+              await saveFlareEnd(activePeriodId ?? null, startISO ?? endDate, endDate, "", flareDurationDays ?? 1);
+            }
+          },
+          {
+            text: "Save Reflection",
+            onPress: async () => {
+              const endDate = new Date().toISOString();
+              const { flareStartDate: startISO, flareDurationDays } = useAppStore.getState();
+              setFlareEnd(endDate, flareReflection);
+              await saveFlareEnd(activePeriodId ?? null, startISO ?? endDate, endDate, flareReflection, flareDurationDays ?? 1);
             }
           }
-        ],
-        "plain-text"
+        ]
       );
     } else {
       setInFlare(val);

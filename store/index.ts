@@ -23,9 +23,17 @@ export interface NotificationPrefs {
   insights: boolean;
   ovulation: boolean;
   flares: boolean;
-  dailyLogHour: number; // 0-23, default 20
-  quietHoursStart: number; // 0-23, default 22
-  quietHoursEnd: number;   // 0-23, default 8
+  padReminder: boolean;
+  hydrationNudge: boolean;
+  ironFoodReminder: boolean;
+  heatPadReminder: boolean;
+  periodDayTips: boolean;    // all 5-day morning + evening notifications
+  endoDayTips: boolean;      // endo-specific full-cycle notifications
+  pcosNotifications: boolean; // pcos-specific cycle & symptom notifications
+  moodCheckIn: boolean;
+  dailyLogHour: number;
+  quietHoursStart: number;
+  quietHoursEnd: number;
 }
 
 interface AppState {
@@ -132,6 +140,14 @@ export const useAppStore = create<AppState>()(
         insights: true,
         ovulation: false,
         flares: true,
+        padReminder: true,
+        hydrationNudge: true,
+        ironFoodReminder: true,
+        heatPadReminder: true,
+        periodDayTips: true,
+        endoDayTips: true,
+        pcosNotifications: true,
+        moodCheckIn: true,
         dailyLogHour: 20,
         quietHoursStart: 22,
         quietHoursEnd: 8,

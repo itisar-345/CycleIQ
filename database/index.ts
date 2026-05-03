@@ -1,34 +1,27 @@
 import { differenceInDays } from "date-fns";
-import { open, DB } from "@op-engineering/op-sqlite";
-import "react-native-get-random-values";
+import * as SQLite from "expo-sqlite";
 import { v4 as uuidv4 } from "uuid";
-import { getOrCreateDbKey } from "../utils/secureKey";
 
 export const dbName = "cycleiq.sqlite";
 
-let db: DB | null = null;
+let db: SQLite.SQLiteDatabase | null = null;
 
 const ensureDb = async () => {
   if (db) return db;
-  const encryptionKey = await getOrCreateDbKey();
-  db = open({ name: dbName, encryptionKey });
+  db = await SQLite.openDatabaseAsync(dbName);
   return db;
 };
 
 const execSql = async (sql: string, params: any[] = []): Promise<any> => {
   const database = await ensureDb();
   try {
-    const res = await database.executeAsync(sql, params);
-    const rowsArr = res.rows?._array || res.rows || [];
-    // Shim for old expo-sqlite WebSQL ResultSet
-    return {
-      rows: {
-        length: rowsArr.length,
-        item: (i: number) => rowsArr[i]
-      },
-      insertId: res.insertId,
-      rowsAffected: res.rowsAffected
-    };
+    const trimmed = sql.trimStart().toUpperCase();
+    if (trimmed.startsWith("SELECT")) {
+      const rows = await database.getAllAsync(sql, params);
+      return { rows: { length: rows.length, item: (i: number) => rows[i] } };
+    }
+    const result = await database.runAsync(sql, params);
+    return { rows: { length: 0, item: () => null }, insertId: result.lastInsertRowId, rowsAffected: result.changes };
   } catch (error) {
     console.error("SQL Error", error, sql);
     throw error;
@@ -37,83 +30,69 @@ const execSql = async (sql: string, params: any[] = []): Promise<any> => {
 
 export const initDb = async () => {
   const database = await ensureDb();
-  await new Promise<void>((resolve, reject) => {
-    database.transaction(
-      (tx) => {
-        tx.executeSql("PRAGMA journal_mode = WAL;");
-        tx.executeSql(
-          `CREATE TABLE IF NOT EXISTS cycles (
-            id TEXT PRIMARY KEY,
-            start_date TEXT NOT NULL,
-            end_date TEXT,
-            cycle_length INTEGER,
-            period_length INTEGER,
-            is_confirmed INTEGER DEFAULT 0,
-            notes_encrypted TEXT
-          );`,
-        );
-        tx.executeSql(
-`CREATE TABLE IF NOT EXISTS symptom_entries (
-            id TEXT PRIMARY KEY,
-            cycle_id TEXT,
-            logged_date TEXT NOT NULL,
-            pain_score INTEGER,
-            pain_locations TEXT,
-            pain_type TEXT,
-            mood_score INTEGER,
-            mood_tags TEXT,
-            brain_fog_score INTEGER,
-            energy_score INTEGER,
-            stress_score INTEGER,
-            bloating TEXT,
-            nausea INTEGER,
-            headache INTEGER,
-            fatigue_score INTEGER,
-            extended_symptoms TEXT,  // JSON for Sec5/6 PCOS/Endo extended + flare
-            flare_start TEXT,
-            flare_end TEXT,
-            flare_reflection_encrypted TEXT,
-            flow_intensity TEXT,
-            clots_size TEXT,  // JSON or string for Sec6 clots+size
-            spotting INTEGER,
-            sleep_hours REAL,
-            sleep_quality INTEGER,
-            exercise_type TEXT,
-            exercise_duration INTEGER,
-            diet_notes_encrypted TEXT,
-            medication_log_encrypted TEXT,
-            synced INTEGER DEFAULT 0,
-            updated_at TEXT,
-            FOREIGN KEY(cycle_id) REFERENCES cycles(id)
-          );
-          CREATE INDEX IF NOT EXISTS idx_symptom_date ON symptom_entries(logged_date DESC);
-          CREATE INDEX IF NOT EXISTS idx_flare_start ON symptom_entries(flare_start);`,
-        );
-        tx.executeSql(
-          `CREATE TABLE IF NOT EXISTS user_correlations (
-            id TEXT PRIMARY KEY,
-            title TEXT NOT NULL,
-            correlation REAL,
-            n INTEGER,
-            generated_at TEXT NOT NULL
-          );`
-        );
-      },
-      reject,
-      resolve,
-    );
+  await database.withTransactionAsync(async () => {
+    await database.runAsync("PRAGMA journal_mode = WAL;");
+    await database.runAsync(`CREATE TABLE IF NOT EXISTS cycles (
+      id TEXT PRIMARY KEY,
+      start_date TEXT NOT NULL,
+      end_date TEXT,
+      cycle_length INTEGER,
+      period_length INTEGER,
+      is_confirmed INTEGER DEFAULT 0,
+      notes_encrypted TEXT
+    )`);
+    await database.runAsync(`CREATE TABLE IF NOT EXISTS symptom_entries (
+      id TEXT PRIMARY KEY,
+      cycle_id TEXT,
+      logged_date TEXT NOT NULL,
+      pain_score INTEGER,
+      pain_locations TEXT,
+      pain_type TEXT,
+      mood_score INTEGER,
+      mood_tags TEXT,
+      brain_fog_score INTEGER,
+      energy_score INTEGER,
+      stress_score INTEGER,
+      bloating TEXT,
+      nausea INTEGER,
+      headache INTEGER,
+      fatigue_score INTEGER,
+      extended_symptoms TEXT,
+      flare_start TEXT,
+      flare_end TEXT,
+      flare_reflection_encrypted TEXT,
+      flow_intensity TEXT,
+      clots_size TEXT,
+      spotting INTEGER,
+      sleep_hours REAL,
+      sleep_quality INTEGER,
+      exercise_type TEXT,
+      exercise_duration INTEGER,
+      diet_notes_encrypted TEXT,
+      medication_log_encrypted TEXT,
+      synced INTEGER DEFAULT 0,
+      updated_at TEXT,
+      FOREIGN KEY(cycle_id) REFERENCES cycles(id)
+    )`);
+    await database.runAsync(`CREATE INDEX IF NOT EXISTS idx_symptom_date ON symptom_entries(logged_date DESC)`);
+    await database.runAsync(`CREATE INDEX IF NOT EXISTS idx_flare_start ON symptom_entries(flare_start)`);
+    await database.runAsync(`CREATE TABLE IF NOT EXISTS user_correlations (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      correlation REAL,
+      n INTEGER,
+      generated_at TEXT NOT NULL
+    )`);
+    await database.runAsync(`CREATE TABLE IF NOT EXISTS prediction_feedback (
+      id TEXT PRIMARY KEY,
+      cycle_id TEXT NOT NULL,
+      predicted_start TEXT NOT NULL,
+      actual_start TEXT NOT NULL,
+      error_days REAL NOT NULL,
+      recorded_at TEXT NOT NULL
+    )`);
   });
   return database;
-};
-
-export const closeDb = () => {
-  if (!db) return;
-  try {
-    db.close();
-  } catch {
-    // ignore
-  }
-  db = null;
 };
 
 export const getLatestCycle = async () => {
@@ -126,7 +105,6 @@ export const getLatestCycle = async () => {
 export const createCycle = async (startDate: string) => {
   const id = uuidv4();
   const prevCycle = await getLatestCycle();
-  let period_length = null;
 
   await execSql(
     `INSERT INTO cycles (id,start_date,is_confirmed) VALUES (?,?,1);`,
@@ -142,6 +120,37 @@ export const createCycle = async (startDate: string) => {
       cycleLength,
       prevCycle.id,
     ]);
+
+    // Record prediction feedback: compare what was predicted vs what actually happened
+    try {
+      const existing = await execSql(
+        `SELECT id FROM prediction_feedback WHERE cycle_id = ?;`,
+        [prevCycle.id]
+      );
+      if (existing.rows.length === 0) {
+        // Re-run engine on cycles BEFORE this new one to get what was predicted
+        const { runPredictionEngine } = await import("../utils/predictions");
+        const histResult = await execSql(
+          `SELECT * FROM cycles WHERE id != ? ORDER BY start_date DESC;`, [id]
+        );
+        const historicCycles: any[] = [];
+        for (let i = 0; i < histResult.rows.length; i++) historicCycles.push(histResult.rows.item(i));
+        if (historicCycles.length >= 2) {
+          const pred = runPredictionEngine({ cycles: historicCycles, currentMode: "standard" });
+          if (pred.predictedStartISO) {
+            const errorDays = differenceInDays(new Date(startDate), new Date(pred.predictedStartISO));
+            await execSql(
+              `INSERT INTO prediction_feedback (id, cycle_id, predicted_start, actual_start, error_days, recorded_at)
+               VALUES (?,?,?,?,?,?);`,
+              [uuidv4(), prevCycle.id, pred.predictedStartISO, startDate, errorDays, new Date().toISOString()]
+            );
+          }
+        }
+      }
+    } catch (e) {
+      // Non-fatal — feedback recording should never block cycle creation
+      console.warn("Prediction feedback recording failed", e);
+    }
   }
 
   return id;
@@ -251,6 +260,24 @@ export const getAllCycles = async () => {
 
 import { computeCyclePrediction, runPredictionEngine, PredictionResult } from "../utils/predictions";
 
+/**
+ * Returns the mean signed error (actual - predicted) over the last N feedback records.
+ * Positive = predictions were too early (need to add days).
+ * Negative = predictions were too late (need to subtract days).
+ * Capped at ±7 days to avoid over-correction.
+ */
+export const getPredictionBias = async (limit = 6): Promise<number> => {
+  const result = await execSql(
+    `SELECT error_days FROM prediction_feedback ORDER BY recorded_at DESC LIMIT ?;`,
+    [limit]
+  );
+  if (result.rows.length < 2) return 0;
+  let sum = 0;
+  for (let i = 0; i < result.rows.length; i++) sum += result.rows.item(i).error_days;
+  const bias = sum / result.rows.length;
+  return Math.max(-7, Math.min(7, Math.round(bias * 10) / 10));
+};
+
 export const getCyclePredictions = async (
   currentMode: string = "standard",
   postPillMode = false,
@@ -259,7 +286,8 @@ export const getCyclePredictions = async (
   const result = await execSql(`SELECT * FROM cycles ORDER BY start_date DESC;`);
   const cycles: any[] = [];
   for (let i = 0; i < result.rows.length; i++) cycles.push(result.rows.item(i));
-  return runPredictionEngine({ cycles, currentMode, postPillMode, postPillStartDate });
+  const biasCorrection = await getPredictionBias();
+  return runPredictionEngine({ cycles, currentMode, postPillMode, postPillStartDate, biasCorrection });
 };
 
 export const getCycleEntries = async (cycleId: string) => {
@@ -371,7 +399,7 @@ export const saveFlareEnd = async (
   }
 };
 
-
+export const deleteCycle = async (cycleId: string): Promise<void> => {
   await execSql(`DELETE FROM symptom_entries WHERE cycle_id = ?;`, [cycleId]);
   await execSql(`DELETE FROM cycles WHERE id = ?;`, [cycleId]);
 };
@@ -475,8 +503,9 @@ export const upsertSymptomEntry = async (entry: any) => {
       headache = ?,
       fatigue_score = ?,
       stress_score = ?,
+      extended_symptoms = ?,
       flow_intensity = ?,
-      clots = ?,
+      clots_size = ?,
       spotting = ?,
       sleep_hours = ?,
       sleep_quality = ?,
@@ -502,7 +531,7 @@ export const upsertSymptomEntry = async (entry: any) => {
         entry.stress_score ?? null,
         entry.extended_symptoms ? JSON.stringify(entry.extended_symptoms) : null,
         entry.flow_intensity ?? null,
-        entry.clots ? 1 : 0,
+        entry.clots_size ?? null,
         entry.spotting ? 1 : 0,
         entry.sleep_hours ?? null,
         entry.sleep_quality ?? null,

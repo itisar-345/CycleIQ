@@ -6,7 +6,7 @@ import { Stack, router, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
 import "react-native-reanimated";
-import { startSyncEngine } from "@/utils/syncEngine";
+import { startSyncEngine, markDbReady } from "@/utils/syncEngine";
 import {
   requestNotificationPermission,
   scheduleDailyLogReminder,
@@ -24,6 +24,7 @@ export default function RootLayout() {
   const { isOnboarded, notificationsEnabled, notificationPrefs, postPillMode, postPillStartDate } = useAppStore();
   const segments = useSegments();
   const [mounted, setMounted] = useState(false);
+  const [dbReady, setDbReady] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -31,13 +32,13 @@ export default function RootLayout() {
 
   useEffect(() => {
     initDb()
-      .then(() => { startSyncEngine(); })
+      .then(() => { markDbReady(); setDbReady(true); startSyncEngine(); })
       .catch((error) => { console.error("Database initialization error:", error); });
   }, []);
 
   // Wire up all scheduled notifications after onboarding
   useEffect(() => {
-    if (!isOnboarded) return;
+    if (!isOnboarded || !dbReady) return;
     const setupNotifications = async () => {
       const granted = await requestNotificationPermission();
       if (!granted) return;
@@ -63,7 +64,7 @@ export default function RootLayout() {
       }
     };
     setupNotifications();
-  }, [isOnboarded, notificationsEnabled, notificationPrefs]);
+  }, [isOnboarded, dbReady, notificationsEnabled, notificationPrefs]);
 
   useEffect(() => {
     if (!mounted) return;

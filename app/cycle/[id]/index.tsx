@@ -1,5 +1,6 @@
 import { Colors } from '@/constants/theme';
 import { getAllCycles, getCycleEntries, getCyclePhases, getDayOfCycle, getPhaseForDay } from '@/database';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAppStore } from '@/store';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useState } from 'react';
@@ -8,8 +9,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function CycleDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
-const colorScheme = useAppStore(state => state.currentMode ?? 'light') as keyof typeof Colors;
-const theme = Colors[colorScheme];
+  const colorScheme = useColorScheme() ?? 'light';
+  const theme = Colors[colorScheme];
   const [cycle, setCycle] = useState<any>(null);
   const [entries, setEntries] = useState<any[]>([]);
   const [phases, setPhases] = useState<any[]>([]);

@@ -1,6 +1,7 @@
 import { Colors } from "@/constants/theme";
 import { closeCycle, createCycle, getLatestCycle, getDayOfCycle, getPhaseForDay, getCyclePredictions, generateInsights, CycleInsight } from "@/database";
 import { PredictionResult } from "@/utils/predictions";
+import { scheduleAllCycleNotifications } from "@/utils/notifications";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useAppStore } from "@/store";
@@ -67,6 +68,11 @@ export default function HomeScreen() {
         
         const stats = await getCyclePredictions(currentMode, postPillMode, postPillStartDate ?? null);
         setPredictionStats(stats);
+
+        // Schedule all cycle-aware notifications in one go
+        if (stats.predictedStartISO) {
+          await scheduleAllCycleNotifications(stats);
+        }
         
         const generatedInsights = await generateInsights(currentMode);
         const validInsights = generatedInsights.filter((i: CycleInsight) => !dismissedInsights.includes(i.title));
@@ -119,6 +125,11 @@ export default function HomeScreen() {
             // Refresh prediction immediately after new cycle is created
             const stats = await getCyclePredictions(currentMode, postPillMode, postPillStartDate ?? null);
             setPredictionStats(stats);
+            // Schedule period-day self-care & nutrition notifications
+            await scheduleAllCycleNotifications(
+              stats,
+              new Date(startDate)
+            );
           } catch (error) {
             console.error("Failed starting period", error);
             Alert.alert(
@@ -154,43 +165,6 @@ export default function HomeScreen() {
   const getFlareDuration = () => {
     if (!flareStartDate) return 1;
     return differenceInDays(new Date(), parseISO(flareStartDate)) + 1;
-  };
-
-  const generatePrediction = () => {
-    if (!latestStartDate) return "Log your first period to start getting predictions.";
-    if (!predictionStats) return "Loading prediction...";
-    if (predictionStats.model === "none") return predictionStats.label;
-
-    const lines: string[] = [];
-
-    // Window
-    if (predictionStats.windowStartISO && predictionStats.windowEndISO) {
-      const start = format(parseISO(predictionStats.windowStartISO), "MMM d");
-      const end = format(parseISO(predictionStats.windowEndISO), "MMM d");
-      const center = predictionStats.predictedStartISO
-        ? format(parseISO(predictionStats.predictedStartISO), "MMM d")
-        : null;
-      lines.push(`Next ${cycleTerm}: likely ${start}–${end}${center ? ` (centre ${center})` : ""}`);
-    }
-
-    // Confidence
-    const pct = Math.round(predictionStats.confidence * 100);
-    const modelLabel =
-      predictionStats.model === "full-rules" ? "Full rules" :
-      predictionStats.model === "weighted-average" ? "Weighted avg" : "Median";
-    lines.push(`${modelLabel} · ${pct}% confidence`);
-
-    // MAE
-    if (predictionStats.mae !== null) {
-      lines.push(`Historical accuracy: ±${predictionStats.mae} days`);
-    }
-
-    // Outlier warning
-    if (predictionStats.outlierFlagged) {
-      lines.push("⚠️ Last cycle was unusually long — window is wider than normal.");
-    }
-
-    return lines.join("\n");
   };
 
   return (
@@ -285,33 +259,78 @@ export default function HomeScreen() {
           </TouchableOpacity>
         )}
 
-        {/* Cycle Overview & GPR Predictions */}
-        <View
-          style={[
-            styles.card,
-            { backgroundColor: theme.surface, borderColor: theme.border },
-          ]}
-        >
-          <Text style={[styles.cardTitle, { color: theme.text }]}>
-            Cycle Status
-          </Text>
+        {/* Cycle Overview */}
+        <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+          <Text style={[styles.cardTitle, { color: theme.text }]}>Cycle Status</Text>
           <View style={styles.circleContainer}>
             <View style={[styles.cycleCircle, { borderColor: theme.tint }]}>
-              <Text style={[styles.dayText, { color: theme.tint }]}>
-                Day {currentCycleDay}
-              </Text>
-              <Text style={[styles.subDayText, { color: theme.textSecondary }]}>
-                of approx. {cycleLength}
-              </Text>
+              <Text style={[styles.dayText, { color: theme.tint }]}>Day {currentCycleDay}</Text>
+              <Text style={[styles.subDayText, { color: theme.textSecondary }]}>of approx. {cycleLength}</Text>
               <Text style={{ color: theme.text, marginTop: 8, fontWeight: 'bold' }}>
                 {currentPhase.toUpperCase()} PHASE
               </Text>
             </View>
           </View>
-          <Text style={[styles.predictionText, { color: theme.textSecondary }]}>
-            {generatePrediction()}
-          </Text>
         </View>
+
+        {/* Next Period Prediction Card */}
+        {predictionStats && predictionStats.model !== "none" ? (
+          <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.tint, borderWidth: 2, alignItems: 'flex-start' }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+              <Text style={{ fontSize: 22 }}>🔮</Text>
+              <Text style={[styles.cardTitle, { color: theme.text, marginBottom: 0 }]}>Next {cycleTerm.charAt(0).toUpperCase() + cycleTerm.slice(1)} Prediction</Text>
+            </View>
+
+            {predictionStats.predictedStartISO && (
+              <Text style={{ fontSize: 28, fontWeight: 'bold', color: theme.tint, marginBottom: 4 }}>
+                {format(parseISO(predictionStats.predictedStartISO), 'MMM d')}
+              </Text>
+            )}
+
+            {predictionStats.windowStartISO && predictionStats.windowEndISO && (
+              <Text style={{ color: theme.textSecondary, fontSize: 15, marginBottom: 12 }}>
+                Window: {format(parseISO(predictionStats.windowStartISO), 'MMM d')} – {format(parseISO(predictionStats.windowEndISO), 'MMM d')}
+              </Text>
+            )}
+
+            {/* Confidence bar */}
+            <View style={{ width: '100%', marginBottom: 8 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
+                <Text style={{ color: theme.textSecondary, fontSize: 13 }}>Confidence</Text>
+                <Text style={{ color: theme.tint, fontWeight: 'bold', fontSize: 13 }}>
+                  {Math.round(predictionStats.confidence * 100)}%
+                </Text>
+              </View>
+              <View style={{ width: '100%', height: 8, borderRadius: 4, backgroundColor: theme.border, overflow: 'hidden' }}>
+                <View style={{ width: `${Math.round(predictionStats.confidence * 100)}%`, height: 8, borderRadius: 4, backgroundColor: theme.tint }} />
+              </View>
+            </View>
+
+            {predictionStats.mae !== null && (
+              <Text style={{ color: theme.textSecondary, fontSize: 13, marginTop: 4 }}>
+                Historical accuracy: ±{predictionStats.mae} days
+              </Text>
+            )}
+
+            {predictionStats.outlierFlagged && (
+              <Text style={{ color: theme.error, fontSize: 13, marginTop: 6 }}>
+                ⚠️ Last cycle was unusually long — window is wider than normal.
+              </Text>
+            )}
+
+            <Text style={{ color: theme.textSecondary, fontSize: 11, marginTop: 10 }}>
+              {predictionStats.label} · Not medical advice
+            </Text>
+          </View>
+        ) : predictionStats?.model === "none" ? (
+          <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border, alignItems: 'flex-start' }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+              <Text style={{ fontSize: 22 }}>🔮</Text>
+              <Text style={[styles.cardTitle, { color: theme.text, marginBottom: 0 }]}>Predictions</Text>
+            </View>
+            <Text style={{ color: theme.textSecondary }}>{predictionStats.label}</Text>
+          </View>
+        ) : null}
 
         {/* Pain management card — suppressed if medication already logged today */}
         {activePeriodId && !medicationLoggedToday && (
@@ -445,12 +464,6 @@ const styles = StyleSheet.create({
   },
   dayText: { fontSize: 40, fontWeight: "bold" },
   subDayText: { fontSize: 16, marginTop: 4 },
-  predictionText: {
-    fontSize: 15,
-    textAlign: "center",
-    marginTop: 16,
-    lineHeight: 22,
-  },
   logButton: { padding: 18, borderRadius: 16, alignItems: "center" },
   logButtonText: { color: "#FFF", fontSize: 18, fontWeight: "bold" },
 });

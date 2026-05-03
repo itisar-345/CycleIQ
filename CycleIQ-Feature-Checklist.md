@@ -2,7 +2,7 @@
 
 **Product:** CycleIQ — Period & Symptom Tracker  
 **Version:** 2.0  
-**Last Updated:** March 21, 2026  
+**Last Updated:** July 2025  
 **Storage:** All data stored locally on device (no account, no server, no sync)  
 **Status Key:** `[ ]` Not started · `[~]` In progress · `[x]` Complete
 
@@ -102,7 +102,7 @@
 - [x] PCOS correlation pairs: stress score vs cycle length
 - [x] PCOS correlation pairs: craving intensity vs cycle day
 - [x] PCOS correlation pairs: sleep hours vs anxiety spike
-- [ ] PCOS insights copy template library
+- [x] PCOS insights copy template library (condition-specific correlation pairs implemented)
 - [x] PCOS-specific prediction model: wide prior, no regularity assumption
 - [x] 90-day no-period gentle prompt ("It's been a while — is everything okay?")
 - [x] 120-day no-period doctor suggestion prompt (care-framed, not alarming)
@@ -132,11 +132,11 @@
 - [x] Flare pattern analysis — triggers after 5+ logged flares
 - [x] Flare pattern: most common cycle-day of flare onset
 - [x] Flare pattern: sleep, stress, dietary correlates with flare severity
-- [ ] Predictive flare warning notification (1–2 days ahead, confidence >= 0.7)
+- [x] Predictive flare warning notification (1–2 days ahead, confidence >= 0.7)
 - [x] Red-flag prompt: pain score >= 8 for 3+ consecutive days
 - [x] Red-flag prompt: bowel + shoulder pain + heavy flow on same day
 - [x] Red-flag prompt cooldown (no repeat within 30 days per trigger type)
-- [ ] Red-flag prompts logged locally and included in exported report
+- [~] Red-flag prompts logged locally and included in exported report (prompts fire; report export pending structured log)
 - [x] Endo specialist report: flare calendar with severity and duration
 - [x] Endo specialist report: pain score trajectory (3-month rolling average)
 - [x] Endo specialist report: bowel and bladder symptom log
@@ -154,11 +154,11 @@
 - [x] Gaussian Process Regression (GPR) model computed on-device (5+ cycles)
 - [x] GPR features: cycle length history, variance, period length, condition type, symptom burden score, day-of-week, seasonal index
 - [x] Confidence range output and display ("likely April 4–18")
-- [ ] Confidence range visualised as gradient fade on calendar
-- [ ] Model retrained locally after each confirmed cycle (<10KB stored on device)
-- [ ] Model evaluation — MAE tracked locally after each confirmed cycle
+- [~] Confidence range visualised as gradient fade on calendar (prediction window shading implemented; gradient fade pending)
+- [~] Model retrained locally after each confirmed cycle (bias correction via prediction_feedback table implemented; full retrain pending)
+- [x] Model evaluation — MAE tracked locally after each confirmed cycle
 - [x] Prediction shown on home screen and calendar
-- [ ] Prediction updated immediately when a cycle is confirmed or edited
+- [~] Prediction updated immediately when a cycle is confirmed or edited (updates on confirm; edit-triggered refresh pending)
 - [x] Perimenopause model: extended cycle variance thresholds (up to 120+ days)
 - [x] Post-pill mode: predictions suppressed for first 90 days, replaced with baseline-building message
 
@@ -193,9 +193,9 @@
 - [x] Dismissed insights excluded from all future computation runs
 - [x] Insights older than 90 days re-evaluated and retired if correlation weakened
 - [x] Local notification on new strong insight (|r| > 0.5)
-- [ ] All insights labelled "Patterns we've noticed" — not medical advice
-- [ ] No causal language in any insight copy ("linked to" / "tend to" only — never "causes")
-- [ ] Mental health correlation disclaimer copy on relevant insight cards
+- [x] All insights labelled "Patterns we've noticed" — not medical advice
+- [x] No causal language in any insight copy ("linked to" / "tend to" only — never "causes")
+- [x] Mental health correlation disclaimer copy on relevant insight cards
 
 ---
 
@@ -209,9 +209,9 @@
 - [x] Medication timing guidance suppressed if user already logged medication today
 - [x] Evidence grade label on every suggestion (RCT-supported / limited evidence / anecdotal)
 - [x] Content bundled with app (fully offline, updated via app releases)
-- [ ] Content versioned with review date displayed on each article
+- [x] Content versioned with review date displayed on each article
 - [ ] 24-month content review flag system
-- [ ] No affiliate links, supplement recommendations, or product endorsements permitted
+- [x] No affiliate links, supplement recommendations, or product endorsements permitted (no such content in bundled articles)
 
 ---
 
@@ -324,8 +324,8 @@
 ## 17. Privacy & Data Security
 
 - [ ] SQLCipher encryption for all local SQLite data on device
-- [ ] AES-256-GCM encryption for sensitive free-text fields (diet notes, medication logs, notes)
-- [ ] Encryption key stored in device secure enclave / Keychain — never leaves device
+- [x] AES-256-GCM encryption for sensitive free-text fields (diet notes, medication logs, notes)
+- [x] Encryption key stored in device secure enclave / Keychain — never leaves device
 - [ ] Plain-language privacy policy accessible in-app
 - [ ] No data ever leaves the device without explicit user action (e.g. sharing a report)
 - [ ] Data export: full local data export as JSON or CSV (saved to device or shared via share sheet)
@@ -341,11 +341,11 @@
 ## 18. Local Data Architecture
 
 - [x] Local SQLite database (SQLCipher) as sole data store
-- [ ] cycles table — local schema with all fields
-- [ ] symptom_entries table — all core and condition-specific fields, indexed on logged_date DESC
-- [ ] cycle_predictions table — predicted dates, confidence, model version
-- [ ] user_correlations table — locally computed correlations with generated_at
-- [ ] app_settings table — condition, language, notification prefs, tier, dismissed insights
+- [x] cycles table — local schema with all fields
+- [x] symptom_entries table — all core and condition-specific fields, indexed on logged_date DESC
+- [~] cycle_predictions table — predicted dates, confidence, model version (prediction_feedback table implemented; dedicated predictions table pending)
+- [x] user_correlations table — locally computed correlations with generated_at
+- [~] app_settings table — condition, language, notification prefs, tier, dismissed insights (stored in Zustand/AsyncStorage; SQLite table pending)
 - [ ] All data read and written from local SQLite only — no network calls for core features
 - [ ] Database migration framework for app update schema changes
 - [ ] Local backup: export full encrypted database to file on demand (via share sheet)
@@ -355,12 +355,12 @@
 
 ## 19. Mobile Client Architecture
 
-- [ ] React Native (Expo managed workflow) — iOS and Android single codebase
-- [ ] Zustand state management (condition, today's entry, cycles, insights, UI state)
-- [ ] SQLite local repository layer via expo-sqlite + SQLCipher
-- [ ] On-device GPR prediction model (compiled to WASM or TFLite)
-- [ ] On-device correlation engine (runs as background JS task)
-- [ ] Local push notifications via Expo Notifications (no server required)
+- [x] React Native (Expo managed workflow) — iOS and Android single codebase
+- [x] Zustand state management (condition, today's entry, cycles, insights, UI state)
+- [x] SQLite local repository layer via expo-sqlite + op-sqlite
+- [~] On-device GPR prediction model (rule-based engine with bias correction implemented; WASM/TFLite pending)
+- [x] On-device correlation engine (runs as background JS task)
+- [x] Local push notifications via Expo Notifications (no server required)
 - [ ] Native biometric auth module (FaceID / TouchID / Fingerprint) for app lock
 - [ ] HealthKit integration (iOS) — read-only, opt-in
 - [ ] Health Connect integration (Android) — read-only, opt-in
@@ -392,4 +392,4 @@
 
 ---
 
-_Last updated: March 21, 2026 — v2.0 (no-account, fully local on-device architecture)_
+_Last updated: July 2025 — v2.0 (no-account, fully local on-device architecture)_

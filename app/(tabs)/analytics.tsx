@@ -1,9 +1,11 @@
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { Colors } from "@/constants/theme";
-import { getAllCycles, getPhaseAverages, generateInsights, persistAndRetireInsights, CycleInsight, PhaseAverage } from "@/database";
+import { getAllCycles, getPhaseAverages, generateInsights, persistAndRetireInsights, CycleInsight, PhaseAverage, getCyclePredictions } from "@/database";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useAppStore } from "@/store";
 import { scheduleInsightNotification, scheduleFlareWarning } from "@/utils/notifications";
+import { PredictionResult } from "@/utils/predictions";
+import { format, parseISO } from "date-fns";
 import React, { useEffect, useState } from "react";
 import {
   Alert,
@@ -23,11 +25,14 @@ export default function AnalyticsScreen() {
   const [cycles, setCycles] = useState<any[]>([]);
   const [phaseAverages, setPhaseAverages] = useState<PhaseAverage[]>([]);
   const [insights, setInsights] = useState<CycleInsight[]>([]);
+  const [prediction, setPrediction] = useState<PredictionResult | null>(null);
 
   useEffect(() => {
     const loadData = async () => {
       const allCycles = await getAllCycles();
       setCycles(allCycles);
+      const pred = await getCyclePredictions(currentMode, false, null);
+      setPrediction(pred);
       if (allCycles.length > 0) {
         const avgs = await getPhaseAverages(allCycles[0].id);
         setPhaseAverages(avgs);
@@ -90,6 +95,44 @@ export default function AnalyticsScreen() {
         <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
           Patterns we&apos;ve noticed in your data.
         </Text>
+
+        {/* Prediction Summary Card */}
+        {prediction && prediction.model !== "none" && (
+          <View style={[styles.predCard, { backgroundColor: theme.surface, borderColor: theme.tint }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+              <Text style={{ fontSize: 20 }}>🔮</Text>
+              <Text style={{ fontSize: 18, fontWeight: 'bold', color: theme.text }}>Next Period Prediction</Text>
+            </View>
+            {prediction.predictedStartISO && (
+              <Text style={{ fontSize: 26, fontWeight: 'bold', color: theme.tint, marginBottom: 2 }}>
+                {format(parseISO(prediction.predictedStartISO), 'MMMM d, yyyy')}
+              </Text>
+            )}
+            {prediction.windowStartISO && prediction.windowEndISO && (
+              <Text style={{ color: theme.textSecondary, marginBottom: 10 }}>
+                Likely window: {format(parseISO(prediction.windowStartISO), 'MMM d')} – {format(parseISO(prediction.windowEndISO), 'MMM d')}
+              </Text>
+            )}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
+              <Text style={{ color: theme.textSecondary, fontSize: 13 }}>Confidence</Text>
+              <Text style={{ color: theme.tint, fontWeight: 'bold', fontSize: 13 }}>{Math.round(prediction.confidence * 100)}%</Text>
+            </View>
+            <View style={{ width: '100%', height: 8, borderRadius: 4, backgroundColor: theme.border, overflow: 'hidden', marginBottom: 8 }}>
+              <View style={{ width: `${Math.round(prediction.confidence * 100)}%`, height: 8, borderRadius: 4, backgroundColor: theme.tint }} />
+            </View>
+            {prediction.mae !== null && (
+              <Text style={{ color: theme.textSecondary, fontSize: 13 }}>Historical accuracy: ±{prediction.mae} days</Text>
+            )}
+            {prediction.outlierFlagged && (
+              <Text style={{ color: theme.error ?? '#E53E3E', fontSize: 13, marginTop: 4 }}>
+                ⚠️ Last cycle was unusually long — window is wider.
+              </Text>
+            )}
+            <Text style={{ color: theme.textSecondary, fontSize: 11, marginTop: 8 }}>
+              {prediction.label} · Not medical advice
+            </Text>
+          </View>
+        )}
 
         {cycles.length < 3 && (
           <View
@@ -258,4 +301,5 @@ const styles = StyleSheet.create({
   insightTitle: { fontSize: 18, fontWeight: "bold", marginBottom: 8 },
   patternLabel: { fontSize: 11, fontWeight: "600", letterSpacing: 0.5, marginBottom: 6, textTransform: "uppercase" },
   mhDisclaimer: { padding: 10, borderRadius: 8, marginBottom: 12 },
+  predCard: { padding: 20, borderRadius: 16, borderWidth: 2, marginBottom: 20 },
 });

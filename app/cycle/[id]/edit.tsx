@@ -1,6 +1,6 @@
 import { Colors } from "@/constants/theme";
 import { getAllCycles, updateCycle } from "@/database";
-import { useAppStore } from "@/store";
+import { useColorScheme } from "@/hooks/use-color-scheme";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
@@ -16,9 +16,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function CycleEdit() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const colorScheme = useAppStore(
-    (state) => state.currentMode ?? "light",
-  ) as any;
+  const colorScheme = useColorScheme() ?? "light";
   const theme = Colors[colorScheme];
   const [cycle, setCycle] = useState<any>(null);
   const [startDate, setStartDate] = useState("");

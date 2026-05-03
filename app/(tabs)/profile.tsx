@@ -125,10 +125,18 @@ export default function ProfileScreen() {
           <Text style={[styles.sectionTitle, { color: theme.text }]}>Notifications & Reminders</Text>
 
           {[
-            { key: 'period', label: 'Period Reminders' },
-            { key: 'insights', label: 'Predictive Insights' },
-            { key: 'ovulation', label: 'Ovulation Window' },
-            { key: 'flares', label: 'Flare & Symptom Warnings' },
+            { key: 'period',           label: '🩸 Period Reminders' },
+            { key: 'padReminder',      label: '🛍️ Stock Up on Pads (5 days before)' },
+            { key: 'hydrationNudge',   label: '💧 Hydration Nudge (3 days before)' },
+            { key: 'ironFoodReminder', label: '🥩 Anti-Inflam Food Tips (2 days before)' },
+            { key: 'heatPadReminder',  label: '🔥 Heat Pad Reminder (predicted Day 1)' },
+            { key: 'periodDayTips',    label: '🌸 Period Day Tips (Days 1–5, AM & PM)' },
+            { key: 'moodCheckIn',      label: '💭 PMS Mood Check-In (Luteal phase)' },
+            { key: 'insights',         label: '✨ Predictive Insights' },
+            { key: 'ovulation',        label: '🌸 Ovulation Window' },
+            { key: 'flares',           label: '💜 Flare & Symptom Warnings' },
+            ...(currentMode === 'endo' ? [{ key: 'endoDayTips', label: '💜 Endo Full-Cycle Tips (Days 1–5 + Recovery)' }] : []),
+            ...(currentMode === 'pcos' ? [{ key: 'pcosNotifications', label: '💚 PCOS Cycle Notifications' }] : []),
           ].map(({ key, label }) => (
             <View key={key} style={styles.toggleRow}>
               <Text style={[styles.toggleText, { color: theme.text }]}>{label}</Text>

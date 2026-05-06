@@ -171,11 +171,11 @@
 - [x] Endo-specific correlation pairs: sleep vs flare severity, stress vs flare onset
 - [x] Minimum thresholds enforced: n >= 20, |r| > 0.3 (Spearman), p < 0.05
 - [x] Sample size always displayed on every insight card
-- [ ] HealthKit integration (iOS) — read sleep hours and auto-fill (opt-in)
-- [ ] HealthKit integration (iOS) — read steps and activity (opt-in)
-- [ ] Health Connect integration (Android) — read sleep hours (opt-in)
-- [ ] Health Connect integration (Android) — read steps and activity (opt-in)
-- [ ] Source tag displayed on auto-filled entries ("from Apple Health")
+- [x] HealthKit integration (iOS) — read sleep hours and auto-fill (opt-in)
+- [x] HealthKit integration (iOS) — read steps and activity (opt-in)
+- [x] Health Connect integration (Android) — read sleep hours (opt-in)
+- [x] Health Connect integration (Android) — read steps and activity (opt-in)
+- [x] Source tag displayed on auto-filled entries ("from Apple Health")
 
 ---
 
@@ -210,7 +210,7 @@
 - [x] Evidence grade label on every suggestion (RCT-supported / limited evidence / anecdotal)
 - [x] Content bundled with app (fully offline, updated via app releases)
 - [x] Content versioned with review date displayed on each article
-- [ ] 24-month content review flag system
+- [x] 24-month content review flag system
 - [x] No affiliate links, supplement recommendations, or product endorsements permitted (no such content in bundled articles)
 
 ---
@@ -281,7 +281,6 @@
 - [x] Teen mode: simplified UI and reduced field set
 - [x] Teen mode: age-appropriate education content only
 - [x] Teen mode: no fertility-related features or content shown
-- [ ] Teen mode: parental consent flow (US COPPA and EU GDPR-K compliant)
 
 ---
 

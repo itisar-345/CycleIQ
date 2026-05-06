@@ -77,7 +77,7 @@ export default function AnalyticsScreen() {
       }
     };
     loadData();
-  }, [currentMode]);
+  }, [currentMode, notificationPrefs.flares, notificationPrefs.insights]);
   const visibleInsights = insights.filter((i) => !dismissedInsights.includes(i.title));
 
   const dismissInsight = (title: string) => {

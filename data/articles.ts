@@ -65,6 +65,23 @@ export const OFFLINE_ARTICLES: Article[] = [
   }
 ];
 
+export const CONTENT_REVIEW_WINDOW_MONTHS = 24;
+
+export const getArticleReviewStatus = (
+  article: Article,
+  asOf: Date = new Date(),
+) => {
+  const reviewedAt = new Date(article.lastReviewed);
+  const nextReviewAt = new Date(reviewedAt);
+  nextReviewAt.setMonth(nextReviewAt.getMonth() + CONTENT_REVIEW_WINDOW_MONTHS);
+  const isReviewDue = nextReviewAt <= asOf;
+  return {
+    isReviewDue,
+    nextReviewDate: nextReviewAt.toISOString(),
+    label: isReviewDue ? "Review due" : `Review by ${nextReviewAt.toISOString().split("T")[0]}`,
+  };
+};
+
 export const getFilteredArticles = (mode: string, query: string = "") => {
   let articles = OFFLINE_ARTICLES;
 

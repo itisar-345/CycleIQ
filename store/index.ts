@@ -1,6 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
+import type { HealthImportPrefs } from "@/utils/healthIntegrations";
 
 export type AppMode = "standard" | "pcos" | "endo" | "peri" | "teen";
 
@@ -20,6 +21,7 @@ export interface EndoSetup {
 
 export interface NotificationPrefs {
   period: boolean;
+  dailyLog: boolean;
   insights: boolean;
   ovulation: boolean;
   flares: boolean;
@@ -63,6 +65,7 @@ interface AppState {
   postPillStartDate: string | null;
   pcosWidePrediction: boolean;
   notificationPrefs: NotificationPrefs;
+  healthImportPrefs: HealthImportPrefs;
   dismissedInsights: string[];
 
   consecutiveLowMoodDays: number; // For safeguarding
@@ -101,6 +104,7 @@ interface AppState {
   setLanguagePreset: (preset: "default" | "inclusive" | "custom") => void;
   setCustomTerms: (terms: { cycle?: string; flow?: string; body?: string }) => void;
   setNotificationPrefs: (prefs: Partial<NotificationPrefs>) => void;
+  setHealthImportPrefs: (prefs: Partial<HealthImportPrefs>) => void;
   dismissInsight: (title: string) => void;
 }
 
@@ -114,6 +118,7 @@ const persistSettingsToSqlite = (state: AppState) => {
         customTerms: state.customTerms,
         notificationsEnabled: state.notificationsEnabled,
         notificationPrefs: state.notificationPrefs,
+        healthImportPrefs: state.healthImportPrefs,
         dismissedInsights: state.dismissedInsights,
       }),
     )
@@ -156,6 +161,7 @@ export const useAppStore = create<AppState>()(
       isTeen: false as boolean,
       notificationPrefs: {
         period: true,
+        dailyLog: true,
         insights: true,
         ovulation: false,
         flares: true,
@@ -172,6 +178,12 @@ export const useAppStore = create<AppState>()(
         quietHoursStart: 22,
         quietHoursEnd: 8,
       } as NotificationPrefs,
+      healthImportPrefs: {
+        appleHealthSleep: false,
+        appleHealthActivity: false,
+        healthConnectSleep: false,
+        healthConnectActivity: false,
+      } as HealthImportPrefs,
       dismissedInsights: [] as string[],
 
       setOnboarded: (status) => set({ isOnboarded: status }),
@@ -236,6 +248,10 @@ export const useAppStore = create<AppState>()(
       },
       setNotificationPrefs: (prefs) => {
         set((state) => ({ notificationPrefs: { ...state.notificationPrefs, ...prefs } }));
+        persistSettingsToSqlite(get());
+      },
+      setHealthImportPrefs: (prefs) => {
+        set((state) => ({ healthImportPrefs: { ...state.healthImportPrefs, ...prefs } }));
         persistSettingsToSqlite(get());
       },
       dismissInsight: (title) => 

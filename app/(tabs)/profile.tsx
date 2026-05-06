@@ -1,4 +1,4 @@
-import { StyleSheet, View, Text, Switch, ScrollView, TouchableOpacity, TextInput } from 'react-native';
+import { Alert, Platform, StyleSheet, View, Text, Switch, ScrollView, TouchableOpacity, TextInput } from 'react-native';
 import { router } from 'expo-router';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { differenceInDays, parseISO } from 'date-fns';
 import { scheduleDailyLogReminder } from '@/utils/notifications';
+import { isHealthBridgeAvailable, requestHealthPermissions } from '@/utils/healthIntegrations';
 
 export default function ProfileScreen() {
   const colorScheme = useColorScheme() ?? 'light';
@@ -14,6 +15,7 @@ export default function ProfileScreen() {
   const {
     currentMode, setMode,
     notificationPrefs, setNotificationPrefs,
+    healthImportPrefs, setHealthImportPrefs,
     languagePreset, setLanguagePreset,
     customTerms, setCustomTerms,
     postPillMode, postPillStartDate,
@@ -41,7 +43,20 @@ export default function ProfileScreen() {
   const handleDailyHourChange = async (delta: number) => {
     const newHour = Math.max(8, Math.min(21, (notificationPrefs.dailyLogHour ?? 20) + delta));
     setNotificationPrefs({ dailyLogHour: newHour });
-    await scheduleDailyLogReminder(notificationPrefs.period, newHour);
+    await scheduleDailyLogReminder(notificationPrefs.dailyLog, newHour);
+  };
+
+  const handleHealthToggle = async (key: keyof typeof healthImportPrefs, value: boolean) => {
+    const nextPrefs = { ...healthImportPrefs, [key]: value };
+    setHealthImportPrefs({ [key]: value });
+    if (!value) return;
+    const granted = await requestHealthPermissions(nextPrefs);
+    if (!granted && !isHealthBridgeAvailable()) {
+      Alert.alert(
+        "Health integration unavailable",
+        "This build needs the CycleIQ native health bridge to read Apple Health or Health Connect data. Your opt-in preference was saved and will work in a native build that includes it.",
+      );
+    }
   };
 
   return (
@@ -126,6 +141,7 @@ export default function ProfileScreen() {
 
           {[
             { key: 'period',           label: '🩸 Period Reminders' },
+            { key: 'dailyLog',         label: 'Daily Log Reminder' },
             { key: 'padReminder',      label: '🛍️ Stock Up on Pads (5 days before)' },
             { key: 'hydrationNudge',   label: '💧 Hydration Nudge (3 days before)' },
             { key: 'ironFoodReminder', label: '🥩 Anti-Inflam Food Tips (2 days before)' },
@@ -194,6 +210,52 @@ export default function ProfileScreen() {
               </View>
             ))}
           </View>
+        </View>
+
+        <View style={[styles.section, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>Health Data Import</Text>
+          <Text style={[styles.description, { color: theme.textSecondary }]}>
+            Read-only, opt-in auto-fill for sleep, steps, and activity.
+          </Text>
+          {Platform.OS === 'ios' ? (
+            <>
+              <View style={styles.toggleRow}>
+                <Text style={[styles.toggleText, { color: theme.text }]}>Apple Health sleep</Text>
+                <Switch
+                  value={healthImportPrefs.appleHealthSleep}
+                  onValueChange={(val) => handleHealthToggle('appleHealthSleep', val)}
+                  trackColor={{ true: theme.tint }}
+                />
+              </View>
+              <View style={styles.toggleRow}>
+                <Text style={[styles.toggleText, { color: theme.text }]}>Apple Health steps & activity</Text>
+                <Switch
+                  value={healthImportPrefs.appleHealthActivity}
+                  onValueChange={(val) => handleHealthToggle('appleHealthActivity', val)}
+                  trackColor={{ true: theme.tint }}
+                />
+              </View>
+            </>
+          ) : (
+            <>
+              <View style={styles.toggleRow}>
+                <Text style={[styles.toggleText, { color: theme.text }]}>Health Connect sleep</Text>
+                <Switch
+                  value={healthImportPrefs.healthConnectSleep}
+                  onValueChange={(val) => handleHealthToggle('healthConnectSleep', val)}
+                  trackColor={{ true: theme.tint }}
+                />
+              </View>
+              <View style={styles.toggleRow}>
+                <Text style={[styles.toggleText, { color: theme.text }]}>Health Connect steps & activity</Text>
+                <Switch
+                  value={healthImportPrefs.healthConnectActivity}
+                  onValueChange={(val) => handleHealthToggle('healthConnectActivity', val)}
+                  trackColor={{ true: theme.tint }}
+                />
+              </View>
+            </>
+          )}
         </View>
 
         {/* Reports & Export */}

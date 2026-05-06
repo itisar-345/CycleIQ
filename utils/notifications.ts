@@ -1,4 +1,4 @@
-import { useAppStore } from "@/store";
+import { NotificationPrefs, useAppStore } from "@/store";
 import { addDays, format } from "date-fns";
 import Constants from "expo-constants";
 import type { PredictionResult } from "./predictions";
@@ -7,6 +7,9 @@ const isExpoGo = Constants.executionEnvironment === "storeClient";
 
 // Lazy-load expo-notifications so the module never executes in Expo Go
 const getNotifications = () => import("expo-notifications");
+const PERIOD_DAY_IDS = ["pd1-am","pd1-pm","pd2-am","pd2-pm","pd3-am","pd3-pm","pd4-am","pd4-pm","pd5-am","pd5-pm"];
+const ENDO_IDS = ["endo-pre3","endo-pre1","endo-d1-am","endo-d1-pm","endo-d2-am","endo-d2-pm","endo-d3-am","endo-d3-pm","endo-d4-am","endo-d4-pm","endo-d5-am","endo-d5-pm","endo-post1","endo-post3","endo-mid","endo-flare-pre"];
+const PCOS_IDS = ["pcos-d35","pcos-d60","pcos-d90","pcos-pred-wide","pcos-insulin-d3","pcos-insulin-d7","pcos-supplement-am","pcos-supplement-d14","pcos-ovulation-watch","pcos-stress-pre","pcos-skin-d5","pcos-hair-d10","pcos-post-reset","pcos-log-nudge"];
 
 const initHandler = async () => {
   const N = await getNotifications();
@@ -26,8 +29,10 @@ export const requestNotificationPermission = async (): Promise<boolean> => {
   if (isExpoGo) return false;
   try {
     const N = await getNotifications();
-    const { status } = await N.requestPermissionsAsync();
-    return status === "granted";
+    const current = await N.getPermissionsAsync();
+    if (current.granted) return true;
+    const requested = await N.requestPermissionsAsync();
+    return requested.granted || requested.status === "granted";
   } catch {
     return false;
   }
@@ -45,7 +50,9 @@ const safeHour = (preferredHour: number): number => {
 };
 
 const scheduleAt = async (id: string, title: string, body: string, date: Date, hour = 9) => {
-  if (isExpoGo || date <= new Date()) return;
+  if (isExpoGo || Number.isNaN(date.getTime())) return;
+  const scheduledDate = new Date(date.getFullYear(), date.getMonth(), date.getDate(), safeHour(hour), 0);
+  if (scheduledDate <= new Date()) return;
   try {
     const N = await getNotifications();
     await N.scheduleNotificationAsync({
@@ -53,7 +60,7 @@ const scheduleAt = async (id: string, title: string, body: string, date: Date, h
       content: { title, body },
       trigger: {
         type: N.SchedulableTriggerInputTypes.DATE,
-        date: new Date(date.getFullYear(), date.getMonth(), date.getDate(), safeHour(hour), 0),
+        date: scheduledDate,
       },
     });
   } catch { /* non-fatal */ }
@@ -86,6 +93,41 @@ export const scheduleDailyLogReminder = async (enabled: boolean, hourOfDay = 20)
       trigger: { type: N.SchedulableTriggerInputTypes.DAILY, hour: safeHour(hourOfDay), minute: 0 },
     });
   } catch { /* non-fatal */ }
+};
+
+export const cancelCycleNotifications = async () => {
+  await Promise.all([
+    cancelId("period-reminder"),
+    cancelId("daily-log"),
+    cancelId("ovulation-window"),
+    cancelId("flare-warning"),
+    cancelId("pad-reminder"),
+    cancelId("hydration-nudge"),
+    cancelId("anti-inflam-food"),
+    cancelId("heat-pad"),
+    cancelId("mood-checkin"),
+    cancelId("red-flag"),
+    ...PERIOD_DAY_IDS.map(cancelId),
+    ...ENDO_IDS.map(cancelId),
+    ...PCOS_IDS.map(cancelId),
+  ]);
+};
+
+export const cancelPredictiveNotifications = async () => {
+  await Promise.all([
+    cancelId("period-reminder"),
+    cancelId("ovulation-window"),
+    cancelId("flare-warning"),
+    cancelId("pad-reminder"),
+    cancelId("hydration-nudge"),
+    cancelId("anti-inflam-food"),
+    cancelId("heat-pad"),
+    cancelId("mood-checkin"),
+    cancelId("red-flag"),
+    ...PERIOD_DAY_IDS.map(cancelId),
+    ...ENDO_IDS.map(cancelId),
+    ...PCOS_IDS.map(cancelId),
+  ]);
 };
 
 export const scheduleInsightNotification = async (insightTitle: string, enabled: boolean) => {
@@ -152,8 +194,7 @@ export const scheduleMoodCheckIn = async (cycleStartDate: Date, cycleLength: num
 
 export const schedulePeriodDayNotifications = async (periodStartDate: Date, enabled: boolean) => {
   if (isExpoGo) return;
-  const ids = ["pd1-am","pd1-pm","pd2-am","pd2-pm","pd3-am","pd3-pm","pd4-am","pd4-pm","pd5-am","pd5-pm"];
-  await Promise.all(ids.map(cancelId));
+  await Promise.all(PERIOD_DAY_IDS.map(cancelId));
   if (!enabled) return;
   const d = (n: number) => addDays(periodStartDate, n);
   await scheduleAt("pd1-am", "Day 1 🩸 You've got this", "Grab your heat pad 🔥, take ibuprofen if needed & sip warm ginger tea. Be gentle with yourself 🤍", d(0), 8);
@@ -170,8 +211,7 @@ export const schedulePeriodDayNotifications = async (periodStartDate: Date, enab
 
 export const scheduleEndoNotifications = async (prediction: PredictionResult, enabled: boolean) => {
   if (isExpoGo || prediction.model === "none") return;
-  const ids = ["endo-pre3","endo-pre1","endo-d1-am","endo-d1-pm","endo-d2-am","endo-d2-pm","endo-d3-am","endo-d3-pm","endo-d4-am","endo-d4-pm","endo-d5-am","endo-d5-pm","endo-post1","endo-post3","endo-mid","endo-flare-pre"];
-  await Promise.all(ids.map(cancelId));
+  await Promise.all(ENDO_IDS.map(cancelId));
   if (!enabled) return;
   const base = prediction.predictedStartISO ? new Date(prediction.predictedStartISO) : new Date();
   const d = (n: number) => addDays(base, n);
@@ -198,8 +238,7 @@ export const scheduleEndoNotifications = async (prediction: PredictionResult, en
 
 export const schedulePcosNotifications = async (prediction: PredictionResult, enabled: boolean) => {
   if (isExpoGo || prediction.model === "none") return;
-  const ids = ["pcos-d35","pcos-d60","pcos-d90","pcos-pred-wide","pcos-insulin-d3","pcos-insulin-d7","pcos-supplement-am","pcos-supplement-d14","pcos-ovulation-watch","pcos-stress-pre","pcos-skin-d5","pcos-hair-d10","pcos-post-reset","pcos-log-nudge"];
-  await Promise.all(ids.map(cancelId));
+  await Promise.all(PCOS_IDS.map(cancelId));
   if (!enabled) return;
   const base = new Date();
   const d = (n: number) => addDays(base, n);
@@ -249,10 +288,22 @@ export const scheduleRedFlagNotification = async (prediction: PredictionResult, 
 export const scheduleAllCycleNotifications = async (
   prediction: PredictionResult | null,
   actualPeriodStart?: Date | null,
+  prefsOverride?: NotificationPrefs,
+  modeOverride?: string,
 ): Promise<void> => {
-  if (isExpoGo || !prediction || prediction.model === "none") return;
-  const prefs = useAppStore.getState().notificationPrefs;
-  const { currentMode } = useAppStore.getState();
+  if (isExpoGo) return;
+  const state = useAppStore.getState();
+  const prefs = prefsOverride ?? state.notificationPrefs;
+  const currentMode = modeOverride ?? state.currentMode;
+  if (!state.notificationsEnabled) {
+    await cancelCycleNotifications();
+    return;
+  }
+  await scheduleDailyLogReminder(prefs.dailyLog, prefs.dailyLogHour ?? 20);
+  if (!prediction || prediction.model === "none") {
+    await cancelPredictiveNotifications();
+    return;
+  }
   const predictedStartDate = prediction.predictedStartISO ? new Date(prediction.predictedStartISO) : null;
   if (predictedStartDate) {
     await schedulePeriodReminder(predictedStartDate, prefs.period);
@@ -266,8 +317,10 @@ export const scheduleAllCycleNotifications = async (
   }
   if (actualPeriodStart) {
     await schedulePeriodDayNotifications(actualPeriodStart, prefs.periodDayTips);
-    if (currentMode === "endo" && prefs.endoDayTips) await scheduleEndoNotifications(prediction, prefs.endoDayTips);
-    if (currentMode === "pcos" && prefs.pcosNotifications) await schedulePcosNotifications(prediction, prefs.pcosNotifications);
-    await scheduleRedFlagNotification(prediction, prefs.redFlagAlerts ?? true);
   }
+  if (currentMode === "endo") await scheduleEndoNotifications(prediction, prefs.endoDayTips);
+  else await Promise.all(ENDO_IDS.map(cancelId));
+  if (currentMode === "pcos") await schedulePcosNotifications(prediction, prefs.pcosNotifications);
+  else await Promise.all(PCOS_IDS.map(cancelId));
+  await scheduleRedFlagNotification(prediction, prefs.redFlagAlerts ?? true);
 };

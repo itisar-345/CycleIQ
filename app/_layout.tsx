@@ -1,4 +1,4 @@
-import { initDb, getAllCycles } from "@/database";
+import { getCyclePredictions, initDb } from "@/database";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useAppStore } from "@/store";
 import { DarkTheme, DefaultTheme, ThemeProvider } from "@react-navigation/native";
@@ -8,10 +8,9 @@ import { useEffect, useState } from "react";
 import "react-native-reanimated";
 import { startSyncEngine, markDbReady } from "@/utils/syncEngine";
 import {
+  cancelCycleNotifications,
   requestNotificationPermission,
-  scheduleDailyLogReminder,
-  schedulePeriodReminder,
-  scheduleOvulationReminder,
+  scheduleAllCycleNotifications,
 } from "@/utils/notifications";
 
 
@@ -21,7 +20,7 @@ export const unstable_settings = {
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
-  const { isOnboarded, notificationsEnabled, notificationPrefs, postPillMode, postPillStartDate } = useAppStore();
+  const { isOnboarded, notificationsEnabled, notificationPrefs, postPillMode, postPillStartDate, currentMode } = useAppStore();
   const segments = useSegments();
   const [mounted, setMounted] = useState(false);
   const [dbReady, setDbReady] = useState(false);
@@ -40,31 +39,24 @@ export default function RootLayout() {
   useEffect(() => {
     if (!isOnboarded || !dbReady) return;
     const setupNotifications = async () => {
+      if (!notificationsEnabled) {
+        await cancelCycleNotifications();
+        return;
+      }
       const granted = await requestNotificationPermission();
-      if (!granted) return;
-      await scheduleDailyLogReminder(
-        notificationsEnabled && notificationPrefs.period,
-        notificationPrefs.dailyLogHour ?? 20
-      );
+      if (!granted) {
+        await cancelCycleNotifications();
+        return;
+      }
       try {
-        const cycles = await getAllCycles();
-        const { runPredictionEngine } = await import("@/utils/predictions");
-        const stats = runPredictionEngine({ cycles, currentMode: "standard", postPillMode, postPillStartDate: postPillStartDate ?? null });
-        if (stats.model !== "none" && cycles.length > 0 && stats.predictedStartISO) {
-          const predictedStart = new Date(stats.predictedStartISO);
-          await schedulePeriodReminder(predictedStart, notificationsEnabled && notificationPrefs.period);
-          await scheduleOvulationReminder(
-            new Date(cycles[0].start_date),
-            cycles[0].cycle_length || 28,
-            notificationsEnabled && notificationPrefs.ovulation
-          );
-        }
+        const prediction = await getCyclePredictions(currentMode, postPillMode, postPillStartDate ?? null);
+        await scheduleAllCycleNotifications(prediction, null, notificationPrefs, currentMode);
       } catch (e) {
         console.warn("Notification scheduling failed", e);
       }
     };
     setupNotifications();
-  }, [isOnboarded, dbReady, notificationsEnabled, notificationPrefs]);
+  }, [isOnboarded, dbReady, notificationsEnabled, notificationPrefs, currentMode, postPillMode, postPillStartDate]);
 
   useEffect(() => {
     if (!mounted) return;

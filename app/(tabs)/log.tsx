@@ -3,6 +3,7 @@ import { createRedFlagPromptLog, createSymptomEntry, getAllEntries, saveFlareEnd
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useAppStore } from "@/store";
 import { encryptField, decryptField } from "@/utils/fieldEncryption";
+import { readDailyHealthMetrics } from "@/utils/healthIntegrations";
 import { router } from "expo-router";
 import React, { useState, useEffect } from "react";
 import {
@@ -32,7 +33,8 @@ export default function LogScreen() {
     flareStartDate,
     isTeen,
     languagePreset,
-    customTerms
+    customTerms,
+    healthImportPrefs
   } = useAppStore();
 
   const [pain, setPain] = useState<number>(0);
@@ -54,6 +56,9 @@ export default function LogScreen() {
   const [sleepQuality, setSleepQuality] = useState<number>(3);
   const [exerciseType, setExerciseType] = useState<string>("None");
   const [exerciseDuration, setExerciseDuration] = useState<number>(0);
+  const [stepsCount, setStepsCount] = useState<number | null>(null);
+  const [healthSleepSource, setHealthSleepSource] = useState<string | null>(null);
+  const [healthActivitySource, setHealthActivitySource] = useState<string | null>(null);
   const [dietNotes, setDietNotes] = useState<string>("");
   const [medicationLog, setMedicationLog] = useState<string>("");
   const [autoFillYesterday, setAutoFillYesterday] = useState<boolean>(false);
@@ -103,6 +108,27 @@ export default function LogScreen() {
   };
 
   useEffect(() => {
+    const populateHealthMetrics = async () => {
+      const metrics = await readDailyHealthMetrics(new Date().toISOString(), healthImportPrefs);
+      if (!metrics) return;
+      if (metrics.sleepHours !== null && metrics.sleepHours !== undefined) {
+        setSleepHours(metrics.sleepHours);
+        setHealthSleepSource(metrics.source);
+      }
+      if (metrics.steps !== null && metrics.steps !== undefined) {
+        setStepsCount(metrics.steps);
+        setHealthActivitySource(metrics.source);
+      }
+      if (metrics.activityMinutes !== null && metrics.activityMinutes !== undefined) {
+        setExerciseDuration(metrics.activityMinutes);
+        setExerciseType("Health activity");
+        setHealthActivitySource(metrics.source);
+      }
+    };
+    populateHealthMetrics();
+  }, [healthImportPrefs]);
+
+  useEffect(() => {
     const populateYesterday = async () => {
       if (!autoFillYesterday) return;
       const entries = await getAllEntries();
@@ -126,9 +152,12 @@ export default function LogScreen() {
         setSpotting(!!latest.spotting);
         setStressScore(latest.stress_score ?? 3);
         setSleepHours(latest.sleep_hours ?? 8);
+        setHealthSleepSource(latest.health_sleep_source ?? null);
         setSleepQuality(latest.sleep_quality ?? 3);
         setExerciseType(latest.exercise_type ?? "None");
         setExerciseDuration(latest.exercise_duration ?? 0);
+        setStepsCount(latest.steps_count ?? null);
+        setHealthActivitySource(latest.health_activity_source ?? null);
         setDietNotes(latest.diet_notes_encrypted ? await decryptField(latest.diet_notes_encrypted) : "");
         setMedicationLog(latest.medication_log_encrypted ? await decryptField(latest.medication_log_encrypted) : "");
       }
@@ -251,6 +280,10 @@ export default function LogScreen() {
         sleep_quality: sleepQuality,
         exercise_type: exerciseType,
         exercise_duration: exerciseDuration,
+        steps_count: stepsCount ?? undefined,
+        activity_minutes: healthActivitySource ? exerciseDuration : undefined,
+        health_sleep_source: healthSleepSource ?? undefined,
+        health_activity_source: healthActivitySource ?? undefined,
         diet_notes_encrypted: dietNotes ? await encryptField(dietNotes) : undefined,
         medication_log_encrypted: medicationLog ? await encryptField(medicationLog) : undefined,
       });
@@ -782,6 +815,11 @@ export default function LogScreen() {
           >
             Sleep Hours (0-12)
           </Text>
+          {healthSleepSource && (
+            <Text style={[styles.sourceTag, { color: theme.tint }]}>
+              from {healthSleepSource}
+            </Text>
+          )}
           <View style={styles.sliderContainer}>
             <Text style={[styles.sliderHint, { color: theme.textSecondary }]}>0</Text>
             <View
@@ -838,6 +876,11 @@ export default function LogScreen() {
           >
             Exercise Duration (minutes)
           </Text>
+          {healthActivitySource && (
+            <Text style={[styles.sourceTag, { color: theme.tint }]}>
+              from {healthActivitySource}{stepsCount !== null ? ` • ${stepsCount.toLocaleString()} steps` : ""}
+            </Text>
+          )}
           <View style={styles.durationRow}>
             <TouchableOpacity style={[styles.adjustBtn, { borderColor: theme.tint }]} onPress={() => setExerciseDuration(Math.max(0, exerciseDuration - 5))}>
               <Text style={{ color: theme.tint }}>-5</Text>
@@ -951,6 +994,12 @@ const styles = StyleSheet.create({
   valueText: {
     fontSize: 16,
     fontWeight: "bold",
+  },
+  sourceTag: {
+    fontSize: 12,
+    fontWeight: "700",
+    marginTop: -4,
+    marginBottom: 8,
   },
   inputText: {
     borderWidth: 1,

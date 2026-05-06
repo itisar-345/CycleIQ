@@ -2,6 +2,7 @@ import { differenceInDays } from "date-fns";
 import * as SQLite from "expo-sqlite";
 import { v4 as uuidv4 } from "uuid";
 import type { AppMode, NotificationPrefs } from "../store";
+import type { HealthImportPrefs } from "../utils/healthIntegrations";
 
 export const dbName = "cycleiq.sqlite";
 
@@ -69,6 +70,10 @@ export const initDb = async () => {
       sleep_quality INTEGER,
       exercise_type TEXT,
       exercise_duration INTEGER,
+      steps_count INTEGER,
+      activity_minutes INTEGER,
+      health_sleep_source TEXT,
+      health_activity_source TEXT,
       diet_notes_encrypted TEXT,
       medication_log_encrypted TEXT,
       synced INTEGER DEFAULT 0,
@@ -77,6 +82,10 @@ export const initDb = async () => {
     )`);
     await database.runAsync(`CREATE INDEX IF NOT EXISTS idx_symptom_date ON symptom_entries(logged_date DESC)`);
     await database.runAsync(`CREATE INDEX IF NOT EXISTS idx_flare_start ON symptom_entries(flare_start)`);
+    await database.runAsync(`ALTER TABLE symptom_entries ADD COLUMN steps_count INTEGER;`).catch(() => {});
+    await database.runAsync(`ALTER TABLE symptom_entries ADD COLUMN activity_minutes INTEGER;`).catch(() => {});
+    await database.runAsync(`ALTER TABLE symptom_entries ADD COLUMN health_sleep_source TEXT;`).catch(() => {});
+    await database.runAsync(`ALTER TABLE symptom_entries ADD COLUMN health_activity_source TEXT;`).catch(() => {});
     await database.runAsync(`CREATE TABLE IF NOT EXISTS user_correlations (
       id TEXT PRIMARY KEY,
       title TEXT NOT NULL,
@@ -233,6 +242,10 @@ export interface SymptomEntry {
   sleep_quality?: number;
   exercise_type?: string;
   exercise_duration?: number;
+  steps_count?: number;
+  activity_minutes?: number;
+  health_sleep_source?: string;
+  health_activity_source?: string;
   diet_notes_encrypted?: string;
   medication_log_encrypted?: string;
 }
@@ -245,8 +258,9 @@ export const createSymptomEntry = async (entry: SymptomEntry) => {
         brain_fog_score, energy_score, stress_score, bloating, nausea, headache, fatigue_score,
         extended_symptoms, flare_start, flare_end, flare_reflection_encrypted, flow_intensity, clots_size,
         spotting, sleep_hours, sleep_quality, exercise_type, exercise_duration,
+        steps_count, activity_minutes, health_sleep_source, health_activity_source,
         diet_notes_encrypted, medication_log_encrypted, synced, updated_at
-      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);`,
+      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);`,
     [
       id,
       entry.cycle_id ?? null,
@@ -274,6 +288,10 @@ export const createSymptomEntry = async (entry: SymptomEntry) => {
       entry.sleep_quality ?? null,
       entry.exercise_type ?? null,
       entry.exercise_duration ?? null,
+      entry.steps_count ?? null,
+      entry.activity_minutes ?? null,
+      entry.health_sleep_source ?? null,
+      entry.health_activity_source ?? null,
       entry.diet_notes_encrypted ?? null,
       entry.medication_log_encrypted ?? null,
       0,
@@ -530,6 +548,7 @@ export const persistAppSettingsSnapshot = async (settings: {
   customTerms: Record<string, string>;
   notificationsEnabled: boolean;
   notificationPrefs: NotificationPrefs;
+  healthImportPrefs: HealthImportPrefs;
   dismissedInsights: string[];
   tier?: string;
 }): Promise<void> => {
@@ -539,6 +558,7 @@ export const persistAppSettingsSnapshot = async (settings: {
   await saveAppSetting("custom_terms", settings.customTerms);
   await saveAppSetting("notifications_enabled", settings.notificationsEnabled);
   await saveAppSetting("notification_prefs", settings.notificationPrefs);
+  await saveAppSetting("health_import_prefs", settings.healthImportPrefs);
   await saveAppSetting("dismissed_insights", settings.dismissedInsights);
   await saveAppSetting("tier", settings.tier ?? "free");
 };
@@ -686,6 +706,10 @@ export const upsertSymptomEntry = async (entry: any) => {
       sleep_quality = ?,
       exercise_type = ?,
       exercise_duration = ?,
+      steps_count = ?,
+      activity_minutes = ?,
+      health_sleep_source = ?,
+      health_activity_source = ?,
       updated_at = ?,
       synced = 0
       WHERE id = ?;`,
@@ -712,6 +736,10 @@ export const upsertSymptomEntry = async (entry: any) => {
         entry.sleep_quality ?? null,
         entry.exercise_type ?? null,
         entry.exercise_duration ?? null,
+        entry.steps_count ?? null,
+        entry.activity_minutes ?? null,
+        entry.health_sleep_source ?? null,
+        entry.health_activity_source ?? null,
         new Date().toISOString(),
         entry.id,
       ],

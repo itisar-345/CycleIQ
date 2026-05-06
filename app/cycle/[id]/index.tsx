@@ -72,6 +72,11 @@ export default function CycleDetail() {
                   <Text>Energy: {entry.energy_score || '—'}</Text>
                 </View>
                 {entry.flow_intensity && <Text style={styles.periodNote}>Flow: {entry.flow_intensity}</Text>}
+                {(entry.health_sleep_source || entry.health_activity_source) && (
+                  <Text style={styles.sourceNote}>
+                    Auto-filled from {Array.from(new Set([entry.health_sleep_source, entry.health_activity_source].filter(Boolean))).join(" + ")}
+                  </Text>
+                )}
               </View>
             );
           })
@@ -96,6 +101,7 @@ const styles = StyleSheet.create({
   dayCard: { padding: 16, borderRadius: 12, marginBottom: 12 },
   dayHeader: { fontWeight: 'bold', marginBottom: 8 },
   symptomRow: { flexDirection: 'row', gap: 20, marginBottom: 4 },
-  periodNote: { color: '#FF6B9D', fontWeight: '500', marginTop: 4 }
+  periodNote: { color: '#FF6B9D', fontWeight: '500', marginTop: 4 },
+  sourceNote: { color: '#6B7280', fontSize: 12, fontWeight: '600', marginTop: 6 },
 });
 

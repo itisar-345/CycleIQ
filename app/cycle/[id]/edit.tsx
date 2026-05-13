@@ -1,6 +1,7 @@
 import { Colors } from "@/constants/theme";
 import { getAllCycles, updateCycle } from "@/database";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import { decryptField, encryptField } from "@/utils/fieldEncryption";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
@@ -32,7 +33,7 @@ export default function CycleEdit() {
         setCycle(thisCycle);
         setStartDate(thisCycle.start_date.slice(0, 10)); // YYYY-MM-DD
         setEndDate(thisCycle.end_date ? thisCycle.end_date.slice(0, 10) : "");
-        setNotes(thisCycle.notes_encrypted || "");
+        setNotes(thisCycle.notes_encrypted ? await decryptField(thisCycle.notes_encrypted) : "");
       }
     };
     load();
@@ -46,7 +47,7 @@ export default function CycleEdit() {
     if (endDate !== (cycle.end_date?.slice(0, 10) || ""))
       updates.end_date = endDate || null;
     if (notes !== (cycle.notes_encrypted || ""))
-      updates.notes_encrypted = notes;
+      updates.notes_encrypted = notes ? await encryptField(notes) : "";
 
     await updateCycle(id as string, updates);
     Alert.alert("Saved", "Cycle updated.");

@@ -2,7 +2,7 @@
 
 **Product:** CycleIQ — Period & Symptom Tracker  
 **Version:** 2.0  
-**Last Updated:** July 2025  
+**Last Updated:** May 2026  
 **Storage:** All data stored locally on device (no account, no server, no sync)  
 **Status Key:** `[ ]` Not started · `[~]` In progress · `[x]` Complete
 
@@ -65,7 +65,7 @@
 - [x] Exercise duration (stepper in 5-minute increments)
 - [x] Diet notes (free text, stored locally encrypted)
 - [x] Medication log (structured + free text, stored locally encrypted)
-- [x] Save entry to local SQLite (SQLCipher) immediately on "Done"
+- [~] Save entry to local SQLite (SQLCipher) immediately on "Done" — local SQLite write implemented; SQLCipher configured, keyed, and status-reported in app; native SQLCipher support must be verified in a dev/native build
 - [x] Entry visible in history immediately after save
 
 ---
@@ -171,10 +171,10 @@
 - [x] Endo-specific correlation pairs: sleep vs flare severity, stress vs flare onset
 - [x] Minimum thresholds enforced: n >= 20, |r| > 0.3 (Spearman), p < 0.05
 - [x] Sample size always displayed on every insight card
-- [x] HealthKit integration (iOS) — read sleep hours and auto-fill (opt-in)
-- [x] HealthKit integration (iOS) — read steps and activity (opt-in)
-- [x] Health Connect integration (Android) — read sleep hours (opt-in)
-- [x] Health Connect integration (Android) — read steps and activity (opt-in)
+- [~] HealthKit integration (iOS) — read sleep hours and auto-fill (opt-in; JS bridge contract implemented, native bridge not present in repo)
+- [~] HealthKit integration (iOS) — read steps and activity (opt-in; JS bridge contract implemented, native bridge not present in repo)
+- [~] Health Connect integration (Android) — read sleep hours (opt-in; JS bridge contract implemented, native bridge not present in repo)
+- [~] Health Connect integration (Android) — read steps and activity (opt-in; JS bridge contract implemented, native bridge not present in repo)
 - [x] Source tag displayed on auto-filled entries ("from Apple Health")
 
 ---
@@ -230,9 +230,9 @@
 - [x] Endo report additions (flare calendar, pain trajectory, bowel/bladder log, functional impact days)
 - [x] Generated PDF saved to device local storage
 - [x] Report share sheet (share to email, print, Files app / local downloads)
-- [ ] Report list screen showing locally saved reports
-- [ ] Appointment prep tool — structured questionnaire auto-populated from local logs
-- [ ] Appointment prep one-page PDF export saved locally
+- [x] Report list screen showing locally saved reports
+- [x] Appointment prep tool — structured questionnaire auto-populated from local logs
+- [x] Appointment prep one-page PDF export saved locally
 
 ---
 
@@ -322,7 +322,7 @@
 
 ## 17. Privacy & Data Security
 
-- [ ] SQLCipher encryption for all local SQLite data on device
+- [~] SQLCipher encryption for all local SQLite data on device — Expo config and PRAGMA key handling implemented; requires native/dev build verification
 - [x] AES-256-GCM encryption for sensitive free-text fields (diet notes, medication logs, notes)
 - [x] Encryption key stored in device secure enclave / Keychain — never leaves device
 - [ ] Plain-language privacy policy accessible in-app
@@ -339,7 +339,7 @@
 
 ## 18. Local Data Architecture
 
-- [x] Local SQLite database (SQLCipher) as sole data store
+- [~] Local SQLite database (SQLCipher) as sole data store — SQLite is sole core datastore; SQLCipher configured, native support pending verification
 - [x] cycles table — local schema with all fields
 - [x] symptom_entries table — all core and condition-specific fields, indexed on logged_date DESC
 - [x] cycle_predictions table — predicted dates, confidence, model version
@@ -356,7 +356,7 @@
 
 - [x] React Native (Expo managed workflow) — iOS and Android single codebase
 - [x] Zustand state management (condition, today's entry, cycles, insights, UI state)
-- [x] SQLite local repository layer via expo-sqlite + op-sqlite
+- [~] SQLite local repository layer via expo-sqlite + op-sqlite — expo-sqlite implemented; op-sqlite not installed
 - [x] On-device GPR prediction model (adaptive on-device rules with stored retraining and bias correction)
 - [x] On-device correlation engine (runs as background JS task)
 - [x] Local push notifications via Expo Notifications (no server required)
@@ -391,4 +391,4 @@
 
 ---
 
-_Last updated: July 2025 — v2.0 (no-account, fully local on-device architecture)_
+_Last updated: May 2026 — v2.0 audit pass (no-account, fully local on-device architecture; native-only capabilities marked in progress until verified in native builds)_

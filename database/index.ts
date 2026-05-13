@@ -1,17 +1,59 @@
 import { differenceInDays } from "date-fns";
 import * as SQLite from "expo-sqlite";
-import { v4 as uuidv4 } from "uuid";
 import type { AppMode, NotificationPrefs } from "../store";
 import type { HealthImportPrefs } from "../utils/healthIntegrations";
+import { getOrCreateDbKey } from "../utils/secureKey";
 
 export const dbName = "cycleiq.sqlite";
 
 let db: SQLite.SQLiteDatabase | null = null;
+let dbKeyApplied = false;
+let dbEncryptionStatus: {
+  keyApplied: boolean;
+  sqlCipherAvailable: boolean;
+  cipherVersion: string | null;
+} = {
+  keyApplied: false,
+  sqlCipherAvailable: false,
+  cipherVersion: null,
+};
+
+const quoteSqlString = (value: string) => `'${value.replace(/'/g, "''")}'`;
 
 const ensureDb = async () => {
   if (db) return db;
   db = await SQLite.openDatabaseAsync(dbName);
+  if (!dbKeyApplied) {
+    const key = await getOrCreateDbKey();
+    try {
+      await db.runAsync(`PRAGMA key = ${quoteSqlString(key)};`);
+      await db.runAsync(`PRAGMA cipher_compatibility = 4;`).catch(() => {});
+      const cipherRows = await db.getAllAsync(`PRAGMA cipher_version;`).catch(() => []);
+      const cipherVersion =
+        Array.isArray(cipherRows) && cipherRows.length > 0
+          ? String(Object.values(cipherRows[0] as Record<string, unknown>)[0] ?? "")
+          : "";
+      dbEncryptionStatus = {
+        keyApplied: true,
+        sqlCipherAvailable: cipherVersion.length > 0,
+        cipherVersion: cipherVersion || null,
+      };
+    } catch {
+      dbEncryptionStatus = {
+        keyApplied: false,
+        sqlCipherAvailable: false,
+        cipherVersion: null,
+      };
+    } finally {
+      dbKeyApplied = true;
+    }
+  }
   return db;
+};
+
+export const getDatabaseEncryptionStatus = async () => {
+  await ensureDb();
+  return dbEncryptionStatus;
 };
 
 const execSql = async (sql: string, params: any[] = []): Promise<any> => {
@@ -28,6 +70,12 @@ const execSql = async (sql: string, params: any[] = []): Promise<any> => {
     console.error("SQL Error", error, sql);
     throw error;
   }
+};
+
+const createLocalId = () => {
+  const randomUUID = globalThis.crypto?.randomUUID?.bind(globalThis.crypto);
+  if (randomUUID) return randomUUID();
+  return `local-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 };
 
 export const initDb = async () => {
@@ -64,6 +112,7 @@ export const initDb = async () => {
       flare_end TEXT,
       flare_reflection_encrypted TEXT,
       flow_intensity TEXT,
+      clots_present INTEGER DEFAULT 0,
       clots_size TEXT,
       spotting INTEGER,
       sleep_hours REAL,
@@ -86,6 +135,7 @@ export const initDb = async () => {
     await database.runAsync(`ALTER TABLE symptom_entries ADD COLUMN activity_minutes INTEGER;`).catch(() => {});
     await database.runAsync(`ALTER TABLE symptom_entries ADD COLUMN health_sleep_source TEXT;`).catch(() => {});
     await database.runAsync(`ALTER TABLE symptom_entries ADD COLUMN health_activity_source TEXT;`).catch(() => {});
+    await database.runAsync(`ALTER TABLE symptom_entries ADD COLUMN clots_present INTEGER DEFAULT 0;`).catch(() => {});
     await database.runAsync(`CREATE TABLE IF NOT EXISTS user_correlations (
       id TEXT PRIMARY KEY,
       title TEXT NOT NULL,
@@ -146,7 +196,7 @@ export const getLatestCycle = async () => {
 };
 
 export const createCycle = async (startDate: string) => {
-  const id = uuidv4();
+  const id = createLocalId();
   const prevCycle = await getLatestCycle();
 
   await execSql(
@@ -185,7 +235,7 @@ export const createCycle = async (startDate: string) => {
             await execSql(
               `INSERT INTO prediction_feedback (id, cycle_id, predicted_start, actual_start, error_days, recorded_at)
                VALUES (?,?,?,?,?,?);`,
-              [uuidv4(), prevCycle.id, pred.predictedStartISO, startDate, errorDays, new Date().toISOString()]
+              [createLocalId(), prevCycle.id, pred.predictedStartISO, startDate, errorDays, new Date().toISOString()]
             );
           }
         }
@@ -236,6 +286,7 @@ export interface SymptomEntry {
   flare_end?: string;
   flare_reflection_encrypted?: string;
   flow_intensity?: string | null;
+  clots_present?: boolean;
   clots_size?: string | null;
   spotting?: boolean;
   sleep_hours?: number;
@@ -251,13 +302,13 @@ export interface SymptomEntry {
 }
 
 export const createSymptomEntry = async (entry: SymptomEntry) => {
-  const id = uuidv4();
+  const id = createLocalId();
   await execSql(
     `INSERT INTO symptom_entries (
         id, cycle_id, logged_date, pain_score, pain_locations, pain_type, mood_score, mood_tags,
         brain_fog_score, energy_score, stress_score, bloating, nausea, headache, fatigue_score,
         extended_symptoms, flare_start, flare_end, flare_reflection_encrypted, flow_intensity, clots_size,
-        spotting, sleep_hours, sleep_quality, exercise_type, exercise_duration,
+        clots_present, spotting, sleep_hours, sleep_quality, exercise_type, exercise_duration,
         steps_count, activity_minutes, health_sleep_source, health_activity_source,
         diet_notes_encrypted, medication_log_encrypted, synced, updated_at
       ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);`,
@@ -283,6 +334,7 @@ export const createSymptomEntry = async (entry: SymptomEntry) => {
       entry.flare_reflection_encrypted ?? null,
       entry.flow_intensity ?? null,
       entry.clots_size ?? null,
+      entry.clots_present ? 1 : 0,
       entry.spotting ? 1 : 0,
       entry.sleep_hours ?? null,
       entry.sleep_quality ?? null,
@@ -348,8 +400,33 @@ export const retrainAndStoreCyclePrediction = async (
   const result = await execSql(`SELECT * FROM cycles ORDER BY start_date DESC;`);
   const cycles: any[] = [];
   for (let i = 0; i < result.rows.length; i++) cycles.push(result.rows.item(i));
+  const burdenResult = await execSql(`
+    SELECT
+      cycle_id,
+      AVG(
+        COALESCE(pain_score, 0) +
+        COALESCE(fatigue_score, 0) +
+        COALESCE(brain_fog_score, 0) +
+        COALESCE(stress_score, 0)
+      ) / 4.0 AS burden
+    FROM symptom_entries
+    WHERE cycle_id IS NOT NULL
+    GROUP BY cycle_id;
+  `);
+  const symptomBurdenByCycle: Record<string, number> = {};
+  for (let i = 0; i < burdenResult.rows.length; i++) {
+    const row = burdenResult.rows.item(i);
+    symptomBurdenByCycle[row.cycle_id] = Number(row.burden) || 0;
+  }
   const biasCorrection = await getPredictionBias();
-  const prediction = runPredictionEngine({ cycles, currentMode, postPillMode, postPillStartDate, biasCorrection });
+  const prediction = runPredictionEngine({
+    cycles,
+    currentMode,
+    postPillMode,
+    postPillStartDate,
+    biasCorrection,
+    symptomBurdenByCycle,
+  });
   await saveCyclePrediction(prediction, currentMode);
   return prediction;
 };
@@ -364,7 +441,7 @@ export const saveCyclePrediction = async (
       mean, std_dev, confidence, mae, model, label, payload_json
     ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?);`,
     [
-      uuidv4(),
+      createLocalId(),
       new Date().toISOString(),
       "cycleiq-prediction-v3",
       currentMode,
@@ -443,40 +520,70 @@ export const updateCycle = async (
   cycleId: string,
   data: Partial<{
     start_date: string;
-    end_date: string;
+    end_date: string | null;
     cycle_length: number;
-    period_length: number;
+    period_length: number | null;
     notes_encrypted: string;
   }>,
 ) => {
+  const existing = await execSql(`SELECT * FROM cycles WHERE id = ?;`, [cycleId]);
+  const current = existing.rows.length > 0 ? existing.rows.item(0) : null;
   const updates: string[] = [];
   const params: any[] = [];
   if (data.start_date) {
     updates.push("start_date = ?");
     params.push(data.start_date);
   }
-  if (data.end_date) {
+  if (Object.prototype.hasOwnProperty.call(data, "end_date")) {
     updates.push("end_date = ?");
-    params.push(data.end_date);
+    params.push(data.end_date ?? null);
   }
   if (typeof data.cycle_length === "number") {
     updates.push("cycle_length = ?");
     params.push(data.cycle_length);
   }
-  if (typeof data.period_length === "number") {
+  if (typeof data.period_length === "number" || data.period_length === null) {
     updates.push("period_length = ?");
-    params.push(data.period_length);
+    params.push(data.period_length ?? null);
   }
-  if (data.notes_encrypted) {
+  if (Object.prototype.hasOwnProperty.call(data, "notes_encrypted")) {
     updates.push("notes_encrypted = ?");
-    params.push(data.notes_encrypted);
+    params.push(data.notes_encrypted ?? null);
   }
   if (updates.length === 0) return;
+
+  const endDateWasProvided = Object.prototype.hasOwnProperty.call(data, "end_date");
+  const nextStart = data.start_date ?? current?.start_date;
+  const nextEnd = endDateWasProvided ? data.end_date : current?.end_date;
+  if (endDateWasProvided && data.end_date === null && data.period_length === undefined) {
+    updates.push("period_length = ?");
+    params.push(null);
+  } else if (nextStart && nextEnd && data.period_length === undefined) {
+    updates.push("period_length = ?");
+    params.push(differenceInDays(new Date(nextEnd), new Date(nextStart)) + 1);
+  }
+
   params.push(cycleId);
   await execSql(
     `UPDATE cycles SET ${updates.join(", ")} WHERE id = ?;`,
     params,
   );
+
+  const allCycles = await getAllCycles();
+  for (let i = 0; i < allCycles.length; i++) {
+    const currentCycle = allCycles[i];
+    const previousCycle = allCycles[i + 1];
+    if (previousCycle?.start_date && currentCycle?.start_date) {
+      const cycleLength = differenceInDays(
+        new Date(currentCycle.start_date),
+        new Date(previousCycle.start_date),
+      );
+      await execSql(`UPDATE cycles SET cycle_length = ? WHERE id = ?;`, [
+        cycleLength,
+        previousCycle.id,
+      ]);
+    }
+  }
   await retrainAndStoreCyclePrediction();
 };
 
@@ -490,7 +597,7 @@ export interface RedFlagPromptLogInput {
 }
 
 export const createRedFlagPromptLog = async (log: RedFlagPromptLogInput): Promise<string> => {
-  const id = uuidv4();
+  const id = createLocalId();
   await execSql(
     `INSERT INTO red_flag_prompt_logs (
       id, trigger_type, triggered_at, logged_date, message, severity, cycle_id, entry_context_json
@@ -700,6 +807,7 @@ export const upsertSymptomEntry = async (entry: any) => {
       stress_score = ?,
       extended_symptoms = ?,
       flow_intensity = ?,
+      clots_present = ?,
       clots_size = ?,
       spotting = ?,
       sleep_hours = ?,
@@ -730,6 +838,7 @@ export const upsertSymptomEntry = async (entry: any) => {
         entry.stress_score ?? null,
         entry.extended_symptoms ? JSON.stringify(entry.extended_symptoms) : null,
         entry.flow_intensity ?? null,
+        entry.clots_present ? 1 : 0,
         entry.clots_size ?? null,
         entry.spotting ? 1 : 0,
         entry.sleep_hours ?? null,
@@ -972,7 +1081,7 @@ export const persistAndRetireInsights = async (freshInsights: CycleInsight[]): P
     } else {
       await execSql(
         `INSERT INTO user_correlations (id, title, correlation, n, generated_at) VALUES (?,?,?,?,?);`,
-        [uuidv4(), insight.title, insight.correlation ?? null, insight.n ?? null, now]
+        [createLocalId(), insight.title, insight.correlation ?? null, insight.n ?? null, now]
       );
     }
   }

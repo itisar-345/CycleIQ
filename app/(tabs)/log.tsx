@@ -148,7 +148,8 @@ export default function LogScreen() {
         setHeadache(!!latest.headache);
         setFatigue(latest.fatigue_score ?? 0);
         setFlow(latest.flow_intensity ?? null);
-        setClots(!!latest.clots);
+        setClots(!!latest.clots_present || !!latest.clots_size);
+        setClotsSize(latest.clots_size ?? null);
         setSpotting(!!latest.spotting);
         setStressScore(latest.stress_score ?? 3);
         setSleepHours(latest.sleep_hours ?? 8);
@@ -273,7 +274,9 @@ export default function LogScreen() {
         headache,
         fatigue_score: fatigue,
         extended_symptoms: extended,
+        flare_start: inFlare ? (flareStartDate ?? new Date().toISOString()) : undefined,
         flow_intensity: flow,
+        clots_present: clots,
         clots_size: clotsSize,
         spotting,
         sleep_hours: sleepHours,
@@ -689,6 +692,14 @@ export default function LogScreen() {
             {!isTeen && (
               <View style={{ marginTop: 16 }}>
                 {renderToggle("Clotting Present", clots, setClots)}
+                {clots && (
+                  <>
+                    <Text style={[styles.label, { color: theme.textSecondary, marginTop: 12 }]}>
+                      Clot Size
+                    </Text>
+                    {renderRadio(["Small", "Medium", "Large"], clotsSize, setClotsSize)}
+                  </>
+                )}
               </View>
             )}
           </View>
@@ -899,7 +910,25 @@ export default function LogScreen() {
           >
             Stress Score (1-5)
           </Text>
-          {renderSlider10(stressScore, setStressScore)}
+          <View style={styles.buttonGroup}>
+            {[1, 2, 3, 4, 5].map((num) => (
+              <TouchableOpacity
+                key={num}
+                style={[
+                  styles.chip,
+                  {
+                    borderColor: theme.tint,
+                    backgroundColor: stressScore === num ? theme.tint : "transparent",
+                  },
+                ]}
+                onPress={() => setStressScore(num)}
+              >
+                <Text style={{ color: stressScore === num ? "#FFF" : theme.text, fontWeight: stressScore === num ? "bold" : "normal" }}>
+                  {num}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
 
           <Text style={[styles.label, { color: theme.textSecondary, marginTop: 16 }]}>Diet Notes</Text>
           <TextInput

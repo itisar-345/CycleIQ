@@ -6,7 +6,6 @@ import { Stack, router, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
 import "react-native-reanimated";
-import { startSyncEngine, markDbReady } from "@/utils/syncEngine";
 import {
   cancelCycleNotifications,
   requestNotificationPermission,
@@ -31,7 +30,7 @@ export default function RootLayout() {
 
   useEffect(() => {
     initDb()
-      .then(() => { markDbReady(); setDbReady(true); startSyncEngine(); })
+      .then(() => { setDbReady(true); })
       .catch((error) => { console.error("Database initialization error:", error); });
   }, []);
 
@@ -60,11 +59,10 @@ export default function RootLayout() {
 
   useEffect(() => {
     if (!mounted) return;
-    const inTabsGroup = segments[0] === "(tabs)";
     const inOnboardingGroup = segments[0] === "onboarding";
     if (!isOnboarded && !inOnboardingGroup) {
       router.replace("/onboarding");
-    } else if (isOnboarded && !inTabsGroup) {
+    } else if (isOnboarded && inOnboardingGroup) {
       router.replace("/(tabs)");
     }
   }, [isOnboarded, mounted, segments]);

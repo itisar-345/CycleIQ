@@ -15,7 +15,7 @@ export interface PredictionResult {
   mean: number;
   stdDev: number;
   confidence: number;
-  model: "none" | "rule-based" | "weighted-average" | "full-rules";
+  model: "none" | "rule-based" | "weighted-average" | "full-rules" | "gpr";
   label: string;
   predictedStartISO: string | null;
   windowStartISO: string | null;
@@ -160,6 +160,88 @@ const computeSeasonalAdjustment = (
   return sameBucket.length >= 2 ? mean(sameBucket) : fallback;
 };
 
+const CONDITION_FEATURE: Record<string, number> = {
+  standard: 0,
+  teen: 0.2,
+  endo: 0.45,
+  pcos: 0.75,
+  peri: 1,
+};
+
+type GprFeatureVector = number[];
+
+const getCycleLength = (cycle: any): number | null => {
+  const value = cycle?.cycle_length;
+  return typeof value === "number" && value > 0 && value <= 365 ? value : null;
+};
+
+const getSymptomBurden = (
+  cycleId: string | null | undefined,
+  symptomBurdenByCycle?: Record<string, number>,
+): number => {
+  if (!cycleId || !symptomBurdenByCycle) return 0;
+  return Math.max(0, Math.min(10, symptomBurdenByCycle[cycleId] ?? 0));
+};
+
+const buildGprFeature = (
+  cycle: any,
+  historyLengths: number[],
+  currentMode: string,
+  symptomBurdenByCycle?: Record<string, number>,
+): GprFeatureVector => {
+  const history = historyLengths.length > 0 ? historyLengths : [getPrior(currentMode).priorMean];
+  const recent = history.slice(0, 5);
+  const recentMedian = median(recent);
+  const variability = recent.length > 1 ? stdDev(recent) : getPrior(currentMode).minStdDev;
+  const periodLength =
+    typeof cycle?.period_length === "number" && cycle.period_length > 0
+      ? cycle.period_length
+      : 5;
+  const start = cycle?.start_date ? new Date(cycle.start_date) : new Date();
+  const dayOfWeek = start.getDay();
+  const seasonAngle = (start.getMonth() / 12) * Math.PI * 2;
+  return [
+    recentMedian / 60,
+    Math.min(variability, 60) / 60,
+    Math.min(periodLength, 14) / 14,
+    CONDITION_FEATURE[currentMode] ?? CONDITION_FEATURE.standard,
+    dayOfWeek / 6,
+    Math.sin(seasonAngle),
+    Math.cos(seasonAngle),
+    getSymptomBurden(cycle?.id, symptomBurdenByCycle) / 10,
+  ];
+};
+
+const squaredDistance = (a: GprFeatureVector, b: GprFeatureVector): number =>
+  a.reduce((sum, value, index) => sum + (value - b[index]) ** 2, 0);
+
+const kernel = (a: GprFeatureVector, b: GprFeatureVector): number => {
+  const rbf = Math.exp(-0.5 * squaredDistance(a, b) / (0.65 ** 2));
+  const linear = a.reduce((sum, value, index) => sum + value * b[index], 0) * 0.05;
+  return rbf + linear;
+};
+
+const solveLinearSystem = (matrix: number[][], vector: number[]): number[] | null => {
+  const n = matrix.length;
+  const a = matrix.map((row, i) => [...row, vector[i]]);
+  for (let col = 0; col < n; col++) {
+    let pivot = col;
+    for (let row = col + 1; row < n; row++) {
+      if (Math.abs(a[row][col]) > Math.abs(a[pivot][col])) pivot = row;
+    }
+    if (Math.abs(a[pivot][col]) < 1e-8) return null;
+    [a[col], a[pivot]] = [a[pivot], a[col]];
+    const div = a[col][col];
+    for (let j = col; j <= n; j++) a[col][j] /= div;
+    for (let row = 0; row < n; row++) {
+      if (row === col) continue;
+      const factor = a[row][col];
+      for (let j = col; j <= n; j++) a[row][j] -= factor * a[col][j];
+    }
+  }
+  return a.map((row) => row[n]);
+};
+
 // ─── condition priors ─────────────────────────────────────────────────────────
 
 interface ConditionPrior {
@@ -291,12 +373,20 @@ export interface PredictionEngineInput {
   postPillMode?: boolean;
   postPillStartDate?: string | null;
   biasCorrection?: number;
+  symptomBurdenByCycle?: Record<string, number>;
 }
 
 // ─── main engine ─────────────────────────────────────────────────────────────
 
 export function runPredictionEngine(input: PredictionEngineInput): PredictionResult {
-  const { cycles, currentMode, postPillMode = false, postPillStartDate = null, biasCorrection = 0 } = input;
+  const {
+    cycles,
+    currentMode,
+    postPillMode = false,
+    postPillStartDate = null,
+    biasCorrection = 0,
+    symptomBurdenByCycle,
+  } = input;
   const prior = getPrior(currentMode);
 
   const { suppressed, daysRemaining } = isPostPillSuppressed(postPillMode, postPillStartDate);
@@ -316,9 +406,14 @@ export function runPredictionEngine(input: PredictionEngineInput): PredictionRes
 
   if (lengths.length < 5)
     return applyBias(ruleTier2(lengths, latestStartDate, prior, mae, pcosFields, endoFields), biasCorrection);
-  if (lengths.length < 12)
-    return applyBias(ruleTier3(lengths, latestStartDate, prior, mae, pcosFields, endoFields), biasCorrection);
-  return applyBias(ruleTier4(cycles, lengths, latestStartDate, prior, mae, pcosFields, endoFields), biasCorrection);
+  const fallback =
+    lengths.length < 12
+      ? ruleTier3(lengths, latestStartDate, prior, mae, pcosFields, endoFields)
+      : ruleTier4(cycles, lengths, latestStartDate, prior, mae, pcosFields, endoFields);
+  return applyBias(
+    runGprModel(cycles, lengths, currentMode, prior, mae, pcosFields, endoFields, symptomBurdenByCycle, fallback),
+    biasCorrection,
+  );
 }
 
 // ─── Tier 2: Bayesian prior blend ────────────────────────────────────────────
@@ -456,6 +551,78 @@ function ruleTier4(
 
 // ─── bias correction ──────────────────────────────────────────────────────────
 
+function runGprModel(
+  cycles: any[],
+  lengths: number[],
+  currentMode: string,
+  prior: ConditionPrior,
+  mae: number | null,
+  pcosFields: PcosFields,
+  endoFields: EndoFields,
+  symptomBurdenByCycle: Record<string, number> | undefined,
+  fallback: PredictionResult,
+): PredictionResult {
+  const trainingCycles = cycles.filter((cycle) => getCycleLength(cycle) !== null).slice(0, 18);
+  if (trainingCycles.length < 5) return fallback;
+
+  const y = trainingCycles.map((cycle) => getCycleLength(cycle) as number);
+  const yMean = mean(y);
+  const centered = y.map((value) => value - yMean);
+  const xTrain = trainingCycles.map((cycle, index) => {
+    const olderLengths = trainingCycles
+      .slice(index + 1)
+      .map(getCycleLength)
+      .filter((value): value is number => value !== null);
+    const history = olderLengths.length >= 2 ? olderLengths : lengths.slice(index + 1);
+    return buildGprFeature(cycle, history, currentMode, symptomBurdenByCycle);
+  });
+
+  const noise = Math.max(0.08, (mae ?? prior.minStdDev) / 40);
+  const covariance = xTrain.map((rowFeature, row) =>
+    xTrain.map((colFeature, col) =>
+      kernel(rowFeature, colFeature) + (row === col ? noise ** 2 : 0),
+    ),
+  );
+  const alpha = solveLinearSystem(covariance, centered);
+  if (!alpha) return fallback;
+
+  const latestCycle = cycles[0] ?? trainingCycles[0];
+  const xStar = buildGprFeature(latestCycle, lengths, currentMode, symptomBurdenByCycle);
+  const kStar = xTrain.map((feature) => kernel(feature, xStar));
+  const predicted = yMean + kStar.reduce((sum, value, index) => sum + value * alpha[index], 0);
+  const v = solveLinearSystem(covariance, kStar);
+  if (!v) return fallback;
+
+  const variance = Math.max(
+    1,
+    kernel(xStar, xStar) + noise ** 2 - kStar.reduce((sum, value, index) => sum + value * v[index], 0),
+  );
+  const modelSd = Math.sqrt(variance) * 10;
+  const sd = Math.max(modelSd * prior.stdDevMultiplier, mae ?? 0, prior.minStdDev);
+  const blendedMean = Math.max(12, Math.min(180, predicted * 0.8 + fallback.mean * 0.2));
+  const cv = sd / blendedMean;
+  const confidence = Math.max(0.9 - cv * 0.9 - prior.confidencePenalty, 0.35);
+  const slope = trendSlope([...lengths.slice(0, 6)].reverse());
+  const trendDirection: PredictionResult["trendDirection"] =
+    slope > 0.5 ? "lengthening" : slope < -0.5 ? "shortening" : "stable";
+
+  return buildResult({
+    mean: blendedMean,
+    stdDev: sd,
+    confidence,
+    model: "gpr",
+    label: `Gaussian Process Regression (${trainingCycles.length} cycles, on-device)`,
+    latestStart: cycles[0]?.start_date ?? null,
+    mae,
+    outlierFlagged: prior.outlierThreshold > 0 && lengths[0] > prior.outlierThreshold,
+    trendDirection,
+    regimeChangeDetected: detectRegimeChange(lengths),
+    lateArrivalP90: Math.round(percentile(lengths, 0.9)),
+    ...pcosFields,
+    ...endoFields,
+  });
+}
+
 function applyBias(result: PredictionResult, biasDays: number): PredictionResult {
   if (biasDays === 0 || result.model === "none") return result;
   const shift = (iso: string | null) => iso ? addDaysToISO(iso, biasDays) : null;
@@ -549,7 +716,7 @@ export function computeCyclePrediction(
   return {
     mean: r.mean, stdDev: r.stdDev, confidence: r.confidence,
     model: r.model === "none" ? "none"
-         : r.model === "full-rules" || r.model === "weighted-average" ? "gpr"
+         : r.model === "full-rules" || r.model === "weighted-average" || r.model === "gpr" ? "gpr"
          : "rule-based",
   };
 }

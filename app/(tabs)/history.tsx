@@ -86,6 +86,12 @@ export default function HistoryScreen() {
                   <Text style={{ color: theme.tint }}>View</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
+                  style={[styles.actionBtn, { borderColor: theme.tint }]}
+                  onPress={() => router.push(`/cycle/${cycle.id}/edit` as any)}
+                >
+                  <Text style={{ color: theme.tint }}>Edit</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
                   style={[styles.actionBtn, { borderColor: theme.error }]}
                   onPress={() => handleDelete(cycle.id)}
                 >

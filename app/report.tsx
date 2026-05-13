@@ -1,4 +1,4 @@
-import { StyleSheet, View, Text, ScrollView, TouchableOpacity } from 'react-native';
+import { Alert, StyleSheet, View, Text, ScrollView, TouchableOpacity } from 'react-native';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAppStore } from '@/store';
@@ -8,21 +8,14 @@ import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { getAllCycles, getAllEntries, getRedFlagPromptLogs } from '@/database';
 import { generateSpecialistReportHtml } from '@/utils/reportGenerator';
-import { Alert } from 'react-native';
 import * as Print from 'expo-print';
-import * as Sharing from 'expo-sharing';
-import * as FileSystem from 'expo-file-system';
 import { format } from 'date-fns';
-
-const getDocumentDir = (): string => {
-  // expo-file-system v2 uses FileSystem.documentDirectory (string | null)
-  return (FileSystem as any).documentDirectory ?? '';
-};
+import { savePdfToReports, shareReport } from '@/utils/localReports';
 
 export default function ReportScreen() {
   const colorScheme = useColorScheme() ?? 'light';
   const theme = Colors[colorScheme];
-  const { currentMode, userName } = useAppStore();
+  const { currentMode } = useAppStore();
   
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<any>({
@@ -51,15 +44,13 @@ export default function ReportScreen() {
       });
       
       let flares = 0;
-      const symptomCounts: Record<string, number> = {};
-      
       entries.forEach(e => {
         if (e.flare_start) flares++;
         if (e.extended_symptoms) {
           try {
             const ext = JSON.parse(e.extended_symptoms);
             if (ext.flare && ext.flare.start) flares++;
-          } catch(err) {}
+          } catch {}
         }
       });
       
@@ -82,17 +73,10 @@ export default function ReportScreen() {
     try {
       const html = generateSpecialistReportHtml(data.rawCycles, data.rawEntries, currentMode, data.redFlagPromptLogs);
       const { uri: tempUri } = await Print.printToFileAsync({ html });
-      // Persist to permanent local storage
-      const reportsDir = (FileSystem as any).documentDirectory + 'cycleiq_reports/';
-      await (FileSystem as any).makeDirectoryAsync(reportsDir, { intermediates: true });
       const fileName = `CycleIQ_Report_${format(new Date(), 'yyyy-MM-dd_HHmm')}.pdf`;
-      const permanentUri = reportsDir + fileName;
-      await (FileSystem as any).copyAsync({ from: tempUri, to: permanentUri });
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(permanentUri);
-      } else {
-        Alert.alert('Report saved', `PDF saved to: ${permanentUri}`);
-      }
+      const permanentUri = await savePdfToReports(tempUri, fileName);
+      const shared = await shareReport(permanentUri);
+      if (!shared) Alert.alert('Report saved', `PDF saved to: ${permanentUri}`);
     } catch (e) {
       console.error('PDF generation failed', e);
       Alert.alert('Error', 'Could not generate or share the report.');

@@ -8,6 +8,8 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { differenceInDays, parseISO } from 'date-fns';
 import { scheduleDailyLogReminder } from '@/utils/notifications';
 import { isHealthBridgeAvailable, requestHealthPermissions } from '@/utils/healthIntegrations';
+import { getDatabaseEncryptionStatus } from '@/database';
+import { useEffect, useState } from 'react';
 
 export default function ProfileScreen() {
   const colorScheme = useColorScheme() ?? 'light';
@@ -20,6 +22,17 @@ export default function ProfileScreen() {
     customTerms, setCustomTerms,
     postPillMode, postPillStartDate,
   } = useAppStore();
+  const [databaseEncryption, setDatabaseEncryption] = useState<{
+    keyApplied: boolean;
+    sqlCipherAvailable: boolean;
+    cipherVersion: string | null;
+  } | null>(null);
+
+  useEffect(() => {
+    getDatabaseEncryptionStatus()
+      .then(setDatabaseEncryption)
+      .catch(() => setDatabaseEncryption(null));
+  }, []);
 
   const toggleMode = (mode: AppMode) => setMode(mode);
 
@@ -258,9 +271,23 @@ export default function ProfileScreen() {
           )}
         </View>
 
+        <View style={[styles.section, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>Data Protection</Text>
+          <Text style={[styles.description, { color: theme.textSecondary }]}>
+            Sensitive notes use AES-256-GCM with a SecureStore-backed key.
+          </Text>
+          <Text style={[styles.description, { color: databaseEncryption?.sqlCipherAvailable ? theme.tint : theme.error }]}>
+            SQLite database encryption: {databaseEncryption?.sqlCipherAvailable
+              ? `SQLCipher active${databaseEncryption.cipherVersion ? ` (${databaseEncryption.cipherVersion})` : ""}`
+              : "Native SQLCipher support not available in this build"}
+          </Text>
+        </View>
+
         {/* Reports & Export */}
         <View style={[styles.section, { backgroundColor: theme.surface, borderColor: theme.border, paddingVertical: 8 }]}>
           <ActionRow onPress={() => router.push('/report' as any)} title="Doctor-Ready Symptom Report" iconName="doc.text.fill" color="#E57373" />
+          <ActionRow onPress={() => router.push('/reports' as any)} title="Saved Reports" iconName="doc.text.fill" color="#64B5F6" />
+          <ActionRow onPress={() => router.push('/appointment-prep' as any)} title="Appointment Prep" iconName="doc.text.fill" color="#BA68C8" />
           <ActionRow title="Export Cycle Data (CSV)" iconName="arrow.down.doc.fill" color="#81C784" />
         </View>
 

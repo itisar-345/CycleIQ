@@ -10,6 +10,8 @@ import { scheduleDailyLogReminder } from '@/utils/notifications';
 import { isHealthBridgeAvailable, requestHealthPermissions } from '@/utils/healthIntegrations';
 import { getDatabaseEncryptionStatus } from '@/database';
 import { useEffect, useState } from 'react';
+import { exportAndShareDatabaseFileBackup, exportAndShareLocalData, restoreLocalDataBackupFromUri, wipeLocalDataAndFiles } from '@/utils/privacyData';
+import * as DocumentPicker from 'expo-document-picker';
 
 export default function ProfileScreen() {
   const colorScheme = useColorScheme() ?? 'light';
@@ -27,6 +29,7 @@ export default function ProfileScreen() {
     sqlCipherAvailable: boolean;
     cipherVersion: string | null;
   } | null>(null);
+  const [privacyActionInProgress, setPrivacyActionInProgress] = useState(false);
 
   useEffect(() => {
     getDatabaseEncryptionStatus()
@@ -69,6 +72,89 @@ export default function ProfileScreen() {
         "Health integration unavailable",
         "This build needs the CycleIQ native health bridge to read Apple Health or Health Connect data. Your opt-in preference was saved and will work in a native build that includes it.",
       );
+    }
+  };
+
+  const handleExportLocalData = async (format: 'json' | 'csv') => {
+    try {
+      setPrivacyActionInProgress(true);
+      const uri = await exportAndShareLocalData(format);
+      Alert.alert("Export ready", `Your ${format.toUpperCase()} export was saved locally and shared only if you chose a destination.\n\n${uri}`);
+    } catch (error) {
+      console.error("Local data export failed", error);
+      Alert.alert("Export failed", "CycleIQ could not create your local data export. Please try again.");
+    } finally {
+      setPrivacyActionInProgress(false);
+    }
+  };
+
+  const handleDatabaseBackup = async () => {
+    try {
+      setPrivacyActionInProgress(true);
+      const uri = await exportAndShareDatabaseFileBackup();
+      Alert.alert("Database backup ready", `Your SQLite database backup was saved locally and shared only if you chose a destination.\n\n${uri}`);
+    } catch (error) {
+      console.error("Database backup failed", error);
+      Alert.alert("Backup failed", "CycleIQ could not create a database-file backup in this build.");
+    } finally {
+      setPrivacyActionInProgress(false);
+    }
+  };
+
+  const confirmDeleteLocalData = () => {
+    Alert.alert(
+      "Delete local data?",
+      "This removes CycleIQ's local SQLite data and generated files on this device. This cannot be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              setPrivacyActionInProgress(true);
+              await wipeLocalDataAndFiles();
+              Alert.alert("Local data deleted", "Your CycleIQ database records and generated files were removed from this device.");
+            } catch (error) {
+              console.error("Local data wipe failed", error);
+              Alert.alert("Delete failed", "CycleIQ could not delete all local data. Please try again.");
+            } finally {
+              setPrivacyActionInProgress(false);
+            }
+          },
+        },
+      ],
+    );
+  };
+
+  const handleRestoreBackup = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({ type: 'application/json', copyToCacheDirectory: true });
+      if (result.canceled || !result.assets?.[0]?.uri) return;
+      Alert.alert(
+        "Restore backup?",
+        "This replaces all current local data with the selected backup. This cannot be undone.",
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Restore",
+            style: "destructive",
+            onPress: async () => {
+              try {
+                setPrivacyActionInProgress(true);
+                await restoreLocalDataBackupFromUri(result.assets[0].uri);
+                Alert.alert("Restore complete", "Your backup has been restored. Restart the app to see your data.");
+              } catch (e) {
+                Alert.alert("Restore failed", "The selected file could not be restored. Make sure it is a valid CycleIQ JSON backup.");
+              } finally {
+                setPrivacyActionInProgress(false);
+              }
+            },
+          },
+        ],
+      );
+    } catch {
+      Alert.alert("File picker error", "Could not open the file picker. Please try again.");
     }
   };
 
@@ -281,14 +367,47 @@ export default function ProfileScreen() {
               ? `SQLCipher active${databaseEncryption.cipherVersion ? ` (${databaseEncryption.cipherVersion})` : ""}`
               : "Native SQLCipher support not available in this build"}
           </Text>
+          <Text style={[styles.description, { color: theme.textSecondary }]}>
+            No analytics or third-party crash reporting SDKs are bundled in this app build.
+          </Text>
         </View>
 
         {/* Reports & Export */}
         <View style={[styles.section, { backgroundColor: theme.surface, borderColor: theme.border, paddingVertical: 8 }]}>
+          <ActionRow onPress={() => router.push('/privacy' as any)} title="Plain-Language Privacy Policy" iconName="lock.shield.fill" color="#4DB6AC" />
           <ActionRow onPress={() => router.push('/report' as any)} title="Doctor-Ready Symptom Report" iconName="doc.text.fill" color="#E57373" />
           <ActionRow onPress={() => router.push('/reports' as any)} title="Saved Reports" iconName="doc.text.fill" color="#64B5F6" />
           <ActionRow onPress={() => router.push('/appointment-prep' as any)} title="Appointment Prep" iconName="doc.text.fill" color="#BA68C8" />
-          <ActionRow title="Export Cycle Data (CSV)" iconName="arrow.down.doc.fill" color="#81C784" />
+          <ActionRow
+            onPress={() => !privacyActionInProgress && handleExportLocalData('json')}
+            title="Export Local Data (JSON)"
+            iconName="arrow.down.doc.fill"
+            color="#81C784"
+          />
+          <ActionRow
+            onPress={() => !privacyActionInProgress && handleExportLocalData('csv')}
+            title="Export Local Data (CSV)"
+            iconName="square.and.arrow.up.fill"
+            color="#64B5F6"
+          />
+          <ActionRow
+            onPress={() => !privacyActionInProgress && handleDatabaseBackup()}
+            title="Backup SQLite Database"
+            iconName="lock.shield.fill"
+            color="#4DB6AC"
+          />
+          <ActionRow
+            onPress={() => !privacyActionInProgress && handleRestoreBackup()}
+            title="Restore from JSON Backup"
+            iconName="arrow.down.doc.fill"
+            color="#FFB74D"
+          />
+          <ActionRow
+            onPress={() => !privacyActionInProgress && confirmDeleteLocalData()}
+            title="Delete All Local Data"
+            iconName="trash.fill"
+            color={theme.error}
+          />
         </View>
 
       </ScrollView>

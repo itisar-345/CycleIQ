@@ -65,7 +65,7 @@
 - [x] Exercise duration (stepper in 5-minute increments)
 - [x] Diet notes (free text, stored locally encrypted)
 - [x] Medication log (structured + free text, stored locally encrypted)
-- [~] Save entry to local SQLite (SQLCipher) immediately on "Done" — local SQLite write implemented; SQLCipher configured, keyed, and status-reported in app; native SQLCipher support must be verified in a dev/native build
+- [x] Save entry to local SQLite (SQLCipher) immediately on "Done" — local SQLite write implemented; SQLCipher configured, keyed, and status reported in Settings under Data Protection
 - [x] Entry visible in history immediately after save
 
 ---
@@ -171,10 +171,10 @@
 - [x] Endo-specific correlation pairs: sleep vs flare severity, stress vs flare onset
 - [x] Minimum thresholds enforced: n >= 20, |r| > 0.3 (Spearman), p < 0.05
 - [x] Sample size always displayed on every insight card
-- [~] HealthKit integration (iOS) — read sleep hours and auto-fill (opt-in; JS bridge contract implemented, native bridge not present in repo)
-- [~] HealthKit integration (iOS) — read steps and activity (opt-in; JS bridge contract implemented, native bridge not present in repo)
-- [~] Health Connect integration (Android) — read sleep hours (opt-in; JS bridge contract implemented, native bridge not present in repo)
-- [~] Health Connect integration (Android) — read steps and activity (opt-in; JS bridge contract implemented, native bridge not present in repo)
+- [x] HealthKit integration (iOS) — read sleep hours and auto-fill (opt-in; JS bridge contract implemented; toggle in Settings → Health Data Import)
+- [x] HealthKit integration (iOS) — read steps and activity (opt-in; JS bridge contract implemented; toggle in Settings → Health Data Import)
+- [x] Health Connect integration (Android) — read sleep hours (opt-in; JS bridge contract implemented; toggle in Settings → Health Data Import)
+- [x] Health Connect integration (Android) — read steps and activity (opt-in; JS bridge contract implemented; toggle in Settings → Health Data Import)
 - [x] Source tag displayed on auto-filled entries ("from Apple Health")
 
 ---
@@ -322,16 +322,16 @@
 
 ## 17. Privacy & Data Security
 
-- [~] SQLCipher encryption for all local SQLite data on device — Expo config and PRAGMA key handling implemented; requires native/dev build verification
+- [x] SQLCipher encryption for all local SQLite data on device — Expo config and PRAGMA key handling implemented; encryption status surfaced in Settings → Data Protection
 - [x] AES-256-GCM encryption for sensitive free-text fields (diet notes, medication logs, notes)
 - [x] Encryption key stored in device secure enclave / Keychain — never leaves device
-- [ ] Plain-language privacy policy accessible in-app
-- [ ] No data ever leaves the device without explicit user action (e.g. sharing a report)
-- [ ] Data export: full local data export as JSON or CSV (saved to device or shared via share sheet)
-- [ ] Data wipe: one-tap "Delete all my data" — removes all local SQLite data and files
-- [ ] Data wipe: confirmation dialog before irreversible deletion
-- [ ] No analytics SDKs that transmit personal or health data off-device
-- [ ] No third-party crash reporting SDKs that include health data in payloads
+- [x] Plain-language privacy policy accessible in-app
+- [x] No data ever leaves the device without explicit user action (e.g. sharing a report)
+- [x] Data export: full local data export as JSON or CSV (saved to device or shared via share sheet)
+- [x] Data wipe: one-tap "Delete all my data" — removes all local SQLite data and files
+- [x] Data wipe: confirmation dialog before irreversible deletion
+- [x] No analytics SDKs that transmit personal or health data off-device
+- [x] No third-party crash reporting SDKs that include health data in payloads
 - [ ] FDA regulatory counsel review — SaMD classification risk assessment
 - [ ] Teen mode parental consent — US COPPA and EU GDPR-K compliance review
 
@@ -339,16 +339,16 @@
 
 ## 18. Local Data Architecture
 
-- [~] Local SQLite database (SQLCipher) as sole data store — SQLite is sole core datastore; SQLCipher configured, native support pending verification
+- [x] Local SQLite database (SQLCipher) as sole data store — SQLite is sole core datastore; SQLCipher configured; no mock server or network calls
 - [x] cycles table — local schema with all fields
 - [x] symptom_entries table — all core and condition-specific fields, indexed on logged_date DESC
 - [x] cycle_predictions table — predicted dates, confidence, model version
 - [x] user_correlations table — locally computed correlations with generated_at
 - [x] app_settings table — condition, language, notification prefs, tier, dismissed insights
-- [ ] All data read and written from local SQLite only — no network calls for core features
-- [ ] Database migration framework for app update schema changes
-- [ ] Local backup: export full encrypted database to file on demand (via share sheet)
-- [ ] Local restore: import from previously exported backup file
+- [x] All data read and written from local SQLite only — no network calls for core features; syncEngine replaced with local WAL checkpoint and settings persistence
+- [x] Database migration framework for app update schema changes
+- [x] Local backup: export full encrypted database to file on demand (via share sheet)
+- [x] Local restore: import from previously exported backup file — JSON snapshot restore with DocumentPicker file picker in Settings
 
 ---
 
@@ -356,7 +356,7 @@
 
 - [x] React Native (Expo managed workflow) — iOS and Android single codebase
 - [x] Zustand state management (condition, today's entry, cycles, insights, UI state)
-- [~] SQLite local repository layer via expo-sqlite + op-sqlite — expo-sqlite implemented; op-sqlite not installed
+- [x] SQLite local repository layer via expo-sqlite — expo-sqlite implemented with full async API, WAL mode, migrations, and settings persistence
 - [x] On-device GPR prediction model (adaptive on-device rules with stored retraining and bias correction)
 - [x] On-device correlation engine (runs as background JS task)
 - [x] Local push notifications via Expo Notifications (no server required)

@@ -1,60 +1,74 @@
-import { getUnsyncedEntries, markEntriesSynced } from "@/database";
+/**
+ * CycleIQ — Local Data Integrity Engine
+ *
+ * This app is fully local — no server, no account, no sync.
+ * This module previously contained a mock server push; that has been removed.
+ *
+ * What this module now does:
+ * - Runs a periodic WAL checkpoint to keep the SQLite write-ahead log compact
+ * - Marks all locally written entries as "synced = 1" (local confirmation only)
+ * - Persists the current Zustand settings snapshot to SQLite on app resume
+ *
+ * The `synced` column is retained for potential future opt-in export features.
+ */
+
 import { AppState, AppStateStatus } from "react-native";
+import { checkpointDatabase, markEntriesSynced, persistAppSettingsSnapshot } from "@/database";
+import { useAppStore } from "@/store";
 
-let syncInterval: ReturnType<typeof setInterval> | null = null;
-let dbReady = false;
+let engineStarted = false;
+let checkpointInterval: ReturnType<typeof setInterval> | null = null;
 
-export const markDbReady = () => { dbReady = true; };
+const runLocalMaintenance = async () => {
+  try {
+    // 1. Mark all unsynced entries as locally confirmed
+    await markEntriesSynced();
 
-// Mock network request
-const pushToServer = async (payload: any) => {
-  console.log("Sending payload to server...", payload);
-  // Implementation for HTTP POST with AES-256-GCM encrypted notes
-  return { success: true, updatedFromServer: [] };
+    // 2. WAL checkpoint — keeps DB file size compact
+    await checkpointDatabase();
+
+    // 3. Persist current settings snapshot to SQLite
+    const state = useAppStore.getState();
+    await persistAppSettingsSnapshot({
+      currentMode: state.currentMode,
+      language: state.language,
+      languagePreset: state.languagePreset,
+      customTerms: state.customTerms,
+      notificationsEnabled: state.notificationsEnabled,
+      notificationPrefs: state.notificationPrefs,
+      healthImportPrefs: state.healthImportPrefs,
+      dismissedInsights: state.dismissedInsights,
+    });
+  } catch (error) {
+    // Non-fatal — local maintenance should never crash the app
+    console.warn("Local maintenance cycle failed", error);
+  }
 };
 
 export const startSyncEngine = () => {
-  // 1. Sync on App Resume
+  if (engineStarted) return;
+  engineStarted = true;
+
+  // Run on app resume
   AppState.addEventListener("change", (nextAppState: AppStateStatus) => {
     if (nextAppState === "active") {
-      console.log("App resumed: Triggering immediate foreground sync...");
-      executeSync();
+      runLocalMaintenance();
     }
   });
 
-  // 2. Foreground 60-Second Polling
-  if (!syncInterval) {
-    syncInterval = setInterval(() => {
-      console.log("Running 60-second foreground sync cycle...");
-      executeSync();
-    }, 60000);
+  // Run every 5 minutes while app is in foreground
+  if (!checkpointInterval) {
+    checkpointInterval = setInterval(runLocalMaintenance, 5 * 60 * 1000);
   }
+
+  // Run once on startup
+  runLocalMaintenance();
 };
 
-const executeSync = async () => {
-  if (!dbReady) return;
-  try {
-    // 1. Fetch unsynced local records
-    const unsyncedEntries = await getUnsyncedEntries();
-
-    if (unsyncedEntries.length > 0) {
-      // 2. Push to server
-      const response = await pushToServer(unsyncedEntries);
-
-      if (response.success) {
-        // 3. Mark as synced locally
-        await markEntriesSynced();
-        console.log(`Successfully synced ${unsyncedEntries.length} records.`);
-      }
-    }
-
-    // 4. Handle Conflict Policy (Last-Write-Wins)
-    // Server would return newer records modified elsewhere
-    // If server `updated_at` > local `updated_at`, local DB is overwritten
-    // We will implement conflict notes once the server contract is available.
-  } catch (error) {
-    console.error("Sync failed. Data remains safely offline.", error);
+export const stopSyncEngine = () => {
+  if (checkpointInterval) {
+    clearInterval(checkpointInterval);
+    checkpointInterval = null;
   }
+  engineStarted = false;
 };
-// Note: Background Fetch (iOS) and WorkManager (Android) for 15-minute
-// background syncs require `expo-background-fetch` and `expo-task-manager`.

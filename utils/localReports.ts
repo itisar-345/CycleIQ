@@ -54,3 +54,10 @@ export const shareReport = async (uri: string): Promise<boolean> => {
   await Sharing.shareAsync(uri);
   return true;
 };
+
+export const deleteLocalReports = async (): Promise<void> => {
+  const info = await (FileSystem as any).getInfoAsync(reportsDirectory).catch(() => null);
+  if (info?.exists) {
+    await (FileSystem as any).deleteAsync(reportsDirectory, { idempotent: true });
+  }
+};

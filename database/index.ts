@@ -5,6 +5,7 @@ import type { HealthImportPrefs } from "../utils/healthIntegrations";
 import { getOrCreateDbKey } from "../utils/secureKey";
 
 export const dbName = "cycleiq.sqlite";
+export const dbSchemaVersion = 3;
 
 let db: SQLite.SQLiteDatabase | null = null;
 let dbKeyApplied = false;
@@ -56,6 +57,11 @@ export const getDatabaseEncryptionStatus = async () => {
   return dbEncryptionStatus;
 };
 
+export const checkpointDatabase = async (): Promise<void> => {
+  const database = await ensureDb();
+  await database.runAsync(`PRAGMA wal_checkpoint(FULL);`).catch(() => {});
+};
+
 const execSql = async (sql: string, params: any[] = []): Promise<any> => {
   const database = await ensureDb();
   try {
@@ -76,6 +82,71 @@ const createLocalId = () => {
   const randomUUID = globalThis.crypto?.randomUUID?.bind(globalThis.crypto);
   if (randomUUID) return randomUUID();
   return `local-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+};
+
+type DatabaseMigration = {
+  id: number;
+  name: string;
+  up: (database: SQLite.SQLiteDatabase) => Promise<void>;
+};
+
+const databaseMigrations: DatabaseMigration[] = [
+  {
+    id: 1,
+    name: "symptom-health-and-clot-fields",
+    up: async (database) => {
+      await database.runAsync(`ALTER TABLE symptom_entries ADD COLUMN steps_count INTEGER;`).catch(() => {});
+      await database.runAsync(`ALTER TABLE symptom_entries ADD COLUMN activity_minutes INTEGER;`).catch(() => {});
+      await database.runAsync(`ALTER TABLE symptom_entries ADD COLUMN health_sleep_source TEXT;`).catch(() => {});
+      await database.runAsync(`ALTER TABLE symptom_entries ADD COLUMN health_activity_source TEXT;`).catch(() => {});
+      await database.runAsync(`ALTER TABLE symptom_entries ADD COLUMN clots_present INTEGER DEFAULT 0;`).catch(() => {});
+    },
+  },
+  {
+    id: 2,
+    name: "prediction-and-prompt-indexes",
+    up: async (database) => {
+      await database.runAsync(`CREATE INDEX IF NOT EXISTS idx_symptom_date ON symptom_entries(logged_date DESC)`);
+      await database.runAsync(`CREATE INDEX IF NOT EXISTS idx_flare_start ON symptom_entries(flare_start)`);
+      await database.runAsync(`CREATE INDEX IF NOT EXISTS idx_cycle_predictions_generated ON cycle_predictions(generated_at DESC)`);
+      await database.runAsync(`CREATE INDEX IF NOT EXISTS idx_red_flag_prompt_logs_date ON red_flag_prompt_logs(triggered_at DESC)`);
+    },
+  },
+  {
+    id: 3,
+    name: "local-architecture-migration-ledger",
+    up: async (database) => {
+      await database.runAsync(`CREATE TABLE IF NOT EXISTS schema_migrations (
+        id INTEGER PRIMARY KEY,
+        name TEXT NOT NULL,
+        applied_at TEXT NOT NULL
+      )`);
+    },
+  },
+];
+
+const runDatabaseMigrations = async (database: SQLite.SQLiteDatabase) => {
+  await database.runAsync(`CREATE TABLE IF NOT EXISTS schema_migrations (
+    id INTEGER PRIMARY KEY,
+    name TEXT NOT NULL,
+    applied_at TEXT NOT NULL
+  )`);
+  const appliedRows = await database.getAllAsync<{ id: number }>(`SELECT id FROM schema_migrations;`);
+  const applied = new Set(appliedRows.map((row) => row.id));
+  for (const migration of databaseMigrations) {
+    if (applied.has(migration.id)) continue;
+    await migration.up(database);
+    await database.runAsync(
+      `INSERT OR IGNORE INTO schema_migrations (id, name, applied_at) VALUES (?, ?, ?);`,
+      [migration.id, migration.name, new Date().toISOString()],
+    );
+  }
+  await database.runAsync(
+    `INSERT INTO app_settings (key, value_json, updated_at)
+     VALUES (?, ?, ?)
+     ON CONFLICT(key) DO UPDATE SET value_json = excluded.value_json, updated_at = excluded.updated_at;`,
+    ["db_schema_version", JSON.stringify(dbSchemaVersion), new Date().toISOString()],
+  );
 };
 
 export const initDb = async () => {
@@ -184,6 +255,7 @@ export const initDb = async () => {
       value_json TEXT NOT NULL,
       updated_at TEXT NOT NULL
     )`);
+    await runDatabaseMigrations(database);
   });
   return database;
 };
@@ -499,6 +571,96 @@ export const getAllEntries = async () => {
     entries.push(result.rows.item(i));
   }
   return entries;
+};
+
+const rowsToArray = async (sql: string, params: any[] = []): Promise<any[]> => {
+  const result = await execSql(sql, params);
+  const rows: any[] = [];
+  for (let i = 0; i < result.rows.length; i++) rows.push(result.rows.item(i));
+  return rows;
+};
+
+const localDataTables = [
+  "cycles",
+  "symptom_entries",
+  "cycle_predictions",
+  "prediction_feedback",
+  "user_correlations",
+  "red_flag_prompt_logs",
+  "app_settings",
+  "schema_migrations",
+] as const;
+
+export const exportLocalDataSnapshot = async () => {
+  await initDb();
+  return {
+    exported_at: new Date().toISOString(),
+    app: "CycleIQ",
+    schema: "cycleiq-local-export-v2",
+    schema_version: dbSchemaVersion,
+    cycles: await rowsToArray(`SELECT * FROM cycles ORDER BY start_date DESC;`),
+    symptom_entries: await rowsToArray(`SELECT * FROM symptom_entries ORDER BY logged_date DESC;`),
+    cycle_predictions: await rowsToArray(`SELECT * FROM cycle_predictions ORDER BY generated_at DESC;`),
+    prediction_feedback: await rowsToArray(`SELECT * FROM prediction_feedback ORDER BY recorded_at DESC;`),
+    user_correlations: await rowsToArray(`SELECT * FROM user_correlations ORDER BY generated_at DESC;`),
+    red_flag_prompt_logs: await rowsToArray(`SELECT * FROM red_flag_prompt_logs ORDER BY triggered_at DESC;`),
+    app_settings: await rowsToArray(`SELECT * FROM app_settings ORDER BY key ASC;`),
+    schema_migrations: await rowsToArray(`SELECT * FROM schema_migrations ORDER BY id ASC;`),
+  };
+};
+
+const insertRestoredRows = async (
+  database: SQLite.SQLiteDatabase,
+  tableName: string,
+  rows: Record<string, any>[] = [],
+) => {
+  for (const row of rows) {
+    const columns = Object.keys(row);
+    if (columns.length === 0) continue;
+    const placeholders = columns.map(() => "?").join(", ");
+    const columnList = columns.map((column) => `"${column.replace(/"/g, '""')}"`).join(", ");
+    await database.runAsync(
+      `INSERT OR REPLACE INTO ${tableName} (${columnList}) VALUES (${placeholders});`,
+      columns.map((column) => row[column]),
+    );
+  }
+};
+
+export const restoreLocalDataSnapshot = async (snapshot: Record<string, any>): Promise<void> => {
+  if (snapshot?.app !== "CycleIQ" || typeof snapshot?.schema !== "string") {
+    throw new Error("Invalid CycleIQ local data backup.");
+  }
+  const database = await initDb();
+  await database.withTransactionAsync(async () => {
+    await database.runAsync(`DELETE FROM symptom_entries;`);
+    await database.runAsync(`DELETE FROM cycle_predictions;`);
+    await database.runAsync(`DELETE FROM prediction_feedback;`);
+    await database.runAsync(`DELETE FROM user_correlations;`);
+    await database.runAsync(`DELETE FROM red_flag_prompt_logs;`);
+    await database.runAsync(`DELETE FROM app_settings;`);
+    await database.runAsync(`DELETE FROM schema_migrations;`);
+    await database.runAsync(`DELETE FROM cycles;`);
+
+    for (const tableName of localDataTables) {
+      await insertRestoredRows(database, tableName, snapshot[tableName] ?? []);
+    }
+    await runDatabaseMigrations(database);
+  });
+};
+
+export const wipeLocalDatabase = async (): Promise<void> => {
+  const database = await initDb();
+  await database.withTransactionAsync(async () => {
+    await database.runAsync(`DELETE FROM symptom_entries;`);
+    await database.runAsync(`DELETE FROM cycles;`);
+    await database.runAsync(`DELETE FROM cycle_predictions;`);
+    await database.runAsync(`DELETE FROM prediction_feedback;`);
+    await database.runAsync(`DELETE FROM user_correlations;`);
+    await database.runAsync(`DELETE FROM red_flag_prompt_logs;`);
+    await database.runAsync(`DELETE FROM app_settings;`);
+    await database.runAsync(`DELETE FROM schema_migrations;`);
+    await runDatabaseMigrations(database);
+  });
 };
 
 export const getUnsyncedEntries = async () => {

@@ -37,7 +37,16 @@ export default function ProfileScreen() {
       .catch(() => setDatabaseEncryption(null));
   }, []);
 
-  const toggleMode = (mode: AppMode) => setMode(mode);
+  const toggleMode = (mode: AppMode) => {
+    setMode(mode);
+    // If switching into a condition mode with no existing setup data, route to that condition's setup screen
+    const { pcosData, endoData } = useAppStore.getState();
+    if ((mode === 'pcos' || mode === 'pcod') && !pcosData) {
+      router.push(`/onboarding/${mode}` as any);
+    } else if (mode === 'endo' && !endoData) {
+      router.push('/onboarding/endo' as any);
+    }
+  };
 
   // Post-pill progress (0–90 days)
   const postPillProgress = (() => {

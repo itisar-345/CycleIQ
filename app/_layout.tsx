@@ -1,7 +1,5 @@
-import { getCyclePredictions, initDb } from "@/database";
-import { useColorScheme } from "@/hooks/use-color-scheme";
+import { initDb, getCyclePredictions } from "@/database";
 import { useAppStore } from "@/store";
-import { DarkTheme, DefaultTheme, ThemeProvider } from "@react-navigation/native";
 import { Stack, router, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
@@ -18,7 +16,6 @@ export const unstable_settings = {
 };
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
   const { isOnboarded, notificationsEnabled, notificationPrefs, postPillMode, postPillStartDate, currentMode } = useAppStore();
   const segments = useSegments();
   const [mounted, setMounted] = useState(false);
@@ -58,24 +55,29 @@ export default function RootLayout() {
   }, [isOnboarded, dbReady, notificationsEnabled, notificationPrefs, currentMode, postPillMode, postPillStartDate]);
 
   useEffect(() => {
-    if (!mounted) return;
+    // Wait for both mount and DB before routing — DB must be ready before
+    // any screen that calls database functions mounts.
+    if (!mounted || !dbReady) return;
     const inOnboardingGroup = segments[0] === "onboarding";
     if (!isOnboarded && !inOnboardingGroup) {
-      router.replace("/onboarding");
+      router.replace("/onboarding/goal" as any);
     } else if (isOnboarded && inOnboardingGroup) {
       router.replace("/(tabs)");
     }
-  }, [isOnboarded, mounted, segments]);
+  }, [isOnboarded, mounted, dbReady, segments]);
 
   return (
-    <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
+    <>
       <Stack>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="onboarding" options={{ headerShown: false }} />
-        <Stack.Screen name="privacy" options={{ title: "Privacy" }} />
-        <Stack.Screen name="modal" options={{ presentation: "modal", title: "Modal" }} />
+        <Stack.Screen name="cycle" options={{ headerShown: false }} />
+        <Stack.Screen name="privacy" options={{ headerShown: false }} />
+        <Stack.Screen name="report" options={{ headerShown: false }} />
+        <Stack.Screen name="reports" options={{ headerShown: false }} />
+        <Stack.Screen name="appointment-prep" options={{ headerShown: false }} />
       </Stack>
       <StatusBar style="auto" />
-    </ThemeProvider>
+    </>
   );
 }

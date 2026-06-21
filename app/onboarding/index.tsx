@@ -6,7 +6,31 @@ import React from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-export default function ConditionSelection() {
+const CONDITIONS = [
+  {
+    title: "PCOS",
+    desc: "Polycystic ovary syndrome — irregular cycles, hormonal & metabolic symptoms.",
+    mode: "pcos" as AppMode,
+    path: "/onboarding/pcos",
+    accent: "#E8A0BF",
+  },
+  {
+    title: "PCOD",
+    desc: "Polycystic ovarian disease — cyst tracking & hormonal symptom palette.",
+    mode: "pcod" as AppMode,
+    path: "/onboarding/pcod",
+    accent: "#80DEEA",
+  },
+  {
+    title: "Endometriosis",
+    desc: "Flare tracking, advanced pain logging, and red-flag alerts.",
+    mode: "endo" as AppMode,
+    path: "/onboarding/endo",
+    accent: "#CE93D8",
+  },
+];
+
+export default function ConditionSelectionScreen() {
   const colorScheme = useColorScheme() ?? "light";
   const theme = Colors[colorScheme];
   const { setMode } = useAppStore();
@@ -16,70 +40,33 @@ export default function ConditionSelection() {
     router.push(path as any);
   };
 
-  const ConditionCard = ({
-    title,
-    desc,
-    mode,
-    path,
-    bgColor,
-    borderColor,
-  }: any) => (
-    <TouchableOpacity
-      style={[styles.card, { backgroundColor: bgColor, borderColor }]}
-      onPress={() => handleSelect(mode, path)}
-      activeOpacity={0.8}
-    >
-      <Text style={[styles.cardTitle, { color: theme.text }]}>{title}</Text>
-      <Text style={[styles.cardDesc, { color: theme.textSecondary }]}>
-        {desc}
-      </Text>
-    </TouchableOpacity>
-  );
-
   return (
-    <SafeAreaView
-      style={[styles.container, { backgroundColor: theme.background }]}
-    >
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
+      <View style={styles.backRow}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+          <Text style={[styles.backText, { color: theme.tint }]}>← Back</Text>
+        </TouchableOpacity>
+      </View>
+
       <View style={styles.header}>
-        <Text style={[styles.title, { color: theme.text }]}>CycleIQ Setup</Text>
+        <Text style={[styles.title, { color: theme.text }]}>Which condition?</Text>
         <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
-          What is your primary focus?
+          We'll tailor your log fields and insights. You can change this any time in Settings.
         </Text>
       </View>
 
       <View style={styles.content}>
-        <ConditionCard
-          title="Standard Tracking"
-          desc="Cycle length history and general symptom tracking."
-          mode="standard"
-          path="/onboarding/cycle-history"
-          bgColor={theme.surface}
-          borderColor={theme.border}
-        />
-        <ConditionCard
-          title="PCOS"
-          desc="Diagnosis, custom symptom palette, & metabolic proxies."
-          mode="pcos"
-          path="/onboarding/pcos"
-          bgColor={theme.pcos + "20"}
-          borderColor={theme.pcos}
-        />
-        <ConditionCard
-          title="Endometriosis"
-          desc="Stage, flare history, and advanced pain tracking."
-          mode="endo"
-          path="/onboarding/endo"
-          bgColor={theme.endo + "20"}
-          borderColor={theme.endo}
-        />
-        <ConditionCard
-          title="Irregular (Perimenopause)"
-          desc="Adaptive predictions without assuming regularity."
-          mode="peri"
-          path="/onboarding/cycle-history"
-          bgColor={theme.peri + "20"}
-          borderColor={theme.peri}
-        />
+        {CONDITIONS.map((c) => (
+          <TouchableOpacity
+            key={c.mode}
+            style={[styles.card, { backgroundColor: c.accent + "20", borderColor: c.accent }]}
+            onPress={() => handleSelect(c.mode, c.path)}
+            activeOpacity={0.8}
+          >
+            <Text style={[styles.cardTitle, { color: theme.text }]}>{c.title}</Text>
+            <Text style={[styles.cardDesc, { color: theme.textSecondary }]}>{c.desc}</Text>
+          </TouchableOpacity>
+        ))}
       </View>
     </SafeAreaView>
   );
@@ -87,11 +74,14 @@ export default function ConditionSelection() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  header: { padding: 30, paddingBottom: 10 },
-  title: { fontSize: 32, fontWeight: "bold", marginBottom: 8 },
-  subtitle: { fontSize: 18 },
-  content: { padding: 20, gap: 16 },
+  backRow: { paddingHorizontal: 16, paddingTop: 8 },
+  backBtn: { alignSelf: "flex-start", paddingVertical: 6 },
+  backText: { fontSize: 16, fontWeight: "600" },
+  header: { padding: 24, paddingBottom: 12 },
+  title: { fontSize: 28, fontWeight: "bold", marginBottom: 8 },
+  subtitle: { fontSize: 15, lineHeight: 22 },
+  content: { padding: 20, gap: 14 },
   card: { padding: 20, borderRadius: 16, borderWidth: 2 },
   cardTitle: { fontSize: 20, fontWeight: "bold", marginBottom: 6 },
-  cardDesc: { fontSize: 15, lineHeight: 22 },
+  cardDesc: { fontSize: 14, lineHeight: 20 },
 });

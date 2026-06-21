@@ -3,7 +3,7 @@ import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import type { HealthImportPrefs } from "@/utils/healthIntegrations";
 
-export type AppMode = "standard" | "pcos" | "endo" | "peri" | "teen";
+export type AppMode = "standard" | "pcos" | "pcod" | "endo" | "peri" | "teen";
 
 export interface PCOSSetup {
   diagnosisStatus: string;
@@ -17,6 +17,7 @@ export interface EndoSetup {
   flareHistory: string;
   painLocations: string[];
   currentManagement: string;
+  currentlyInFlare: boolean;
 }
 
 export interface NotificationPrefs {
@@ -72,6 +73,8 @@ interface AppState {
   lastSafeguardPrompt: string | null; // ISO date for Sec 4.7 cooldown;
   lastRedFlagPrompt: string | null;
   lastPCOSPrompt: string | null;
+  lastNotificationPrompt: string | null;
+  cycleVarianceDays: number | null;
   isTeen: boolean; // Teen mode trigger
 
   setOnboarded: (status: boolean) => void;
@@ -84,7 +87,7 @@ interface AppState {
   setDyspareuniaOptIn: (enabled: boolean) => void;
   setPCOSWidePrediction: (enabled: boolean) => void;
   setActivePeriod: (id: string | null, date: string | null) => void;
-  setCycleHistory: (avgLength: number, lastDate: string) => void;
+  setCycleHistory: (avgLength: number, lastDate: string, varianceDays?: number) => void;
   setProfileInfo: (
     age: number,
     gender: string,
@@ -98,6 +101,8 @@ interface AppState {
   setLastPCOSPrompt: (date: string | null) => void;
   setLastSafeguardPrompt: (date: string | null) => void;
   setLastRedFlagPrompt: (date: string | null) => void;
+  setLastNotificationPrompt: (date: string | null) => void;
+  checkNotificationPromptCooldown: () => boolean;
   checkSafeguardCooldown: () => boolean;
   checkPCOSPromptCooldown: () => boolean;
   checkRedFlagCooldown: () => boolean;
@@ -158,6 +163,8 @@ export const useAppStore = create<AppState>()(
       lastSafeguardPrompt: null as string | null,
       lastRedFlagPrompt: null as string | null,
       lastPCOSPrompt: null as string | null,
+      lastNotificationPrompt: null as string | null,
+      cycleVarianceDays: null as number | null,
       isTeen: false as boolean,
       notificationPrefs: {
         period: true,
@@ -200,8 +207,8 @@ export const useAppStore = create<AppState>()(
       }),
       setActivePeriod: (id, date) =>
         set({ activePeriodId: id, activePeriodStartDate: date }),
-      setCycleHistory: (avgLength, lastDate) =>
-        set({ averageCycleLength: avgLength, lastPeriodDate: lastDate }),
+      setCycleHistory: (avgLength, lastDate, varianceDays) =>
+        set({ averageCycleLength: avgLength, lastPeriodDate: lastDate, cycleVarianceDays: varianceDays ?? null }),
       setProfileInfo: (
         age,
         gender,
@@ -238,6 +245,16 @@ export const useAppStore = create<AppState>()(
         set({ lastRedFlagPrompt: date }),
       setLastPCOSPrompt: (date: string | null) =>
         set({ lastPCOSPrompt: date }),
+      setLastNotificationPrompt: (date: string | null) =>
+        set({ lastNotificationPrompt: date }),
+      checkNotificationPromptCooldown: () => {
+        const state = get();
+        if (!state.lastNotificationPrompt) return true;
+        const daysDiff =
+          (Date.now() - new Date(state.lastNotificationPrompt).getTime()) /
+          (1000 * 60 * 60 * 24);
+        return daysDiff >= 30;
+      },
       setLanguagePreset: (preset) => {
         set({ languagePreset: preset });
         persistSettingsToSqlite(get());

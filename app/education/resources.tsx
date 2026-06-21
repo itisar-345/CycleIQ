@@ -1,4 +1,5 @@
 import { useAppStore } from "@/store";
+import { router } from "expo-router";
 import React from "react";
 import {
     ScrollView,
@@ -57,8 +58,14 @@ export default function ResourcesScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+          <Text style={styles.backText}>Back</Text>
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Resources</Text>
+        <View style={{ width: 56 }} />
+      </View>
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.title}>Mental Health Resources</Text>
         <Text style={styles.subtitle}>
           Non-clinical support options. These are not substitutes for
           professional care.
@@ -120,6 +127,10 @@ export default function ResourcesScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F8F9FA" },
+  header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: "#E5E7EB" },
+  headerTitle: { fontSize: 18, fontWeight: "bold", color: "#2A2422" },
+  backButton: { width: 56, paddingVertical: 8 },
+  backText: { fontWeight: "700", color: "#FFB8A1" },
   content: { padding: 20, paddingBottom: 40 },
   title: {
     fontSize: 28,

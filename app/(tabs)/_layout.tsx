@@ -25,8 +25,8 @@ export default function TabLayout() {
         name="index"
         options={{
           title: "Home",
-          tabBarIcon: ({ color }: { color: string }) => (
-            <IconSymbol size={28} name="house.fill" color={color} />
+          tabBarIcon: ({ color }: { color: string | import('react-native').ColorValue }) => (
+            <IconSymbol size={28} name="house.fill" color={color as string} />
           ),
         }}
       />
@@ -34,8 +34,8 @@ export default function TabLayout() {
         name="log"
         options={{
           title: "Log Hub",
-          tabBarIcon: ({ color }: { color: string }) => (
-            <IconSymbol size={28} name="paperplane.fill" color={color} />
+          tabBarIcon: ({ color }: { color: string | import('react-native').ColorValue }) => (
+            <IconSymbol size={28} name="paperplane.fill" color={color as string} />
           ),
         }}
       />
@@ -43,8 +43,8 @@ export default function TabLayout() {
         name="calendar"
         options={{
           title: "Calendar",
-          tabBarIcon: ({ color }: { color: string }) => (
-            <IconSymbol size={28} name="calendar" color={color} />
+          tabBarIcon: ({ color }: { color: string | import('react-native').ColorValue }) => (
+            <IconSymbol size={28} name="calendar" color={color as string} />
           ),
         }}
       />
@@ -52,8 +52,8 @@ export default function TabLayout() {
         name="education"
         options={{
           title: "Education",
-          tabBarIcon: ({ color }: { color: string }) => (
-            <IconSymbol size={28} name="books.vertical.fill" color={color} />
+          tabBarIcon: ({ color }: { color: string | import('react-native').ColorValue }) => (
+            <IconSymbol size={28} name="books.vertical.fill" color={color as string} />
           ),
         }}
       />
@@ -61,8 +61,8 @@ export default function TabLayout() {
         name="history"
         options={{
           title: "History",
-          tabBarIcon: ({ color }: { color: string }) => (
-            <IconSymbol size={28} name="clock.fill" color={color} />
+          tabBarIcon: ({ color }: { color: string | import('react-native').ColorValue }) => (
+            <IconSymbol size={28} name="clock.fill" color={color as string} />
           ),
         }}
       />
@@ -70,8 +70,8 @@ export default function TabLayout() {
         name="analytics"
         options={{
           title: "Insights",
-          tabBarIcon: ({ color }: { color: string }) => (
-            <IconSymbol size={28} name="chevron.right" color={color} />
+          tabBarIcon: ({ color }: { color: string | import('react-native').ColorValue }) => (
+            <IconSymbol size={28} name="chevron.right" color={color as string} />
           ),
         }}
       />
@@ -79,8 +79,8 @@ export default function TabLayout() {
         name="profile"
         options={{
           title: "Profile",
-          tabBarIcon: ({ color }: { color: string }) => (
-            <IconSymbol size={28} name="chevron.right" color={color} />
+          tabBarIcon: ({ color }: { color: string | import('react-native').ColorValue }) => (
+            <IconSymbol size={28} name="chevron.right" color={color as string} />
           ),
         }}
       />

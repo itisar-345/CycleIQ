@@ -29,9 +29,9 @@ export const requestNotificationPermission = async (): Promise<boolean> => {
   if (isExpoGo) return false;
   try {
     const N = await getNotifications();
-    const current = await N.getPermissionsAsync();
-    if (current.granted) return true;
-    const requested = await N.requestPermissionsAsync();
+    const current = await N.getPermissionsAsync() as any;
+    if (current.granted || current.status === "granted") return true;
+    const requested = await N.requestPermissionsAsync() as any;
     return requested.granted || requested.status === "granted";
   } catch {
     return false;

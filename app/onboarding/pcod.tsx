@@ -6,9 +6,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useAppStore, PCOSSetup } from '@/store';
 
-export default function PCOSSetupScreen() {
+export default function PCODSetupScreen() {
   const colorScheme = useColorScheme() ?? 'light';
   const theme = Colors[colorScheme];
+  const accentColor = (theme as any).pcod ?? '#80DEEA';
   const { setPCOSData } = useAppStore();
 
   const [form, setForm] = useState<PCOSSetup>({
@@ -29,8 +30,8 @@ export default function PCOSSetupScreen() {
         <TouchableOpacity
           key={opt}
           style={[styles.optionButton, {
-            borderColor: theme.pcos,
-            backgroundColor: form[key] === opt ? theme.pcos : 'transparent',
+            borderColor: accentColor,
+            backgroundColor: form[key] === opt ? accentColor : 'transparent',
           }]}
           onPress={() => setForm({ ...form, [key]: opt })}
         >
@@ -46,11 +47,11 @@ export default function PCOSSetupScreen() {
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
       <View style={styles.backRow}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Text style={[styles.backText, { color: theme.pcos }]}>← Back</Text>
+          <Text style={[styles.backText, { color: accentColor }]}>← Back</Text>
         </TouchableOpacity>
       </View>
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={[styles.title, { color: theme.text }]}>PCOS Setup</Text>
+        <Text style={[styles.title, { color: theme.text }]}>PCOD Setup</Text>
 
         <View style={[styles.privacyNote, { backgroundColor: theme.surface, borderColor: theme.border }]}>
           <Text style={[styles.privacyText, { color: theme.textSecondary }]}>
@@ -65,16 +66,16 @@ export default function PCOSSetupScreen() {
 
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: theme.text }]}>Cycle pattern type</Text>
-          {renderSingleSelect('cyclePattern', ['Infrequent (Oligomenorrhoea)', 'Absent (Amenorrhoea)', 'Irregular'])}
+          {renderSingleSelect('cyclePattern', ['Regular with cysts', 'Irregular', 'Absent (Amenorrhoea)'])}
         </View>
 
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: theme.text }]}>Current management</Text>
-          {renderSingleSelect('currentManagement', ['Hormonal BC', 'Metformin', 'Diet-only', 'None'])}
+          {renderSingleSelect('currentManagement', ['Hormonal BC', 'Lifestyle changes', 'Medication', 'None'])}
         </View>
 
         <Text style={[styles.deferNote, { color: theme.textSecondary }]}>
-          You can add comorbidities and pain detail from your profile after setup.
+          You can add symptoms and cyst detail from your profile after setup.
         </Text>
 
         <TouchableOpacity

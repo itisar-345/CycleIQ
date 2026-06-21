@@ -1,13 +1,13 @@
 import { Colors } from "@/constants/theme";
-import { closeCycle, createCycle, getLatestCycle, getDayOfCycle, getPhaseForDay, getCyclePredictions, generateInsights, CycleInsight } from "@/database";
+import { closeCycle, createCycle, getLatestCycle, getDayOfCycle, getPhaseForDay, getCyclePredictions, generateInsights, CycleInsight, getLatestPredictionFeedback } from "@/database";
 import { PredictionResult } from "@/utils/predictions";
-import { scheduleAllCycleNotifications } from "@/utils/notifications";
+import { scheduleAllCycleNotifications, requestNotificationPermission } from "@/utils/notifications";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useAppStore } from "@/store";
 import { differenceInDays, format, parseISO } from "date-fns";
 import { router } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Alert,
   ScrollView,
@@ -32,12 +32,19 @@ export default function HomeScreen() {
     setInFlare,
     checkPCOSPromptCooldown,
     setLastPCOSPrompt,
+    age,
+    notificationsEnabled,
+    setNotificationPrefs,
     postPillMode,
     postPillStartDate,
     isTeen,
     dismissedInsights,
     languagePreset,
-    customTerms
+    customTerms,
+    healthImportPrefs,
+    lastNotificationPrompt,
+    setLastNotificationPrompt,
+    checkNotificationPromptCooldown,
   } = useAppStore();
   const [cycleLength, setCycleLength] = useState<number>(28);
   const [latestStartDate, setLatestStartDate] = useState<string | null>(null);
@@ -46,6 +53,21 @@ export default function HomeScreen() {
   const [predictionStats, setPredictionStats] = useState<PredictionResult | null>(null);
   const [latestInsight, setLatestInsight] = useState<CycleInsight | null>(null);
   const [medicationLoggedToday, setMedicationLoggedToday] = useState(false);
+  const [dataLoaded, setDataLoaded] = useState(false);
+  // Miss acknowledgment: shown once per session when last prediction was off by >4 days.
+  const [lastMissErrorDays, setLastMissErrorDays] = useState<number | null>(null);
+  const missShownRef = useRef(false);
+
+  // Profile completion checklist — deferred items from onboarding
+  // Spec: detailed condition profile, notifications, age/language, health data import
+  const healthImportEnabled = healthImportPrefs.appleHealthSleep || healthImportPrefs.appleHealthActivity ||
+    healthImportPrefs.healthConnectSleep || healthImportPrefs.healthConnectActivity;
+  const profileItems = [
+    !notificationsEnabled && { label: "Enable reminders", route: "/profile" },
+    !age && { label: "Add your age", route: "/profile" },
+    ["pcos","pcod","endo"].includes(currentMode) && !useAppStore.getState().pcosData && !useAppStore.getState().endoData && { label: "Complete condition profile", route: "/profile" },
+    !healthImportEnabled && { label: "Connect health data", route: "/profile" },
+  ].filter(Boolean) as { label: string; route: string }[];
 
   // Dynamic terminology
   const flowTerm = languagePreset === 'custom' ? customTerms.flow : 'flow';
@@ -87,7 +109,17 @@ export default function HomeScreen() {
         const allEntries = await getAllEntries();
         const todayEntry = allEntries.find((e: any) => e.logged_date?.startsWith(todayStr));
         setMedicationLoggedToday(!!(todayEntry?.medication_log_encrypted));
-        
+
+        // Load most recent prediction feedback — show miss note if off by >4 days
+        if (!missShownRef.current) {
+          const feedback = await getLatestPredictionFeedback();
+          if (feedback && Math.abs(feedback.error_days) > 4) {
+            setLastMissErrorDays(Math.round(feedback.error_days));
+            missShownRef.current = true;
+          }
+        }
+
+        setDataLoaded(true);
         if (latest && currentMode === "pcos" && !activePeriodId && latest.start_date) {
           const daysSinceStart = differenceInDays(new Date(), parseISO(latest.start_date));
           if (daysSinceStart >= 90) {
@@ -107,6 +139,7 @@ export default function HomeScreen() {
         }
       } catch (error) {
         console.error("Unable to load latest cycle length", error);
+        setDataLoaded(true);
       }
     };
     loadLatestCycle();
@@ -122,20 +155,32 @@ export default function HomeScreen() {
             const startDate = new Date().toISOString();
             const newId = await createCycle(startDate);
             setActivePeriod(newId, startDate);
-            // Refresh prediction immediately after new cycle is created
             const stats = await getCyclePredictions(currentMode, postPillMode, postPillStartDate ?? null);
             setPredictionStats(stats);
-            // Schedule period-day self-care & nutrition notifications
-            await scheduleAllCycleNotifications(
-              stats,
-              new Date(startDate)
-            );
+            await scheduleAllCycleNotifications(stats, new Date(startDate));
+            // Contextual notification ask — max once per 30 days, only when not yet granted
+            if (!notificationsEnabled && checkNotificationPromptCooldown()) {
+              setLastNotificationPrompt(new Date().toISOString());
+              setTimeout(() => {
+                Alert.alert(
+                  "Want a reminder next time?",
+                  "We can notify you 2 days before your next predicted period. You control all notification types in Settings.",
+                  [
+                    { text: "Not now", style: "cancel" },
+                    {
+                      text: "Yes, remind me",
+                      onPress: async () => {
+                        const granted = await requestNotificationPermission();
+                        if (granted) setNotificationPrefs({ period: true, dailyLog: true });
+                      },
+                    },
+                  ],
+                );
+              }, 800);
+            }
           } catch (error) {
             console.error("Failed starting period", error);
-            Alert.alert(
-              "Error",
-              "Could not log period start. Please try again.",
-            );
+            Alert.alert("Error", "Could not log period start. Please try again.");
           }
         },
       },
@@ -167,6 +212,36 @@ export default function HomeScreen() {
     return differenceInDays(new Date(), parseISO(flareStartDate)) + 1;
   };
 
+  // First-run empty state: data loaded but no cycle ever logged
+  if (dataLoaded && !latestStartDate && !activePeriodId) {
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
+        <View style={styles.emptyState}>
+          <Text style={styles.emptyIcon}>🩸</Text>
+          <Text style={[styles.emptyTitle, { color: theme.text }]}>You're all set</Text>
+          <Text style={[styles.emptyDesc, { color: theme.textSecondary }]}>
+            Log your last period to unlock your cycle dashboard, predictions, and insights.
+          </Text>
+          <TouchableOpacity
+            style={[styles.emptyCTA, { backgroundColor: theme.error }]}
+            onPress={handleStartPeriod}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.emptyCTAText}>Log my last period</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.emptySecondary, { borderColor: theme.border }]}
+            onPress={() => router.push("/log")}
+          >
+            <Text style={[styles.emptySecondaryText, { color: theme.textSecondary }]}>
+              Just log today's symptoms instead
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView
       style={[styles.container, { backgroundColor: theme.background }]}
@@ -189,6 +264,25 @@ export default function HomeScreen() {
             </Text>
           </View>
         </View>
+
+        {/* Profile completion banner — shown until all deferred items are done */}
+        {profileItems.length > 0 && (
+          <TouchableOpacity
+            style={[styles.profileBanner, { backgroundColor: theme.surface, borderColor: theme.tint }]}
+            onPress={() => router.push("/profile" as any)}
+            activeOpacity={0.8}
+          >
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.profileBannerTitle, { color: theme.text }]}>
+                Complete your profile
+              </Text>
+              <Text style={[styles.profileBannerDesc, { color: theme.textSecondary }]}>
+                {profileItems.map(i => i.label).join(" · ")}
+              </Text>
+            </View>
+            <Text style={[styles.profileBannerArrow, { color: theme.tint }]}>→</Text>
+          </TouchableOpacity>
+        )}
 
         {/* Post-pill progress bar */}
         {postPillMode && postPillStartDate && (() => {
@@ -318,6 +412,18 @@ export default function HomeScreen() {
               </Text>
             )}
 
+            {lastMissErrorDays !== null && (
+              <TouchableOpacity
+                onPress={() => setLastMissErrorDays(null)}
+                style={[styles.missNote, { backgroundColor: theme.border }]}
+                activeOpacity={0.7}
+              >
+                <Text style={{ color: theme.text, fontSize: 13, lineHeight: 19 }}>
+                  Last prediction was {Math.abs(lastMissErrorDays)}d {lastMissErrorDays > 0 ? "early" : "late"} — we're learning your pattern. Tap to dismiss.
+                </Text>
+              </TouchableOpacity>
+            )}
+
             <Text style={{ color: theme.textSecondary, fontSize: 11, marginTop: 10 }}>
               {predictionStats.label} · Not medical advice
             </Text>
@@ -340,7 +446,7 @@ export default function HomeScreen() {
               <Text style={[styles.cardTitle, { color: theme.error, flex: 1 }]}>Pain Management</Text>
             </View>
             <Text style={{ color: theme.text, marginBottom: 12 }}>Applying heat therapy directly to your lower abdomen or lower back can significantly reduce muscle tension and cramping.</Text>
-            <TouchableOpacity onPress={() => router.push('/education' as any)} style={[styles.bannerBtn, { backgroundColor: theme.error }]}>
+            <TouchableOpacity onPress={() => router.push('/(tabs)/education' as any)} style={[styles.bannerBtn, { backgroundColor: theme.error }]}>
               <Text style={styles.bannerBtnText}>View Protocols</Text>
             </TouchableOpacity>
           </View>
@@ -466,4 +572,17 @@ const styles = StyleSheet.create({
   subDayText: { fontSize: 16, marginTop: 4 },
   logButton: { padding: 18, borderRadius: 16, alignItems: "center" },
   logButtonText: { color: "#FFF", fontSize: 18, fontWeight: "bold" },
+  emptyState: { flex: 1, justifyContent: "center", alignItems: "center", padding: 36, gap: 16 },
+  emptyIcon: { fontSize: 64 },
+  emptyTitle: { fontSize: 28, fontWeight: "bold", textAlign: "center" },
+  emptyDesc: { fontSize: 16, textAlign: "center", lineHeight: 24 },
+  emptyCTA: { width: "100%", padding: 20, borderRadius: 16, alignItems: "center", marginTop: 8 },
+  emptyCTAText: { color: "#FFF", fontSize: 18, fontWeight: "bold" },
+  emptySecondary: { width: "100%", padding: 14, borderRadius: 14, borderWidth: 1, alignItems: "center" },
+  emptySecondaryText: { fontSize: 15 },
+  profileBanner: { flexDirection: "row", alignItems: "center", padding: 14, borderRadius: 14, borderWidth: 1, marginBottom: 20 },
+  profileBannerTitle: { fontSize: 15, fontWeight: "700", marginBottom: 2 },
+  profileBannerDesc: { fontSize: 13, lineHeight: 18 },
+  profileBannerArrow: { fontSize: 20, fontWeight: "bold", paddingLeft: 8 },
+  missNote: { borderRadius: 10, padding: 10, marginTop: 10 },
 });

@@ -444,6 +444,13 @@ import { runPredictionEngine, PredictionResult } from "../utils/predictions";
  * Negative = predictions were too late (need to subtract days).
  * Capped at ±7 days to avoid over-correction.
  */
+export const getLatestPredictionFeedback = async (): Promise<{ error_days: number; recorded_at: string } | null> => {
+  const result = await execSql(
+    `SELECT error_days, recorded_at FROM prediction_feedback ORDER BY recorded_at DESC LIMIT 1;`
+  );
+  return result.rows.length > 0 ? result.rows.item(0) : null;
+};
+
 export const getPredictionBias = async (limit = 6): Promise<number> => {
   const result = await execSql(
     `SELECT error_days FROM prediction_feedback ORDER BY recorded_at DESC LIMIT ?;`,

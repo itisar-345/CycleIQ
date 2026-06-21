@@ -1,7 +1,8 @@
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import { router } from "expo-router";
 
 const sections = [
   {
@@ -36,8 +37,14 @@ export default function PrivacyScreen() {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
+      <View style={[styles.header, { borderBottomColor: theme.border }]}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+          <Text style={[styles.backText, { color: theme.tint }]}>Back</Text>
+        </TouchableOpacity>
+        <Text style={[styles.headerTitle, { color: theme.text }]}>Privacy</Text>
+        <View style={{ width: 56 }} />
+      </View>
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={[styles.title, { color: theme.text }]}>Privacy</Text>
         <Text style={[styles.intro, { color: theme.textSecondary }]}>
           CycleIQ is designed around local-first menstrual and symptom tracking.
         </Text>
@@ -54,8 +61,11 @@ export default function PrivacyScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1 },
+  headerTitle: { fontSize: 18, fontWeight: "bold" },
+  backButton: { width: 56, paddingVertical: 8 },
+  backText: { fontWeight: "700" },
   content: { padding: 20, paddingBottom: 40 },
-  title: { fontSize: 32, fontWeight: "700", marginBottom: 8 },
   intro: { fontSize: 15, lineHeight: 22, marginBottom: 20 },
   section: { borderWidth: 1, borderRadius: 12, padding: 16, marginBottom: 12 },
   sectionTitle: { fontSize: 17, fontWeight: "700", marginBottom: 6 },

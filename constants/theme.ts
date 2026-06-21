@@ -17,6 +17,7 @@ export const Colors = {
     error: '#E57373',
     success: '#81C784',
     pcos: '#A5D6A7', // Soft Green
+    pcod: '#80DEEA', // Soft Cyan
     endo: '#CE93D8', // Soft Purple
     peri: '#FFCC80', // Soft Orange
   },
@@ -33,6 +34,7 @@ export const Colors = {
     error: '#E07A5F',
     success: '#81B29A',
     pcos: '#E9C46A',
+    pcod: '#4DD0E1',
     endo: '#F4A261',
     peri: '#A8DADC',
     standard: '#E9E4D4',

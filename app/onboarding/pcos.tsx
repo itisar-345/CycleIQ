@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { StyleSheet, View, Text, ScrollView, TouchableOpacity } from 'react-native';
 import { Colors } from '@/constants/theme';
+import { OnboardingProgress } from '@/components/onboarding-progress';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -48,6 +49,7 @@ export default function PCOSSetupScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <Text style={[styles.backText, { color: theme.pcos }]}>← Back</Text>
         </TouchableOpacity>
+        <OnboardingProgress step={4} total={5} label="Step 4 — Condition details" />
       </View>
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={[styles.title, { color: theme.text }]}>PCOS Setup</Text>
@@ -91,7 +93,7 @@ export default function PCOSSetupScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  backRow: { paddingHorizontal: 16, paddingTop: 8 },
+  backRow: { paddingHorizontal: 16, paddingTop: 8, gap: 12 },
   backBtn: { alignSelf: 'flex-start', paddingVertical: 6 },
   backText: { fontSize: 16, fontWeight: '600' },
   content: { padding: 24, paddingBottom: 50 },

@@ -1,7 +1,8 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
+import { SAFEGUARDING_PROMPT_COOLDOWN_DAYS } from "@/constants/safeguarding";
 import type { HealthImportPrefs } from "@/utils/healthIntegrations";
+import { encryptedPersistStorage } from "@/utils/encryptedPersistStorage";
 
 export type AppMode = "standard" | "pcos" | "pcod" | "endo" | "peri" | "teen";
 
@@ -109,6 +110,7 @@ interface AppState {
   setLanguagePreset: (preset: "default" | "inclusive" | "custom") => void;
   setCustomTerms: (terms: { cycle?: string; flow?: string; body?: string }) => void;
   setNotificationPrefs: (prefs: Partial<NotificationPrefs>) => void;
+  setNotificationsEnabled: (enabled: boolean) => void;
   setHealthImportPrefs: (prefs: Partial<HealthImportPrefs>) => void;
   dismissInsight: (title: string) => void;
 }
@@ -125,6 +127,14 @@ const persistSettingsToSqlite = (state: AppState) => {
         notificationPrefs: state.notificationPrefs,
         healthImportPrefs: state.healthImportPrefs,
         dismissedInsights: state.dismissedInsights,
+        isOnboarded: state.isOnboarded,
+        pcosData: state.pcosData,
+        endoData: state.endoData,
+        age: state.age,
+        gender: state.gender,
+        isTeen: state.isTeen,
+        postPillMode: state.postPillMode,
+        postPillStartDate: state.postPillStartDate,
       }),
     )
     .catch((error) => {
@@ -193,14 +203,23 @@ export const useAppStore = create<AppState>()(
       } as HealthImportPrefs,
       dismissedInsights: [] as string[],
 
-      setOnboarded: (status) => set({ isOnboarded: status }),
+      setOnboarded: (status) => {
+        set({ isOnboarded: status });
+        persistSettingsToSqlite(get());
+      },
       setMode: (mode) => {
         set({ currentMode: mode });
         persistSettingsToSqlite(get());
       },
       setUserName: (name) => set({ userName: name }),
-      setPCOSData: (data) => set({ pcosData: data }),
-      setEndoData: (data) => set({ endoData: data }),
+      setPCOSData: (data) => {
+        set({ pcosData: data });
+        persistSettingsToSqlite(get());
+      },
+      setEndoData: (data) => {
+        set({ endoData: data });
+        persistSettingsToSqlite(get());
+      },
       setInFlare: (status, startDate) => set({ 
         inFlare: status,
         flareStartDate: status ? (startDate || new Date().toISOString()) : null
@@ -267,6 +286,10 @@ export const useAppStore = create<AppState>()(
         set((state) => ({ notificationPrefs: { ...state.notificationPrefs, ...prefs } }));
         persistSettingsToSqlite(get());
       },
+      setNotificationsEnabled: (enabled) => {
+        set({ notificationsEnabled: enabled });
+        persistSettingsToSqlite(get());
+      },
       setHealthImportPrefs: (prefs) => {
         set((state) => ({ healthImportPrefs: { ...state.healthImportPrefs, ...prefs } }));
         persistSettingsToSqlite(get());
@@ -287,7 +310,7 @@ export const useAppStore = create<AppState>()(
         const daysDiff =
           (now.getTime() - new Date(state.lastSafeguardPrompt).getTime()) /
           (1000 * 60 * 60 * 24);
-        return daysDiff >= 14;
+        return daysDiff >= SAFEGUARDING_PROMPT_COOLDOWN_DAYS;
       },
       checkPCOSPromptCooldown: () => {
         const state = get();
@@ -310,7 +333,20 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: "cycleiq-storage",
-      storage: createJSONStorage(() => AsyncStorage),
+      storage: createJSONStorage(() => encryptedPersistStorage),
     },
   ),
 );
+
+/** Wait until AsyncStorage has rehydrated Zustand — avoids routing on stale isOnboarded. */
+export const waitForStoreHydration = (): Promise<void> =>
+  new Promise((resolve) => {
+    if (useAppStore.persist.hasHydrated()) {
+      resolve();
+      return;
+    }
+    const unsub = useAppStore.persist.onFinishHydration(() => {
+      unsub();
+      resolve();
+    });
+  });

@@ -1,4 +1,5 @@
 import { Colors } from "@/constants/theme";
+import { OnboardingProgress } from "@/components/onboarding-progress";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useAppStore } from "@/store";
 import { router, useLocalSearchParams } from "expo-router";
@@ -40,11 +41,16 @@ export default function CycleHistoryInputScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <Text style={[styles.backText, { color: theme.tint }]}>← Back</Text>
         </TouchableOpacity>
+        <OnboardingProgress
+          step={2}
+          total={next === "condition" ? 5 : 3}
+          label="Step 2 — Your cycle basics"
+        />
       </View>
       <View style={styles.content}>
         <Text style={[styles.title, { color: theme.text }]}>Quick setup</Text>
         <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
-          Two fields — we'll show your first prediction immediately after.
+          {"Two fields — we'll show your first prediction immediately after."}
         </Text>
 
         <View style={styles.field}>
@@ -88,7 +94,7 @@ export default function CycleHistoryInputScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  backRow: { paddingHorizontal: 16, paddingTop: 8 },
+  backRow: { paddingHorizontal: 16, paddingTop: 8, gap: 12 },
   backBtn: { alignSelf: "flex-start", paddingVertical: 6 },
   backText: { fontSize: 16, fontWeight: "600" },
   content: { flex: 1, padding: 24, justifyContent: "center", gap: 20 },

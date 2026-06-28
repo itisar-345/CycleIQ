@@ -1,8 +1,8 @@
 import { Colors } from "@/constants/theme";
 import { deleteCycle, getAllCycles } from "@/database";
 import { useColorScheme } from "@/hooks/use-color-scheme";
-import { router } from "expo-router";
-import React, { useEffect, useState } from "react";
+import { router, useFocusEffect } from "expo-router";
+import React, { useCallback, useEffect, useState } from "react";
 import {
     Alert,
     ScrollView,
@@ -26,6 +26,12 @@ export default function HistoryScreen() {
   useEffect(() => {
     loadCycles();
   }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadCycles();
+    }, []),
+  );
 
   const handleDelete = (cycleId: string) => {
     Alert.alert(

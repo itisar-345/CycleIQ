@@ -1,9 +1,15 @@
 import { Colors } from "@/constants/theme";
+import {
+  SAFEGUARDING_CLINICAL_REVIEW_REQUIRED,
+  SAFEGUARDING_LOW_MOOD_SCORE,
+  SAFEGUARDING_RESOURCES_ROUTE,
+} from "@/constants/safeguarding";
 import { createRedFlagPromptLog, createSymptomEntry, getAllEntries, saveFlareEnd } from "@/database";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useAppStore } from "@/store";
 import { encryptField, decryptField } from "@/utils/fieldEncryption";
 import { readDailyHealthMetrics } from "@/utils/healthIntegrations";
+import { evaluateEndoRedFlag, shouldShowSafeguardingPrompt } from "@/utils/safetyRules";
 import { router } from "expo-router";
 import React, { useState, useEffect } from "react";
 import {
@@ -167,17 +173,23 @@ export default function LogScreen() {
   }, [autoFillYesterday]);
 
   const handleSave = async () => {
-    // 3.3.4 Safeguarding Logic
-    if (mood === 1) {
+    if (__DEV__ && SAFEGUARDING_CLINICAL_REVIEW_REQUIRED) {
+      console.warn(
+        "[CycleIQ] Safeguarding thresholds require clinical review before public release — see docs/CLINICAL_REVIEW.md",
+      );
+    }
+
+    // Safeguarding — thresholds in constants/safeguarding.ts (clinical review required)
+    if (mood === SAFEGUARDING_LOW_MOOD_SCORE) {
       const needsCooldown = useAppStore.getState().checkSafeguardCooldown();
-      if (consecutiveLowMoodDays + 1 >= 3 && needsCooldown) {
+      if (shouldShowSafeguardingPrompt(mood, consecutiveLowMoodDays, needsCooldown)) {
         useAppStore.getState().setLastSafeguardPrompt(new Date().toISOString());
         Alert.alert(
           "We're here for you",
           "It looks like you've been having a tough few days. You don't have to manage this alone — would it help to look at some resources?",
           [
             { text: "Dismiss", style: "cancel" },
-            { text: "View Resources", onPress: () => router.push("/education/resources") },
+            { text: "View Resources", onPress: () => router.push(SAFEGUARDING_RESOURCES_ROUTE as any) },
           ],
         );
         resetLowMood();
@@ -192,30 +204,21 @@ export default function LogScreen() {
     if (currentMode === "endo") {
       const needsRedFlagCooldown = useAppStore.getState().checkRedFlagCooldown();
       if (needsRedFlagCooldown) {
-        let triggerPrompt = false;
-        let promptMessage = "";
-        let triggerType = "";
+        const entries = pain >= 8 ? await getAllEntries() : [];
+        const redFlag = evaluateEndoRedFlag({
+          painScore: pain,
+          previousPainScores: entries.slice(0, 2).map((entry) => Number(entry.pain_score ?? 0)),
+          bowelSymptoms,
+          shoulderSide,
+          flowIntensity: flow,
+        });
 
-        if (bowelSymptoms.length > 0 && !!shoulderSide && shoulderSide !== "None" && shoulderSide !== null && (flow === "Heavy" || flow === "Very Heavy")) {
-          triggerPrompt = true;
-          triggerType = "bowel_shoulder_heavy_flow";
-          promptMessage = "You've logged complex symptoms (bowel + shoulder pain + heavy flow) on the same day. This combination warrants medical attention.";
-        } else if (pain >= 8) {
-          const entries = await getAllEntries();
-          const recentDays = entries.slice(0, 2);
-          if (recentDays.length >= 2 && recentDays.every(e => e.pain_score && e.pain_score >= 8)) {
-            triggerPrompt = true;
-            triggerType = "severe_pain_3_days";
-            promptMessage = "You've logged severe pain (8+) for 3 consecutive days. We strongly recommend contacting your healthcare provider.";
-          }
-        }
-
-        if (triggerPrompt) {
+        if (redFlag.shouldPrompt && redFlag.triggerType) {
           useAppStore.getState().setLastRedFlagPrompt(new Date().toISOString());
           await createRedFlagPromptLog({
-            trigger_type: triggerType,
+            trigger_type: redFlag.triggerType,
             logged_date: new Date().toISOString(),
-            message: promptMessage,
+            message: redFlag.message,
             severity: pain,
             cycle_id: activePeriodId ?? null,
             entry_context: {
@@ -225,7 +228,7 @@ export default function LogScreen() {
               flow_intensity: flow,
             },
           });
-          Alert.alert("Red Flag Notice", promptMessage, [{ text: "Got it" }]);
+          Alert.alert("Red Flag Notice", redFlag.message, [{ text: "Got it" }]);
         }
       }
     }

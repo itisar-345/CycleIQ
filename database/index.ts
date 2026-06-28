@@ -1,8 +1,14 @@
-import { differenceInDays } from "date-fns";
+import { addDays, differenceInDays, parseISO } from "date-fns";
 import * as SQLite from "expo-sqlite";
 import type { AppMode, NotificationPrefs } from "../store";
+import { computeCycleLength, computePeriodLength } from "../utils/cycleMath";
 import type { HealthImportPrefs } from "../utils/healthIntegrations";
 import { getOrCreateDbKey } from "../utils/secureKey";
+import {
+  clearPredictionsDirty,
+  invalidatePredictions,
+  PREDICTION_INVALIDATION_STRATEGY,
+} from "../utils/predictionInvalidation";
 
 export const dbName = "cycleiq.sqlite";
 export const dbSchemaVersion = 3;
@@ -277,10 +283,7 @@ export const createCycle = async (startDate: string) => {
   );
 
   if (prevCycle && prevCycle.start_date) {
-    const cycleLength = differenceInDays(
-      new Date(startDate),
-      new Date(prevCycle.start_date),
-    );
+    const cycleLength = computeCycleLength(startDate, prevCycle.start_date);
     await execSql(`UPDATE cycles SET cycle_length = ? WHERE id = ?;`, [
       cycleLength,
       prevCycle.id,
@@ -318,8 +321,45 @@ export const createCycle = async (startDate: string) => {
     }
   }
 
+  invalidatePredictions("createCycle");
   await retrainAndStoreCyclePrediction();
   return id;
+};
+
+/** Seeds SQLite from onboarding answers so Home, Calendar, and predictions work immediately. */
+export const seedInitialCycleFromOnboarding = async (
+  lastPeriodDate: string,
+  averageLength: number,
+): Promise<{ cycleId: string | null; isRecentPeriod: boolean }> => {
+  const existing = await getLatestCycle();
+  if (existing) {
+    return { cycleId: existing.id, isRecentPeriod: false };
+  }
+
+  const normalizedDate = lastPeriodDate.includes("T")
+    ? lastPeriodDate
+    : `${lastPeriodDate}T12:00:00.000Z`;
+  const prevStart = addDays(parseISO(normalizedDate), -averageLength).toISOString();
+
+  const prevId = createLocalId();
+  await execSql(
+    `INSERT INTO cycles (id, start_date, cycle_length, is_confirmed) VALUES (?,?,?,1);`,
+    [prevId, prevStart, averageLength],
+  );
+
+  const currentId = createLocalId();
+  await execSql(
+    `INSERT INTO cycles (id, start_date, cycle_length, is_confirmed) VALUES (?,?,?,1);`,
+    [currentId, normalizedDate, averageLength],
+  );
+
+  invalidatePredictions("seedInitialCycleFromOnboarding");
+  await retrainAndStoreCyclePrediction();
+
+  const daysSince = differenceInDays(new Date(), parseISO(normalizedDate));
+  const isRecentPeriod = daysSince >= 0 && daysSince <= 7;
+
+  return { cycleId: currentId, isRecentPeriod };
 };
 
 export const closeCycle = async (cycleId: string, endDate: string) => {
@@ -328,12 +368,12 @@ export const closeCycle = async (cycleId: string, endDate: string) => {
   ]);
   if (result.rows.length === 0) return null;
   const startDate = result.rows.item(0).start_date;
-  const periodLength =
-    differenceInDays(new Date(endDate), new Date(startDate)) + 1;
+  const periodLength = computePeriodLength(startDate, endDate);
   await execSql(
     `UPDATE cycles SET end_date = ?, period_length = ?, is_confirmed = 1 WHERE id = ?;`,
     [endDate, periodLength, cycleId],
   );
+  invalidatePredictions("closeCycle");
   await retrainAndStoreCyclePrediction();
   return periodLength;
 };
@@ -468,14 +508,22 @@ export const getCyclePredictions = async (
   postPillMode = false,
   postPillStartDate: string | null = null
 ): Promise<PredictionResult> => {
+  // Policy: PREDICTION_INVALIDATION_STRATEGY === "recompute-on-read"
+  // Always runs engine against live cycles; never reads stale cycle_predictions rows.
+  void PREDICTION_INVALIDATION_STRATEGY;
   return retrainAndStoreCyclePrediction(currentMode, postPillMode, postPillStartDate);
 };
+
+let retrainInFlight: Promise<PredictionResult> | null = null;
 
 export const retrainAndStoreCyclePrediction = async (
   currentMode: string = "standard",
   postPillMode = false,
   postPillStartDate: string | null = null
 ): Promise<PredictionResult> => {
+  if (retrainInFlight) return retrainInFlight;
+
+  retrainInFlight = (async () => {
   const result = await execSql(`SELECT * FROM cycles ORDER BY start_date DESC;`);
   const cycles: any[] = [];
   for (let i = 0; i < result.rows.length; i++) cycles.push(result.rows.item(i));
@@ -506,14 +554,36 @@ export const retrainAndStoreCyclePrediction = async (
     biasCorrection,
     symptomBurdenByCycle,
   });
-  await saveCyclePrediction(prediction, currentMode);
+  await saveCyclePrediction(prediction, currentMode, cycles);
+  clearPredictionsDirty();
   return prediction;
+  })().finally(() => {
+    retrainInFlight = null;
+  });
+
+  return retrainInFlight;
 };
 
 export const saveCyclePrediction = async (
   prediction: PredictionResult,
   currentMode: string = "standard",
+  cycles: { id: string; start_date?: string; cycle_length?: number | null }[] = [],
 ): Promise<void> => {
+  const fingerprint = cycles
+    .map((c) => `${c.id}:${c.start_date ?? ""}:${c.cycle_length ?? ""}`)
+    .join("|");
+
+  const latest = await getLatestStoredCyclePrediction(currentMode);
+  if (
+    latest &&
+    latest.predictedStartISO === prediction.predictedStartISO &&
+    latest.mean === prediction.mean &&
+    latest.confidence === prediction.confidence &&
+    latest.label === prediction.label
+  ) {
+    return;
+  }
+
   await execSql(
     `INSERT INTO cycle_predictions (
       id, generated_at, model_version, current_mode, predicted_start, window_start, window_end,
@@ -533,8 +603,15 @@ export const saveCyclePrediction = async (
       prediction.mae,
       prediction.model,
       prediction.label,
-      JSON.stringify(prediction),
+      JSON.stringify({ ...prediction, _cyclesFingerprint: fingerprint }),
     ],
+  );
+
+  // Keep audit trail bounded — UI always reads latest via getLatestStoredCyclePrediction
+  await execSql(
+    `DELETE FROM cycle_predictions WHERE id NOT IN (
+      SELECT id FROM cycle_predictions ORDER BY generated_at DESC LIMIT 30
+    );`,
   );
 };
 
@@ -753,6 +830,7 @@ export const updateCycle = async (
       ]);
     }
   }
+  invalidatePredictions("updateCycle");
   await retrainAndStoreCyclePrediction();
 };
 
@@ -827,6 +905,14 @@ export const persistAppSettingsSnapshot = async (settings: {
   healthImportPrefs: HealthImportPrefs;
   dismissedInsights: string[];
   tier?: string;
+  isOnboarded?: boolean;
+  pcosData?: unknown;
+  endoData?: unknown;
+  age?: number | null;
+  gender?: string | null;
+  isTeen?: boolean;
+  postPillMode?: boolean;
+  postPillStartDate?: string | null;
 }): Promise<void> => {
   await saveAppSetting("current_mode", settings.currentMode);
   await saveAppSetting("language", settings.language);
@@ -837,6 +923,14 @@ export const persistAppSettingsSnapshot = async (settings: {
   await saveAppSetting("health_import_prefs", settings.healthImportPrefs);
   await saveAppSetting("dismissed_insights", settings.dismissedInsights);
   await saveAppSetting("tier", settings.tier ?? "free");
+  if (settings.isOnboarded !== undefined) await saveAppSetting("is_onboarded", settings.isOnboarded);
+  if (settings.pcosData !== undefined) await saveAppSetting("pcos_data", settings.pcosData);
+  if (settings.endoData !== undefined) await saveAppSetting("endo_data", settings.endoData);
+  if (settings.age !== undefined) await saveAppSetting("age", settings.age);
+  if (settings.gender !== undefined) await saveAppSetting("gender", settings.gender);
+  if (settings.isTeen !== undefined) await saveAppSetting("is_teen", settings.isTeen);
+  if (settings.postPillMode !== undefined) await saveAppSetting("post_pill_mode", settings.postPillMode);
+  if (settings.postPillStartDate !== undefined) await saveAppSetting("post_pill_start_date", settings.postPillStartDate);
 };
 
 export const saveFlareEnd = async (
@@ -873,9 +967,9 @@ export const saveFlareEnd = async (
 export const deleteCycle = async (cycleId: string): Promise<void> => {
   await execSql(`DELETE FROM symptom_entries WHERE cycle_id = ?;`, [cycleId]);
   await execSql(`DELETE FROM cycles WHERE id = ?;`, [cycleId]);
+  invalidatePredictions("deleteCycle");
+  await retrainAndStoreCyclePrediction();
 };
-
-// Phase utilities for Section 2 & 4 (calendar phases, insights overlays)
 
 // Phase utilities for Section 2 & 4 (calendar phases, insights overlays)
 

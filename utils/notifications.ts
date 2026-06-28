@@ -25,17 +25,59 @@ const initHandler = async () => {
 };
 if (!isExpoGo) initHandler();
 
-export const requestNotificationPermission = async (): Promise<boolean> => {
+/** Read-only OS permission check — never prompts. Use on every cold launch and foreground. */
+export const hasNotificationPermission = async (): Promise<boolean> => {
   if (isExpoGo) return false;
   try {
     const N = await getNotifications();
-    const current = await N.getPermissionsAsync() as any;
-    if (current.granted || current.status === "granted") return true;
-    const requested = await N.requestPermissionsAsync() as any;
-    return requested.granted || requested.status === "granted";
+    const current = (await N.getPermissionsAsync()) as { granted?: boolean; status?: string };
+    return !!(current.granted || current.status === "granted");
   } catch {
     return false;
   }
+};
+
+/** Prompts the user if permission has not yet been granted. Use only from explicit user actions. */
+export const requestNotificationPermission = async (): Promise<boolean> => {
+  if (isExpoGo) return false;
+  if (await hasNotificationPermission()) return true;
+  try {
+    const N = await getNotifications();
+    const requested = (await N.requestPermissionsAsync()) as { granted?: boolean; status?: string };
+    return !!(requested.granted || requested.status === "granted");
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * Sync scheduled notifications with current OS permission state.
+ * Called on every launch and foreground — checks permission only, never prompts.
+ */
+export const syncNotificationsWithOsPermission = async (
+  prediction: PredictionResult | null,
+  prefsOverride?: NotificationPrefs,
+  modeOverride?: string,
+): Promise<void> => {
+  const state = useAppStore.getState();
+  if (!state.notificationsEnabled) {
+    await cancelCycleNotifications();
+    return;
+  }
+  const granted = await hasNotificationPermission();
+  if (!granted) {
+    await cancelCycleNotifications();
+    if (state.notificationsEnabled) {
+      state.setNotificationsEnabled(false);
+    }
+    return;
+  }
+  await scheduleAllCycleNotifications(
+    prediction,
+    null,
+    prefsOverride ?? state.notificationPrefs,
+    modeOverride ?? state.currentMode,
+  );
 };
 
 const safeHour = (preferredHour: number): number => {

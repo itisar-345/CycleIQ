@@ -2,7 +2,7 @@
 
 **Product:** CycleIQ — Period & Symptom Tracker  
 **Version:** 2.0  
-**Last Updated:** May 2026  
+**Last Updated:** June 2026  
 **Storage:** All data stored locally on device (no account, no server, no sync)  
 **Status Key:** `[ ]` Not started · `[~]` In progress · `[x]` Complete
 
@@ -10,13 +10,18 @@
 
 ## 1. Onboarding
 
-- [x] Condition selection screen (PCOS / endo / irregular / standard)
+- [x] Goal selection screen (track cycle / unpredictable / diagnosed condition)
+- [x] Onboarding progress indicator (step bar on all onboarding screens)
+- [x] Condition selection screen (PCOS / PCOD / endo)
 - [x] Cycle history input (average length, last period date)
-- [x] Privacy & data consent screen
-- [x] Notification permission request
+- [x] Privacy & data consent screen with first-prediction preview (confidence bar + mode-specific qualifier)
+- [x] Seed initial cycle data to SQLite on onboarding complete (`seedInitialCycleFromOnboarding`)
+- [x] Set active period automatically if last period was within 7 days of onboarding
+- [x] PCOS / PCOD / Endo condition setup forms (diagnosis, pattern, management)
+- [x] Notification permission request (contextual, post first period log)
 - [x] Post-pill mode option ("I recently came off hormonal contraception")
 - [x] Age declaration (teen mode trigger for under 18)
-- [x] Gender / language preference selection
+- [x] Gender / language preference selection (deferred to Profile after setup)
 
 ---
 
@@ -28,21 +33,27 @@
 - [x] Log clots toggle + size chips (shown during active period)
 - [x] Edit existing cycle (start date, end date, notes)
 - [x] Delete cycle with confirmation dialog
+- [x] Delete cycle triggers prediction retrain (invalidates stale engine output)
 - [x] Compute cycle length (start-to-start)
 - [x] Compute period length (end minus start + 1)
 - [x] Cycle history list (all past cycles with lengths and period lengths)
+- [x] Cycle history auto-refreshes on tab focus
 - [x] Cycle detail view (day-by-day symptom summary for that cycle)
 - [x] Calendar view — shaded period day ranges
 - [x] Calendar view — cycle phase labels (menstrual / follicular / ovulatory / luteal)
 - [x] Calendar view — pain score heat-map overlay
 - [x] Calendar view — predicted period window with confidence fade
+- [x] Calendar view — month navigation (‹ ›) and "Jump to today"
+- [x] Calendar view — tap day for detail panel (pain/mood/energy + log CTA)
+- [x] Calendar view — today highlight ring
+- [x] Calendar view — pull-to-refresh
 - [x] Flare active indicator on calendar days (endo users)
 
 ---
 
 ## 3. Daily Symptom & Pain Logging
 
-- [x] Quick-entry log screen (loads on app open)
+- [x] Quick-entry log screen (Log Hub tab)
 - [x] Auto-fill yesterday's defaults (opt-in setting)
 - [x] Pain score slider (0–10)
 - [x] Pain location multi-select chips (pelvic, lower back, head, legs, neck, chest, other)
@@ -65,7 +76,7 @@
 - [x] Exercise duration (stepper in 5-minute increments)
 - [x] Diet notes (free text, stored locally encrypted)
 - [x] Medication log (structured + free text, stored locally encrypted)
-- [x] Save entry to local SQLite (SQLCipher) immediately on "Done" — local SQLite write implemented; SQLCipher configured, keyed, and status reported in Settings under Data Protection
+- [x] Save entry to local SQLite (SQLCipher) immediately on "Done"
 - [x] Entry visible in history immediately after save
 
 ---
@@ -81,6 +92,9 @@
 - [x] Safeguarding prompt cooldown (no repeat within 14 days)
 - [x] Mental health resource list screen (crisis lines, therapy directories)
 - [x] Resources list localised by user region
+- [x] Safeguarding threshold constants centralized in `constants/safeguarding.ts`
+- [x] Clinical review checklist documented in `docs/CLINICAL_REVIEW.md`
+- [ ] **Clinical sign-off required** before public release (`SAFEGUARDING_CLINICAL_REVIEW_REQUIRED = true`)
 
 ---
 
@@ -110,6 +124,7 @@
 - [x] PCOS specialist report: symptom frequency heatmap by cycle phase
 - [x] PCOS specialist report: insulin/metabolic proxy section (cravings, energy crashes, weight trend)
 - [x] PCOS specialist report: medication log with symptom overlays
+- [x] Explicit Home-screen copy explaining wide prediction windows for PCOS (currently shows label + confidence bar only)
 
 ---
 
@@ -148,19 +163,26 @@
 
 ## 7. Cycle Predictions
 
-- [x] Rule-based engine: rolling median of observed cycle lengths (fallback for <5 cycles)
+- [x] Tiered on-device engine: Tier 1 (<2 cycles) → none; Tier 2 (2–4) Bayesian blend; Tier 3 (5–11) adaptive EW; Tier 4 (12+) full rules + GPR
 - [x] "Not enough data" state for users with fewer than 2 cycles
-- [x] Single predicted date (basic mode, <5 cycles)
-- [x] Gaussian Process Regression (GPR) model computed on-device (5+ cycles)
+- [x] Single predicted date + confidence window display
+- [x] Gaussian Process Regression (GPR) model computed on-device (12+ cycles)
 - [x] GPR features: cycle length history, variance, period length, condition type, symptom burden score, day-of-week, seasonal index
-- [x] Confidence range output and display ("likely April 4–18")
+- [x] Confidence range output and display ("likely Apr 4 – Apr 18")
 - [x] Confidence range visualised as gradient fade on calendar
-- [x] Model retrained locally after each confirmed cycle
+- [x] Model retrained locally after each confirmed cycle (create / close / edit)
+- [x] Model retrained on cycle delete
+- [x] Explicit invalidation policy: `recompute-on-read` (`utils/predictionInvalidation.ts`)
+- [x] Dirty flag set on all cycle write paths; cleared after successful retrain
+- [x] `getCyclePredictions()` documented as always recomputing from live cycles
+- [x] Concurrent retrain deduplication (mutex prevents double-write race)
+- [x] Prediction save deduplication (skip INSERT when output identical to latest)
+- [x] Audit trail bounded to last 30 rows in `cycle_predictions`
 - [x] Model evaluation — MAE tracked locally after each confirmed cycle
 - [x] Prediction shown on home screen and calendar
-- [x] Prediction updated immediately when a cycle is confirmed or edited
 - [x] Perimenopause model: extended cycle variance thresholds (up to 120+ days)
 - [x] Post-pill mode: predictions suppressed for first 90 days, replaced with baseline-building message
+- [x] Explicit UI copy when `widePredictionWindow` is true ("Your cycles vary — this wider window is normal")
 
 ---
 
@@ -218,7 +240,7 @@
 ## 11. Medical & Diagnostic Tools
 
 - [x] Report generation runs fully on-device (no network call required)
-- [x] PDF rendering using on-device library (e.g. react-native-html-to-pdf)
+- [x] PDF rendering using on-device library (expo-print)
 - [x] Standard report: cover page (date range, generated date)
 - [x] Standard report: cycle history table (lengths, period lengths, regularity score)
 - [x] Standard report: symptom frequency heatmap by cycle day
@@ -259,6 +281,9 @@
 - [x] Notification preferences screen (per-type enable/disable)
 - [x] Quiet hours configuration (default 10 PM – 8 AM)
 - [x] All notification preferences stored locally
+- [x] OS permission check on every cold launch and foreground (`hasNotificationPermission` — never prompts)
+- [x] In-app `notificationsEnabled` synced to false when OS permission revoked
+- [x] `requestNotificationPermission()` reserved for explicit user actions only
 
 ---
 
@@ -288,16 +313,24 @@
 
 - [x] Home screen — today's cycle day and phase label
 - [x] Home screen — period active banner with flow logging shortcut
-- [x] Home screen — next predicted period window
-- [x] Home screen — quick-log button (opens symptom entry)
+- [x] Home screen — next predicted period window (date + confidence bar + window range)
+- [x] Home screen — quick-log button and quick-action tiles (Log / Calendar / Insights)
+- [x] Home screen — pull-to-refresh
+- [x] Home screen — loading state while dashboard data loads
+- [x] Home screen — auto-refresh on tab focus
+- [x] Home screen — empty state for users with no cycles ("Log my last period")
+- [x] Home screen — profile completion banner (deferred onboarding items)
 - [x] Home screen — latest insight teaser
 - [x] Home screen — contextual pain management card (during active period with cramping)
 - [x] Home screen — flare active banner with timer (endo users in flare)
-- [x] Bottom navigation: Home / Calendar / Log / Insights / Settings
-- [x] Calendar tab — month view with cycle shading, phase labels, pain heat-map
+- [x] Home screen — post-pill baseline progress bar
+- [x] Bottom navigation: Home / Log Hub / Calendar / Education / History / Insights / Profile (7 tabs)
+- [x] Tab bar icons — correct per tab (home, edit, calendar, books, history, chart, person)
+- [x] Haptic feedback on tab press (iOS)
+- [x] Calendar tab — month view with cycle shading, phase labels, pain heat-map, day detail panel
 - [x] Insights tab — coaching cards, trend charts, cycle-phase overlays
 - [x] History tab — cycle list and entry log
-- [x] Settings tab — condition, language, notifications, data & privacy
+- [x] Profile tab — condition, language, notifications, data & privacy, exports
 
 ---
 
@@ -322,7 +355,7 @@
 
 ## 17. Privacy & Data Security
 
-- [x] SQLCipher encryption for all local SQLite data on device — Expo config and PRAGMA key handling implemented; encryption status surfaced in Settings → Data Protection
+- [x] SQLCipher encryption for all local SQLite data on device
 - [x] AES-256-GCM encryption for sensitive free-text fields (diet notes, medication logs, notes)
 - [x] Encryption key stored in device secure enclave / Keychain — never leaves device
 - [x] Plain-language privacy policy accessible in-app
@@ -332,6 +365,10 @@
 - [x] Data wipe: confirmation dialog before irreversible deletion
 - [x] No analytics SDKs that transmit personal or health data off-device
 - [x] No third-party crash reporting SDKs that include health data in payloads
+- [x] Boot gate: routing waits for both DB init and Zustand AsyncStorage hydration
+- [x] Zustand persist encrypted at rest (AES-256-GCM via `utils/encryptedPersistStorage.ts`)
+- [x] Legacy plaintext AsyncStorage blobs migrated to encrypted on next save
+- [x] Sensitive prefs mirrored to encrypted SQLite (`pcos_data`, `endo_data`, age, gender, onboarding flag)
 - [ ] FDA regulatory counsel review — SaMD classification risk assessment
 - [ ] Teen mode parental consent — US COPPA and EU GDPR-K compliance review
 
@@ -339,32 +376,41 @@
 
 ## 18. Local Data Architecture
 
-- [x] Local SQLite database (SQLCipher) as sole data store — SQLite is sole core datastore; SQLCipher configured; no mock server or network calls
-- [x] cycles table — local schema with all fields
-- [x] symptom_entries table — all core and condition-specific fields, indexed on logged_date DESC
-- [x] cycle_predictions table — predicted dates, confidence, model version
+- [x] Local SQLite database (SQLCipher) as sole health data store
+- [x] cycles table — start/end dates, cycle_length, period_length, notes_encrypted
+- [x] symptom_entries table — core fields + extended_symptoms JSON for mode-specific data
+- [x] cycle_predictions table — audit trail (predicted dates, confidence, model version); UI reads via recompute-on-read
 - [x] user_correlations table — locally computed correlations with generated_at
-- [x] app_settings table — condition, language, notification prefs, tier, dismissed insights
-- [x] All data read and written from local SQLite only — no network calls for core features; syncEngine replaced with local WAL checkpoint and settings persistence
+- [x] prediction_feedback table — actual vs predicted for bias correction
+- [x] red_flag_prompt_logs table — red-flag alert history for reports
+- [x] app_settings table — condition, language, notification prefs, dismissed insights (partial Zustand mirror)
+- [x] schema_migrations table — versioned migration framework (dbSchemaVersion = 3)
+- [x] All health data read/written from local SQLite only — no network calls for core features
 - [x] Database migration framework for app update schema changes
 - [x] Local backup: export full encrypted database to file on demand (via share sheet)
-- [x] Local restore: import from previously exported backup file — JSON snapshot restore with DocumentPicker file picker in Settings
+- [x] Local restore: import from previously exported backup file (JSON snapshot + DocumentPicker)
+- [x] Web stub guarded: banner comment + one-time `console.warn` in `database/index.web.ts`
 
 ---
 
 ## 19. Mobile Client Architecture
 
 - [x] React Native (Expo managed workflow) — iOS and Android single codebase
-- [x] Zustand state management (condition, today's entry, cycles, insights, UI state)
-- [x] SQLite local repository layer via expo-sqlite — expo-sqlite implemented with full async API, WAL mode, migrations, and settings persistence
-- [x] On-device GPR prediction model (adaptive on-device rules with stored retraining and bias correction)
-- [x] On-device correlation engine (runs as background JS task)
+- [x] Expo Router file-based navigation (Stack + Tabs)
+- [x] Zustand state management (condition, flare state, notification prefs, onboarding flags)
+- [x] Zustand hydration gate before route guard (`waitForStoreHydration`)
+- [x] SQLite local repository layer via expo-sqlite (async API, WAL mode, migrations)
+- [x] App loading overlay during DB init + store hydration
+- [x] Onboarding progress component (shared step bar)
+- [x] On-device tiered prediction engine (Bayesian → EW → full rules → GPR)
+- [x] On-device correlation engine (Spearman, runs after sufficient entries)
 - [x] Local push notifications via Expo Notifications (no server required)
+- [x] OS notification permission re-sync on AppState foreground
 - [ ] Native biometric auth module (FaceID / TouchID / Fingerprint) for app lock
-- [ ] HealthKit integration (iOS) — read-only, opt-in
-- [ ] Health Connect integration (Android) — read-only, opt-in
-- [ ] iOS 16+ compatibility
-- [ ] Android 10+ compatibility
+- [ ] Native HealthKit module (JS bridge contract exists; native module pending)
+- [ ] Native Health Connect module (JS bridge contract exists; native module pending)
+- [ ] iOS 16+ compatibility verified on device
+- [ ] Android 10+ compatibility verified on device
 - [ ] iOS App Store submission and listing
 - [ ] Android Play Store submission and listing
 
@@ -373,12 +419,15 @@
 ## 20. Quality Assurance
 
 - [ ] Unit tests: all correlation computation logic
-- [ ] Unit tests: cycle length and period length computation
-- [ ] Unit tests: GPR prediction accuracy against held-out cycle data
-- [ ] Unit tests: safeguarding threshold detection (3 consecutive mood = 1)
-- [ ] Unit tests: red-flag prompt trigger logic
+- [x] Unit tests: cycle length and period length computation
+- [x] Unit tests: GPR prediction accuracy against held-out cycle data
+- [x] Unit tests: safeguarding threshold detection (3 consecutive mood = 1)
+- [x] Unit tests: red-flag prompt trigger logic
+- [ ] Unit tests: prediction retrain on cycle delete
+- [ ] Unit tests: prediction save deduplication
 - [ ] Unit tests: SQLite migration scripts (each version upgrade)
 - [ ] Integration tests: full symptom log → correlation computation → insight display flow
+- [ ] Integration tests: onboarding → seedInitialCycleFromOnboarding → Home dashboard flow
 - [ ] Integration tests: period start → prediction update flow
 - [ ] Integration tests: flare start → flare end → flare pattern analysis
 - [ ] Integration tests: local backup export → restore
@@ -388,7 +437,8 @@
 - [ ] Accessibility audit (WCAG 2.1 AA) before launch
 - [ ] User research sessions with PCOS community members
 - [ ] User research sessions with endometriosis community members
+- [ ] Clinical review: safeguarding thresholds and resource destinations
 
 ---
 
-_Last updated: May 2026 — v2.0 audit pass (no-account, fully local on-device architecture; native-only capabilities marked in progress until verified in native builds)_
+\_Last updated: June 2026

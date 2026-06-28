@@ -1,10 +1,12 @@
+import { seedInitialCycleFromOnboarding } from "@/database";
 import { Colors } from "@/constants/theme";
+import { OnboardingProgress } from "@/components/onboarding-progress";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useAppStore } from "@/store";
 import { router } from "expo-router";
 import { addDays, format, parseISO } from "date-fns";
-import React from "react";
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import React, { useState } from "react";
+import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 const MODE_META: Record<string, { icon: string; headline: string; bullets: string[] }> = {
@@ -63,7 +65,8 @@ const MODE_META: Record<string, { icon: string; headline: string; bullets: strin
 export default function ConsentScreen() {
   const colorScheme = useColorScheme() ?? "light";
   const theme = Colors[colorScheme];
-  const { setOnboarded, currentMode, averageCycleLength, lastPeriodDate, cycleVarianceDays } = useAppStore();
+  const { setOnboarded, setActivePeriod, currentMode, averageCycleLength, lastPeriodDate, cycleVarianceDays } = useAppStore();
+  const [completing, setCompleting] = useState(false);
 
   const meta = MODE_META[currentMode] ?? MODE_META.standard;
   const isCondition = ["pcos", "pcod", "endo"].includes(currentMode);
@@ -94,9 +97,28 @@ export default function ConsentScreen() {
     }
   })();
 
-  const handleComplete = () => {
-    setOnboarded(true);
-    router.replace("/(tabs)" as any);
+  const handleComplete = async () => {
+    if (completing) return;
+    setCompleting(true);
+    try {
+      if (lastPeriodDate && averageCycleLength) {
+        const { cycleId, isRecentPeriod } = await seedInitialCycleFromOnboarding(
+          lastPeriodDate,
+          averageCycleLength,
+        );
+        if (isRecentPeriod && cycleId) {
+          const normalizedDate = lastPeriodDate.includes("T")
+            ? lastPeriodDate
+            : `${lastPeriodDate}T12:00:00.000Z`;
+          setActivePeriod(cycleId, normalizedDate);
+        }
+      }
+      setOnboarded(true);
+      router.replace("/(tabs)" as any);
+    } catch (error) {
+      console.error("Onboarding completion failed", error);
+      setCompleting(false);
+    }
   };
 
   return (
@@ -105,6 +127,7 @@ export default function ConsentScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <Text style={[styles.backText, { color: theme.tint }]}>← Back</Text>
         </TouchableOpacity>
+        <OnboardingProgress step={isCondition ? 5 : 3} total={isCondition ? 5 : 3} label="Almost there" />
       </View>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
 
@@ -171,10 +194,15 @@ export default function ConsentScreen() {
 
         {/* 4. FINISH */}
         <TouchableOpacity
-          style={[styles.finishBtn, { backgroundColor: theme.tint }]}
+          style={[styles.finishBtn, { backgroundColor: theme.tint, opacity: completing ? 0.7 : 1 }]}
           onPress={handleComplete}
+          disabled={completing}
         >
-          <Text style={styles.finishText}>Start tracking</Text>
+          {completing ? (
+            <ActivityIndicator color="#FFF" />
+          ) : (
+            <Text style={styles.finishText}>Start tracking</Text>
+          )}
         </TouchableOpacity>
 
       </ScrollView>
@@ -184,7 +212,7 @@ export default function ConsentScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  backRow: { paddingHorizontal: 16, paddingTop: 8 },
+  backRow: { paddingHorizontal: 16, paddingTop: 8, gap: 12 },
   backBtn: { alignSelf: "flex-start", paddingVertical: 6 },
   backText: { fontSize: 16, fontWeight: "600" },
   content: { padding: 24, paddingBottom: 48, gap: 18 },

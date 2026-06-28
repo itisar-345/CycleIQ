@@ -1,4 +1,5 @@
 import { Colors } from "@/constants/theme";
+import { OnboardingProgress } from "@/components/onboarding-progress";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { AppMode, useAppStore } from "@/store";
 import { router } from "expo-router";
@@ -46,12 +47,13 @@ export default function ConditionSelectionScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <Text style={[styles.backText, { color: theme.tint }]}>← Back</Text>
         </TouchableOpacity>
+        <OnboardingProgress step={3} total={5} label="Step 3 — Pick condition" />
       </View>
 
       <View style={styles.header}>
         <Text style={[styles.title, { color: theme.text }]}>Which condition?</Text>
         <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
-          We'll tailor your log fields and insights. You can change this any time in Settings.
+          {"We'll tailor your log fields and insights. You can change this any time in Settings."}
         </Text>
       </View>
 
@@ -74,7 +76,7 @@ export default function ConditionSelectionScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  backRow: { paddingHorizontal: 16, paddingTop: 8 },
+  backRow: { paddingHorizontal: 16, paddingTop: 8, gap: 12 },
   backBtn: { alignSelf: "flex-start", paddingVertical: 6 },
   backText: { fontSize: 16, fontWeight: "600" },
   header: { padding: 24, paddingBottom: 12 },

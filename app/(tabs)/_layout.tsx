@@ -18,7 +18,11 @@ export default function TabLayout() {
         tabBarStyle: {
           backgroundColor: theme.background,
           borderTopColor: theme.border,
+          height: 60,
+          paddingBottom: 6,
+          paddingTop: 4,
         },
+        tabBarLabelStyle: { fontSize: 11, fontWeight: "600" },
       }}
     >
       <Tabs.Screen
@@ -71,7 +75,7 @@ export default function TabLayout() {
         options={{
           title: "Insights",
           tabBarIcon: ({ color }: { color: string | import('react-native').ColorValue }) => (
-            <IconSymbol size={28} name="chevron.right" color={color as string} />
+            <IconSymbol size={28} name="chart.bar.fill" color={color as string} />
           ),
         }}
       />
@@ -80,7 +84,7 @@ export default function TabLayout() {
         options={{
           title: "Profile",
           tabBarIcon: ({ color }: { color: string | import('react-native').ColorValue }) => (
-            <IconSymbol size={28} name="chevron.right" color={color as string} />
+            <IconSymbol size={28} name="person.fill" color={color as string} />
           ),
         }}
       />

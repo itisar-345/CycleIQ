@@ -6,15 +6,17 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useAppStore } from "@/store";
 import { differenceInDays, format, parseISO } from "date-fns";
-import { router } from "expo-router";
-import React, { useEffect, useRef, useState } from "react";
+import { router, useFocusEffect } from "expo-router";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Alert,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
+  ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -54,6 +56,7 @@ export default function HomeScreen() {
   const [latestInsight, setLatestInsight] = useState<CycleInsight | null>(null);
   const [medicationLoggedToday, setMedicationLoggedToday] = useState(false);
   const [dataLoaded, setDataLoaded] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   // Miss acknowledgment: shown once per session when last prediction was off by >4 days.
   const [lastMissErrorDays, setLastMissErrorDays] = useState<number | null>(null);
   const missShownRef = useRef(false);
@@ -73,77 +76,86 @@ export default function HomeScreen() {
   const flowTerm = languagePreset === 'custom' ? customTerms.flow : 'flow';
   const cycleTerm = languagePreset === 'custom' ? customTerms.cycle : languagePreset === 'inclusive' ? 'cycle' : 'period';
 
-  useEffect(() => {
-    const loadLatestCycle = async () => {
-      try {
-        const latest = await getLatestCycle();
-        if (latest && latest.cycle_length) {
-          setCycleLength(latest.cycle_length);
-        }
-        
-        if (latest && latest.start_date) {
-            setLatestStartDate(latest.start_date);
-            const cycleDay = getDayOfCycle(new Date().toISOString(), latest.start_date);
-            setCurrentCycleDay(cycleDay);
-            setCurrentPhase(getPhaseForDay(cycleDay, latest.cycle_length || 28));
-        }
-        
-        const stats = await getCyclePredictions(currentMode, postPillMode, postPillStartDate ?? null);
-        setPredictionStats(stats);
-
-        // Schedule all cycle-aware notifications in one go
-        if (stats.predictedStartISO) {
-          await scheduleAllCycleNotifications(stats);
-        }
-        
-        const generatedInsights = await generateInsights(currentMode);
-        const validInsights = generatedInsights.filter((i: CycleInsight) => !dismissedInsights.includes(i.title));
-        validInsights.sort((a: CycleInsight, b: CycleInsight) => Math.abs(b.correlation || 0) - Math.abs(a.correlation || 0));
-        if (validInsights.length > 0) {
-          setLatestInsight(validInsights[0]);
-        }
-
-        // Check if medication was already logged today
-        const { getAllEntries } = await import("@/database");
-        const todayStr = new Date().toISOString().split("T")[0];
-        const allEntries = await getAllEntries();
-        const todayEntry = allEntries.find((e: any) => e.logged_date?.startsWith(todayStr));
-        setMedicationLoggedToday(!!(todayEntry?.medication_log_encrypted));
-
-        // Load most recent prediction feedback — show miss note if off by >4 days
-        if (!missShownRef.current) {
-          const feedback = await getLatestPredictionFeedback();
-          if (feedback && Math.abs(feedback.error_days) > 4) {
-            setLastMissErrorDays(Math.round(feedback.error_days));
-            missShownRef.current = true;
-          }
-        }
-
-        setDataLoaded(true);
-        if (latest && currentMode === "pcos" && !activePeriodId && latest.start_date) {
-          const daysSinceStart = differenceInDays(new Date(), parseISO(latest.start_date));
-          if (daysSinceStart >= 90) {
-            const is120 = daysSinceStart >= 120;
-            if (checkPCOSPromptCooldown()) {
-              setLastPCOSPrompt(new Date().toISOString());
-              const title = is120 ? "Time to check in?" : "It's been a while";
-              const message = is120 
-                ? `It's been ${daysSinceStart} days since your last period. It might be a good idea to chat with a healthcare provider just to be safe.`
-                : `It's been ${daysSinceStart} days since your last period — is everything okay? Remember to log any symptoms.`;
-              // Small timeout to allow UI to render first
-              setTimeout(() => {
-                Alert.alert(title, message, [{ text: "Got it" }]);
-              }, 500);
-            }
-          }
-        }
-      } catch (error) {
-        console.error("Unable to load latest cycle length", error);
-        setDataLoaded(true);
+  const loadLatestCycle = useCallback(async () => {
+    try {
+      const latest = await getLatestCycle();
+      if (latest && latest.cycle_length) {
+        setCycleLength(latest.cycle_length);
       }
-    };
+
+      if (latest && latest.start_date) {
+        setLatestStartDate(latest.start_date);
+        const cycleDay = getDayOfCycle(new Date().toISOString(), latest.start_date);
+        setCurrentCycleDay(cycleDay);
+        setCurrentPhase(getPhaseForDay(cycleDay, latest.cycle_length || 28));
+      } else {
+        setLatestStartDate(null);
+      }
+
+      const stats = await getCyclePredictions(currentMode, postPillMode, postPillStartDate ?? null);
+      setPredictionStats(stats);
+
+      if (stats.predictedStartISO) {
+        await scheduleAllCycleNotifications(stats);
+      }
+
+      const generatedInsights = await generateInsights(currentMode);
+      const validInsights = generatedInsights.filter((i: CycleInsight) => !dismissedInsights.includes(i.title));
+      validInsights.sort((a: CycleInsight, b: CycleInsight) => Math.abs(b.correlation || 0) - Math.abs(a.correlation || 0));
+      setLatestInsight(validInsights.length > 0 ? validInsights[0] : null);
+
+      const { getAllEntries } = await import("@/database");
+      const todayStr = new Date().toISOString().split("T")[0];
+      const allEntries = await getAllEntries();
+      const todayEntry = allEntries.find((e: any) => e.logged_date?.startsWith(todayStr));
+      setMedicationLoggedToday(!!(todayEntry?.medication_log_encrypted));
+
+      if (!missShownRef.current) {
+        const feedback = await getLatestPredictionFeedback();
+        if (feedback && Math.abs(feedback.error_days) > 4) {
+          setLastMissErrorDays(Math.round(feedback.error_days));
+          missShownRef.current = true;
+        }
+      }
+
+      setDataLoaded(true);
+      if (latest && currentMode === "pcos" && !activePeriodId && latest.start_date) {
+        const daysSinceStart = differenceInDays(new Date(), parseISO(latest.start_date));
+        if (daysSinceStart >= 90) {
+          const is120 = daysSinceStart >= 120;
+          if (checkPCOSPromptCooldown()) {
+            setLastPCOSPrompt(new Date().toISOString());
+            const title = is120 ? "Time to check in?" : "It's been a while";
+            const message = is120
+              ? `It's been ${daysSinceStart} days since your last period. It might be a good idea to chat with a healthcare provider just to be safe.`
+              : `It's been ${daysSinceStart} days since your last period — is everything okay? Remember to log any symptoms.`;
+            setTimeout(() => {
+              Alert.alert(title, message, [{ text: "Got it" }]);
+            }, 500);
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Unable to load latest cycle length", error);
+      setDataLoaded(true);
+    }
+  }, [activePeriodId, currentMode, dismissedInsights, postPillMode, postPillStartDate, checkPCOSPromptCooldown, setLastPCOSPrompt]);
+
+  useEffect(() => {
     loadLatestCycle();
-  }, [activePeriodId, currentMode, dismissedInsights]);
+  }, [loadLatestCycle]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadLatestCycle();
+    }, [loadLatestCycle]),
+  );
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadLatestCycle();
+    setRefreshing(false);
+  };
 
   const handleStartPeriod = () => {
     Alert.alert("Log Period", "Is today the first day of your period?", [
@@ -212,13 +224,25 @@ export default function HomeScreen() {
     return differenceInDays(new Date(), parseISO(flareStartDate)) + 1;
   };
 
+  // Loading state
+  if (!dataLoaded) {
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
+        <View style={styles.loadingWrap}>
+          <ActivityIndicator size="large" color={theme.tint} />
+          <Text style={[styles.loadingText, { color: theme.textSecondary }]}>Loading your dashboard…</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   // First-run empty state: data loaded but no cycle ever logged
   if (dataLoaded && !latestStartDate && !activePeriodId) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
         <View style={styles.emptyState}>
           <Text style={styles.emptyIcon}>🩸</Text>
-          <Text style={[styles.emptyTitle, { color: theme.text }]}>You're all set</Text>
+          <Text style={[styles.emptyTitle, { color: theme.text }]}>{"You're all set"}</Text>
           <Text style={[styles.emptyDesc, { color: theme.textSecondary }]}>
             Log your last period to unlock your cycle dashboard, predictions, and insights.
           </Text>
@@ -234,7 +258,7 @@ export default function HomeScreen() {
             onPress={() => router.push("/log")}
           >
             <Text style={[styles.emptySecondaryText, { color: theme.textSecondary }]}>
-              Just log today's symptoms instead
+              {"Just log today's symptoms instead"}
             </Text>
           </TouchableOpacity>
         </View>
@@ -246,7 +270,12 @@ export default function HomeScreen() {
     <SafeAreaView
       style={[styles.container, { backgroundColor: theme.background }]}
     >
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.tint} />
+        }
+      >
         {/* Header */}
         <View style={styles.header}>
           <Text style={[styles.greeting, { color: theme.textSecondary }]}>
@@ -412,6 +441,16 @@ export default function HomeScreen() {
               </Text>
             )}
 
+            {predictionStats.widePredictionWindow && (
+              <View style={[styles.predictionNote, { backgroundColor: theme.tint + "12", borderColor: theme.tint }]}>
+                <Text style={{ color: theme.text, fontSize: 13, lineHeight: 19 }}>
+                  {currentMode === "pcos"
+                    ? "PCOS can make cycle timing vary. This wider window is expected, and CycleIQ will narrow it as your pattern builds."
+                    : "Your cycles vary, so this wider window is normal. CycleIQ will narrow it as your pattern builds."}
+                </Text>
+              </View>
+            )}
+
             {lastMissErrorDays !== null && (
               <TouchableOpacity
                 onPress={() => setLastMissErrorDays(null)}
@@ -419,7 +458,7 @@ export default function HomeScreen() {
                 activeOpacity={0.7}
               >
                 <Text style={{ color: theme.text, fontSize: 13, lineHeight: 19 }}>
-                  Last prediction was {Math.abs(lastMissErrorDays)}d {lastMissErrorDays > 0 ? "early" : "late"} — we're learning your pattern. Tap to dismiss.
+                  Last prediction was {Math.abs(lastMissErrorDays)}d {lastMissErrorDays > 0 ? "early" : "late"} — {"we're learning your pattern. Tap to dismiss."}
                 </Text>
               </TouchableOpacity>
             )}
@@ -462,6 +501,25 @@ export default function HomeScreen() {
             </TouchableOpacity>
           </View>
         )}
+
+        {/* Quick actions */}
+        <View style={styles.quickActions}>
+          {[
+            { label: "Log today", icon: "✏️", route: "/log" },
+            { label: "Calendar", icon: "📅", route: "/calendar" },
+            { label: "Insights", icon: "📊", route: "/analytics" },
+          ].map((action) => (
+            <TouchableOpacity
+              key={action.route}
+              style={[styles.quickAction, { backgroundColor: theme.surface, borderColor: theme.border }]}
+              onPress={() => router.push(action.route as any)}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.quickIcon}>{action.icon}</Text>
+              <Text style={[styles.quickLabel, { color: theme.text }]}>{action.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
 
         {/* Quick Log Action */}
         <TouchableOpacity
@@ -585,4 +643,18 @@ const styles = StyleSheet.create({
   profileBannerDesc: { fontSize: 13, lineHeight: 18 },
   profileBannerArrow: { fontSize: 20, fontWeight: "bold", paddingLeft: 8 },
   missNote: { borderRadius: 10, padding: 10, marginTop: 10 },
+  predictionNote: { borderRadius: 10, borderWidth: 1, padding: 10, marginTop: 10 },
+  loadingWrap: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12 },
+  loadingText: { fontSize: 15 },
+  quickActions: { flexDirection: "row", gap: 10, marginBottom: 20 },
+  quickAction: {
+    flex: 1,
+    padding: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+    alignItems: "center",
+    gap: 6,
+  },
+  quickIcon: { fontSize: 22 },
+  quickLabel: { fontSize: 12, fontWeight: "700", textAlign: "center" },
 });

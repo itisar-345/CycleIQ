@@ -28,8 +28,8 @@ const warnWebStub = (fn: string) => {
 const noop = () => Promise.resolve();
 const noRows = () => Promise.resolve([]);
 
-export const dbName = "cycleiq.sqlite";
-export const dbSchemaVersion = 3;
+export const getActiveDbName = () => Promise.resolve("cycleiq.sqlite");
+export const dbSchemaVersion = 4;
 export const isWebDatabaseStub = true as const;
 
 export const initDb = () => {
@@ -37,6 +37,7 @@ export const initDb = () => {
   return noop();
 };
 export const getLatestCycle = () => Promise.resolve(null);
+export const getCycle = () => Promise.resolve(null);
 export const createCycle = () => Promise.resolve("");
 export const seedInitialCycleFromOnboarding = () =>
   Promise.resolve({ cycleId: "web-seed", isRecentPeriod: false });
@@ -44,12 +45,9 @@ export const closeCycle = () => Promise.resolve(null);
 export const getAllCycles = noRows;
 export const getCycleEntries = noRows;
 export const getAllEntries = noRows;
-export const getUnsyncedEntries = noRows;
-export const markEntriesSynced = noop;
 export const deleteCycle = noop;
 export const updateCycle = noop;
 export const saveFlareEnd = noop;
-export const upsertSymptomEntry = () => Promise.resolve("");
 export const createSymptomEntry = () => Promise.resolve("");
 export const getPhaseAverages = noRows;
 export const generateInsights = () => Promise.resolve([]);

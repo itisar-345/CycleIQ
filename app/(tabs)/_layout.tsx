@@ -12,17 +12,17 @@ export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: theme.tint,
+        tabBarActiveTintColor: theme.tabIconSelected,
+        tabBarInactiveTintColor: theme.tabIconDefault,
         headerShown: false,
         tabBarButton: HapticTab,
+        // No fixed height: the navigator adds the home-indicator inset itself.
         tabBarStyle: {
-          backgroundColor: theme.background,
+          backgroundColor: theme.surface,
           borderTopColor: theme.border,
-          height: 60,
-          paddingBottom: 6,
           paddingTop: 4,
         },
-        tabBarLabelStyle: { fontSize: 11, fontWeight: "600" },
+        tabBarLabelStyle: { fontSize: 11, fontWeight: "700" },
       }}
     >
       <Tabs.Screen
@@ -30,16 +30,16 @@ export default function TabLayout() {
         options={{
           title: "Home",
           tabBarIcon: ({ color }: { color: string | import('react-native').ColorValue }) => (
-            <IconSymbol size={28} name="house.fill" color={color as string} />
+            <IconSymbol size={24} name="house.fill" color={color as string} />
           ),
         }}
       />
       <Tabs.Screen
         name="log"
         options={{
-          title: "Log Hub",
+          title: "Log",
           tabBarIcon: ({ color }: { color: string | import('react-native').ColorValue }) => (
-            <IconSymbol size={28} name="paperplane.fill" color={color as string} />
+            <IconSymbol size={24} name="square.and.pencil" color={color as string} />
           ),
         }}
       />
@@ -48,16 +48,16 @@ export default function TabLayout() {
         options={{
           title: "Calendar",
           tabBarIcon: ({ color }: { color: string | import('react-native').ColorValue }) => (
-            <IconSymbol size={28} name="calendar" color={color as string} />
+            <IconSymbol size={24} name="calendar" color={color as string} />
           ),
         }}
       />
       <Tabs.Screen
         name="education"
         options={{
-          title: "Education",
+          title: "Learn",
           tabBarIcon: ({ color }: { color: string | import('react-native').ColorValue }) => (
-            <IconSymbol size={28} name="books.vertical.fill" color={color as string} />
+            <IconSymbol size={24} name="books.vertical.fill" color={color as string} />
           ),
         }}
       />
@@ -66,7 +66,7 @@ export default function TabLayout() {
         options={{
           title: "History",
           tabBarIcon: ({ color }: { color: string | import('react-native').ColorValue }) => (
-            <IconSymbol size={28} name="clock.fill" color={color as string} />
+            <IconSymbol size={24} name="clock.fill" color={color as string} />
           ),
         }}
       />
@@ -75,16 +75,16 @@ export default function TabLayout() {
         options={{
           title: "Insights",
           tabBarIcon: ({ color }: { color: string | import('react-native').ColorValue }) => (
-            <IconSymbol size={28} name="chart.bar.fill" color={color as string} />
+            <IconSymbol size={24} name="chart.bar.fill" color={color as string} />
           ),
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
-          title: "Profile",
+          title: "You",
           tabBarIcon: ({ color }: { color: string | import('react-native').ColorValue }) => (
-            <IconSymbol size={28} name="person.fill" color={color as string} />
+            <IconSymbol size={24} name="person.fill" color={color as string} />
           ),
         }}
       />

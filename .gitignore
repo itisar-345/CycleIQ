@@ -44,3 +44,5 @@ expo-env.d.ts
 
 # Cache
 Microsoft/
+# Build output (expo export)
+dist/

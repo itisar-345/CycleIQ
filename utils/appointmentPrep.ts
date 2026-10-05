@@ -1,5 +1,5 @@
 import { format } from "date-fns";
-import { getPhaseForDay } from "@/database";
+import { getPhaseForDay, readExtendedSymptoms, type CycleRow, type SymptomEntryRow } from "@/database";
 
 export interface AppointmentPrepSummary {
   dateRange: string;
@@ -16,20 +16,9 @@ export interface AppointmentPrepSummary {
 const average = (values: number[]) =>
   values.length === 0 ? null : values.reduce((sum, value) => sum + value, 0) / values.length;
 
-const parseExtended = (entry: any): Record<string, any> => {
-  if (!entry?.extended_symptoms) return {};
-  try {
-    return typeof entry.extended_symptoms === "string"
-      ? JSON.parse(entry.extended_symptoms)
-      : entry.extended_symptoms;
-  } catch {
-    return {};
-  }
-};
-
 export const buildAppointmentPrepSummary = (
-  cycles: any[],
-  entries: any[],
+  cycles: CycleRow[],
+  entries: SymptomEntryRow[],
   currentMode: string,
 ): AppointmentPrepSummary => {
   const cycleLengths = cycles
@@ -42,11 +31,11 @@ export const buildAppointmentPrepSummary = (
     .map((entry) => entry.pain_score)
     .filter((value): value is number => typeof value === "number");
   const highPainDays = painScores.filter((score) => score >= 7).length;
-  const flareDays = entries.filter((entry) => entry.flare_start || parseExtended(entry).flare).length;
+  const flareDays = entries.filter((entry) => entry.flare_start || readExtendedSymptoms(entry).flare).length;
   const medicationDays = entries.filter((entry) => entry.medication_log_encrypted).length;
   const latest = entries[0]?.logged_date ? new Date(entries[0].logged_date) : null;
   const oldest = entries[entries.length - 1]?.logged_date ? new Date(entries[entries.length - 1].logged_date) : null;
-  const bloatingDays = entries.filter((entry) => ["Moderate", "Severe"].includes(entry.bloating)).length;
+  const bloatingDays = entries.filter((entry) => entry.bloating === "Moderate" || entry.bloating === "Severe").length;
   const fatigueDays = entries.filter((entry) => (entry.fatigue_score ?? 0) >= 6).length;
   const moodLowDays = entries.filter((entry) => (entry.mood_score ?? 5) <= 2).length;
 

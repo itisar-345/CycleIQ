@@ -1,4 +1,4 @@
-import * as FileSystem from "expo-file-system";
+import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
 
 export interface LocalReportFile {
@@ -9,17 +9,17 @@ export interface LocalReportFile {
   type: "specialist" | "appointment" | "other";
 }
 
-export const reportsDirectory = `${(FileSystem as any).documentDirectory ?? ""}cycleiq_reports/`;
+export const reportsDirectory = `${FileSystem.documentDirectory ?? ""}cycleiq_reports/`;
 
 export const ensureReportsDirectory = async (): Promise<string> => {
-  await (FileSystem as any).makeDirectoryAsync(reportsDirectory, { intermediates: true }).catch(() => {});
+  await FileSystem.makeDirectoryAsync(reportsDirectory, { intermediates: true }).catch(() => {});
   return reportsDirectory;
 };
 
 export const savePdfToReports = async (tempUri: string, fileName: string): Promise<string> => {
   const dir = await ensureReportsDirectory();
   const targetUri = `${dir}${fileName}`;
-  await (FileSystem as any).copyAsync({ from: tempUri, to: targetUri });
+  await FileSystem.copyAsync({ from: tempUri, to: targetUri });
   return targetUri;
 };
 
@@ -31,17 +31,18 @@ export const getReportType = (name: string): LocalReportFile["type"] => {
 
 export const listLocalReports = async (): Promise<LocalReportFile[]> => {
   const dir = await ensureReportsDirectory();
-  const names = await (FileSystem as any).readDirectoryAsync(dir).catch(() => []);
-  const pdfNames = names.filter((name: string) => name.toLowerCase().endsWith(".pdf"));
+  const names = await FileSystem.readDirectoryAsync(dir).catch((): string[] => []);
+  const pdfNames = names.filter((name) => name.toLowerCase().endsWith(".pdf"));
   const reports = await Promise.all(
-    pdfNames.map(async (name: string) => {
+    pdfNames.map(async (name) => {
       const uri = `${dir}${name}`;
-      const info = await (FileSystem as any).getInfoAsync(uri, { size: true }).catch(() => null);
+      const info = await FileSystem.getInfoAsync(uri).catch(() => null);
+      const existing = info?.exists ? info : null;
       return {
         name,
         uri,
-        modifiedAt: typeof info?.modificationTime === "number" ? info.modificationTime : null,
-        size: typeof info?.size === "number" ? info.size : null,
+        modifiedAt: existing ? existing.modificationTime : null,
+        size: existing ? existing.size : null,
         type: getReportType(name),
       } satisfies LocalReportFile;
     }),
@@ -56,8 +57,8 @@ export const shareReport = async (uri: string): Promise<boolean> => {
 };
 
 export const deleteLocalReports = async (): Promise<void> => {
-  const info = await (FileSystem as any).getInfoAsync(reportsDirectory).catch(() => null);
+  const info = await FileSystem.getInfoAsync(reportsDirectory).catch(() => null);
   if (info?.exists) {
-    await (FileSystem as any).deleteAsync(reportsDirectory, { idempotent: true });
+    await FileSystem.deleteAsync(reportsDirectory, { idempotent: true });
   }
 };

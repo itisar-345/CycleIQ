@@ -163,11 +163,11 @@
 
 ## 7. Cycle Predictions
 
-- [x] Tiered on-device engine: Tier 1 (<2 cycles) → none; Tier 2 (2–4) Bayesian blend; Tier 3 (5–11) adaptive EW; Tier 4 (12+) full rules + GPR
-- [x] "Not enough data" state for users with fewer than 2 cycles
+- [x] Tiered on-device engine: no completed cycles → none; Tier 2 (1–4) prior/median blend (1 = onboarding-reported length, low confidence); Tier 3 (5–11) outlier-trimmed adaptive EW; Tier 4 (12+) regime-aware EW over last 12 cycles
+- [x] "Not enough data" state until the first completed cycle (onboarding-reported length counts as one)
 - [x] Single predicted date + confidence window display
-- [x] Gaussian Process Regression (GPR) model computed on-device (12+ cycles)
-- [x] GPR features: cycle length history, variance, period length, condition type, symptom burden score, day-of-week, seasonal index
+- [x] ~~GPR model~~ removed in v4: underperformed a 6-cycle median in walk-forward backtests (`tests/backtest.ts`)
+- [x] Window width, "off by N days" and confidence calibrated from a walk-forward backtest on the user's own history
 - [x] Confidence range output and display ("likely Apr 4 – Apr 18")
 - [x] Confidence range visualised as gradient fade on calendar
 - [x] Model retrained locally after each confirmed cycle (create / close / edit)
@@ -193,10 +193,10 @@
 - [x] Endo-specific correlation pairs: sleep vs flare severity, stress vs flare onset
 - [x] Minimum thresholds enforced: n >= 20, |r| > 0.3 (Spearman), p < 0.05
 - [x] Sample size always displayed on every insight card
-- [x] HealthKit integration (iOS) — read sleep hours and auto-fill (opt-in; JS bridge contract implemented; toggle in Settings → Health Data Import)
-- [x] HealthKit integration (iOS) — read steps and activity (opt-in; JS bridge contract implemented; toggle in Settings → Health Data Import)
-- [x] Health Connect integration (Android) — read sleep hours (opt-in; JS bridge contract implemented; toggle in Settings → Health Data Import)
-- [x] Health Connect integration (Android) — read steps and activity (opt-in; JS bridge contract implemented; toggle in Settings → Health Data Import)
+- [x] HealthKit integration (iOS) — read sleep hours and auto-fill (opt-in; native bridge in utils/health/; toggle in Settings → Health Data Import)
+- [x] HealthKit integration (iOS) — read steps and activity (opt-in; native bridge in utils/health/; toggle in Settings → Health Data Import)
+- [x] Health Connect integration (Android) — read sleep hours (opt-in; native bridge in utils/health/; toggle in Settings → Health Data Import)
+- [x] Health Connect integration (Android) — read steps and activity (opt-in; native bridge in utils/health/; toggle in Settings → Health Data Import)
 - [x] Source tag displayed on auto-filled entries ("from Apple Health")
 
 ---
@@ -355,7 +355,7 @@
 
 ## 17. Privacy & Data Security
 
-- [x] SQLCipher encryption for all local SQLite data on device
+- [x] SQLCipher encryption for all local SQLite data on device (dev/production builds; Expo Go falls back to plaintext and Settings says so)
 - [x] AES-256-GCM encryption for sensitive free-text fields (diet notes, medication logs, notes)
 - [x] Encryption key stored in device secure enclave / Keychain — never leaves device
 - [x] Plain-language privacy policy accessible in-app
@@ -402,13 +402,13 @@
 - [x] SQLite local repository layer via expo-sqlite (async API, WAL mode, migrations)
 - [x] App loading overlay during DB init + store hydration
 - [x] Onboarding progress component (shared step bar)
-- [x] On-device tiered prediction engine (Bayesian → EW → full rules → GPR)
+- [x] On-device tiered prediction engine (prior blend → EW → full rules), backtest-calibrated windows
 - [x] On-device correlation engine (Spearman, runs after sufficient entries)
 - [x] Local push notifications via Expo Notifications (no server required)
 - [x] OS notification permission re-sync on AppState foreground
 - [ ] Native biometric auth module (FaceID / TouchID / Fingerprint) for app lock
-- [ ] Native HealthKit module (JS bridge contract exists; native module pending)
-- [ ] Native Health Connect module (JS bridge contract exists; native module pending)
+- [x] HealthKit bridge via @kingstinct/react-native-healthkit (sleep, steps, exercise minutes; dev/store builds)
+- [x] Health Connect bridge via react-native-health-connect (sleep, steps, exercise; dev/store builds, minSdk 26)
 - [ ] iOS 16+ compatibility verified on device
 - [ ] Android 10+ compatibility verified on device
 - [ ] iOS App Store submission and listing
@@ -418,21 +418,21 @@
 
 ## 20. Quality Assurance
 
-- [ ] Unit tests: all correlation computation logic
+- [x] Unit tests: correlation p-values, Benjamini–Hochberg, insight generation on real SQLite
 - [x] Unit tests: cycle length and period length computation
-- [x] Unit tests: GPR prediction accuracy against held-out cycle data
+- [x] Unit tests + backtest regression gate: engine MAE vs baselines, window coverage, confidence calibration
 - [x] Unit tests: safeguarding threshold detection (3 consecutive mood = 1)
 - [x] Unit tests: red-flag prompt trigger logic
-- [ ] Unit tests: prediction retrain on cycle delete
+- [x] Unit tests: cycle-length recompute on create / edit / delete
 - [ ] Unit tests: prediction save deduplication
-- [ ] Unit tests: SQLite migration scripts (each version upgrade)
+- [x] Unit tests: migration ledger and v4 cycle-length repair
 - [ ] Integration tests: full symptom log → correlation computation → insight display flow
-- [ ] Integration tests: onboarding → seedInitialCycleFromOnboarding → Home dashboard flow
+- [x] Integration tests: onboarding seed → period start → prediction feedback (database layer)
 - [ ] Integration tests: period start → prediction update flow
-- [ ] Integration tests: flare start → flare end → flare pattern analysis
-- [ ] Integration tests: local backup export → restore
+- [x] Integration tests: flare start → flare end with encrypted reflection (database layer)
+- [x] Integration tests: local backup export → restore
 - [ ] Performance test: calendar render with 12 months of dense symptom data
-- [ ] Performance test: on-device GPR model retraining time (<2 seconds target)
+- [ ] Performance test: on-device prediction retraining time (<2 seconds target)
 - [ ] Performance test: correlation computation on 90 days of entries (<3 seconds target)
 - [ ] Accessibility audit (WCAG 2.1 AA) before launch
 - [ ] User research sessions with PCOS community members

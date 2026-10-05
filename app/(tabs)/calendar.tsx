@@ -1,5 +1,6 @@
+import { PHASE_COPY } from '@/constants/copy';
 import { Colors } from '@/constants/theme';
-import { getAllCycles, getAllEntries, getCyclePredictions, getPhaseAverages, getDayOfCycle, getPhaseForDay } from '@/database';
+import { getAllCycles, getAllEntries, getCyclePredictions, getPhaseAverages, getDayOfCycle, getPhaseForDay, type CycleRow, type PhaseAverage, type SymptomEntryRow } from '@/database';
 import { differenceInDays, format, parseISO } from "date-fns";
 import { useAppStore } from '@/store';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -26,8 +27,8 @@ export default function CalendarScreen() {
   const { currentMode, postPillMode, postPillStartDate } = useAppStore();
   const [currentMonthDays, setCurrentMonthDays] = useState<(DayData | null)[]>([]);
   const [selectedDay, setSelectedDay] = useState<DayData | null>(null);
-  const [phaseAverages, setPhaseAverages] = useState<any[]>([]);
-  const [entriesByDate, setEntriesByDate] = useState<Record<string, any>>({});
+  const [phaseAverages, setPhaseAverages] = useState<PhaseAverage[]>([]);
+  const [entriesByDate, setEntriesByDate] = useState<Record<string, SymptomEntryRow>>({});
   const [refreshing, setRefreshing] = useState(false);
 
   const today = new Date();
@@ -36,7 +37,7 @@ export default function CalendarScreen() {
   const year = viewDate.getFullYear();
   const month = viewDate.getMonth();
 
-  const isPeriodDay = (dateStr: string, cycle: any): boolean => {
+  const isPeriodDay = (dateStr: string, cycle: CycleRow): boolean => {
     if (!cycle.start_date) return false;
     const start = new Date(cycle.start_date);
     const end = cycle.end_date ? new Date(cycle.end_date) : null;
@@ -49,8 +50,8 @@ export default function CalendarScreen() {
   const generateMonth = useCallback((
     y: number,
     m: number,
-    loadedCycles: any[],
-    loadedEntriesMap: Record<string, any>,
+    loadedCycles: CycleRow[],
+    loadedEntriesMap: Record<string, SymptomEntryRow>,
     prediction: PredictionResult | null,
   ) => {
     const days: (DayData | null)[] = [];
@@ -75,7 +76,7 @@ export default function CalendarScreen() {
       loadedCycles.forEach(cycle => {
         if (isPeriodDay(dateStr, cycle)) dayData.periodScore += 1;
         const cycleDay = getDayOfCycle(dateStr, cycle.start_date);
-        if (cycleDay > 0) dayData.phase = getPhaseForDay(cycleDay, cycle.cycle_length || 28);
+        if (cycleDay > 0) dayData.phase = getPhaseForDay(cycleDay, cycle.cycle_length || (prediction && prediction.model !== "none" ? prediction.mean : 28));
       });
 
       if (loadedCycles.length > 0 && prediction) {
@@ -115,7 +116,7 @@ export default function CalendarScreen() {
     const allCycles = await getAllCycles();
 
     const allEntries = await getAllEntries();
-    const entriesMap: Record<string, any> = {};
+    const entriesMap: Record<string, SymptomEntryRow> = {};
     allEntries.forEach(e => {
       const d = e.logged_date.split('T')[0];
       if (!entriesMap[d]) entriesMap[d] = e;
@@ -125,7 +126,7 @@ export default function CalendarScreen() {
     const prediction = await getCyclePredictions(currentMode, postPillMode, postPillStartDate ?? null);
     generateMonth(year, month, allCycles, entriesMap, prediction);
     if (allCycles.length > 0) {
-      const avgs = await getPhaseAverages(allCycles[0].id);
+      const avgs = await getPhaseAverages(allCycles[0].id, prediction.model !== "none" ? prediction.mean : 28);
       setPhaseAverages(avgs);
     }
   }, [currentMode, postPillMode, postPillStartDate, generateMonth, year, month]);
@@ -161,7 +162,7 @@ export default function CalendarScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.tint} />
         }
       >
-        <Text style={[styles.title, { color: theme.text }]}>Calendar</Text>
+        <Text style={[styles.title, { color: theme.text }]}>your calendar 📅</Text>
 
         <View style={styles.monthNav}>
           <TouchableOpacity onPress={() => shiftMonth(-1)} style={[styles.navBtn, { borderColor: theme.border }]}>
@@ -176,7 +177,7 @@ export default function CalendarScreen() {
         </View>
 
         <TouchableOpacity onPress={() => { setViewDate(new Date(today.getFullYear(), today.getMonth(), 1)); setSelectedDay(null); }}>
-          <Text style={[styles.todayLink, { color: theme.tint }]}>Jump to today</Text>
+          <Text style={[styles.todayLink, { color: theme.tint }]}>back to today ↩︎</Text>
         </TouchableOpacity>
 
         <View style={styles.weekdays}>
@@ -230,23 +231,23 @@ export default function CalendarScreen() {
             </Text>
             {selectedDay.phase && (
               <Text style={{ color: theme.textSecondary }}>
-                Phase: <Text style={{ color: getPhaseColor(selectedDay.phase), fontWeight: '700' }}>{selectedDay.phase}</Text>
+                <Text style={{ color: getPhaseColor(selectedDay.phase), fontWeight: '700' }}>{PHASE_COPY[selectedDay.phase]?.name ?? selectedDay.phase}</Text> · {PHASE_COPY[selectedDay.phase]?.vibe ?? ''}
               </Text>
             )}
             {selectedEntry ? (
               <View style={styles.detailStats}>
-                <Text style={{ color: theme.text }}>Pain: {selectedEntry.pain_score ?? 0}/10</Text>
-                <Text style={{ color: theme.text }}>Mood: {selectedEntry.mood_score ?? '—'}/5</Text>
-                <Text style={{ color: theme.text }}>Energy: {selectedEntry.energy_score ?? '—'}/10</Text>
+                <Text style={{ color: theme.text }}>🔥 pain {selectedEntry.pain_score ?? '—'}/10</Text>
+                <Text style={{ color: theme.text }}>✨ mood {selectedEntry.mood_score ?? '—'}/5</Text>
+                <Text style={{ color: theme.text }}>🔋 energy {selectedEntry.energy_score ?? '—'}/10</Text>
               </View>
             ) : (
-              <Text style={{ color: theme.textSecondary, marginTop: 8 }}>No symptoms logged this day.</Text>
+              <Text style={{ color: theme.textSecondary, marginTop: 8 }}>nothing logged this day — no stress.</Text>
             )}
             <TouchableOpacity
               style={[styles.logDayBtn, { backgroundColor: theme.tint }]}
               onPress={() => router.push('/log')}
             >
-              <Text style={styles.logDayBtnText}>{selectedEntry ? 'Update log' : 'Log this day'}</Text>
+              <Text style={[styles.logDayBtnText, { color: theme.onTint }]}>{selectedEntry ? 'update this log' : 'log this day'}</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -254,26 +255,26 @@ export default function CalendarScreen() {
         <View style={styles.legend}>
           <View style={styles.legendItem}>
             <View style={[styles.legendDot, { backgroundColor: '#FF6B9D' }]} />
-            <Text style={{ color: theme.textSecondary }}>Period</Text>
+            <Text style={{ color: theme.textSecondary }}>period</Text>
           </View>
           <View style={styles.legendItem}>
             <View style={[styles.legendDot, { backgroundColor: theme.tint, opacity: 0.5 }]} />
-            <Text style={{ color: theme.textSecondary }}>Predicted</Text>
+            <Text style={{ color: theme.textSecondary }}>predicted</Text>
           </View>
           <View style={styles.legendItem}>
             <View style={[styles.legendDot, { backgroundColor: '#FF4757' }]} />
-            <Text style={{ color: theme.textSecondary }}>High pain</Text>
+            <Text style={{ color: theme.textSecondary }}>rough pain day</Text>
           </View>
         </View>
 
         {phaseAverages.length > 0 && (
           <View style={styles.overlaysSection}>
-            <Text style={[styles.sectionTitle, { color: theme.text }]}>Phase trends</Text>
+            <Text style={[styles.sectionTitle, { color: theme.text }]}>how you feel by phase 📊</Text>
             {phaseAverages.map(avg => (
               <View key={avg.phase} style={[styles.avgRow, { backgroundColor: theme.surface }]}>
-                <Text style={{ color: theme.text, fontWeight: '600' }}>{avg.phase}</Text>
+                <Text style={{ color: theme.text, fontWeight: '700' }}>{PHASE_COPY[avg.phase]?.vibe ?? avg.phase}</Text>
                 <Text style={{ color: theme.textSecondary }}>
-                  Mood {avg.mood_avg} · Energy {avg.energy_avg}
+                  mood {avg.mood_avg ?? '—'} · energy {avg.energy_avg ?? '—'}
                 </Text>
               </View>
             ))}
@@ -320,7 +321,7 @@ const styles = StyleSheet.create({
   dayDetailTitle: { fontSize: 18, fontWeight: '700' },
   detailStats: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 4 },
   logDayBtn: { marginTop: 8, padding: 12, borderRadius: 12, alignItems: 'center' },
-  logDayBtnText: { color: '#FFF', fontWeight: '700' },
+  logDayBtnText: { fontWeight: '700' },
   legend: { flexDirection: 'row', justifyContent: 'space-around', marginTop: 24, paddingVertical: 16 },
   legendItem: { alignItems: 'center', gap: 4 },
   legendDot: { width: 12, height: 12, borderRadius: 6 },

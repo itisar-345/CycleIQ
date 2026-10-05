@@ -1,5 +1,6 @@
-import { Colors } from "@/constants/theme";
-import { deleteCycle, getAllCycles } from "@/database";
+import { Colors, Radius, Shadow } from "@/constants/theme";
+import { format } from "date-fns";
+import { deleteCycle, getAllCycles, type CycleRow } from "@/database";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { router, useFocusEffect } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
@@ -16,7 +17,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 export default function HistoryScreen() {
   const colorScheme = useColorScheme() ?? "light";
   const theme = Colors[colorScheme];
-  const [cycles, setCycles] = useState<any[]>([]);
+  const [cycles, setCycles] = useState<CycleRow[]>([]);
 
   const loadCycles = async () => {
     const all = await getAllCycles();
@@ -35,12 +36,12 @@ export default function HistoryScreen() {
 
   const handleDelete = (cycleId: string) => {
     Alert.alert(
-      "Delete cycle",
-      "Are you sure you want to delete this cycle and its symptom logs?",
+      "delete this cycle? 🗑️",
+      "This also deletes its symptom logs, and it can't be undone.",
       [
-        { text: "Cancel", style: "cancel" },
+        { text: "keep it", style: "cancel" },
         {
-          text: "Delete",
+          text: "delete",
           style: "destructive",
           onPress: async () => {
             await deleteCycle(cycleId);
@@ -56,10 +57,10 @@ export default function HistoryScreen() {
       style={[styles.container, { backgroundColor: theme.background }]}
     >
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={[styles.title, { color: theme.text }]}>Cycle History</Text>
+        <Text style={[styles.title, { color: theme.text }]}>your cycle history 🗂️</Text>
         {cycles.length === 0 ? (
           <Text style={{ color: theme.textSecondary }}>
-            No cycles logged yet. Start your first period from home.
+            nothing here yet — tap &quot;my period started&quot; on Home and your history starts building ✨
           </Text>
         ) : (
           cycles.map((cycle) => (
@@ -71,37 +72,34 @@ export default function HistoryScreen() {
               ]}
             >
               <TouchableOpacity
-                onPress={() => router.push(`/cycle/${cycle.id}` as any)}
+                onPress={() => router.push(`/cycle/${cycle.id}`)}
               >
                 <Text style={[styles.cardTitle, { color: theme.text }]}>
-                  {new Date(cycle.start_date).toDateString()} →{" "}
-                  {cycle.end_date
-                    ? new Date(cycle.end_date).toDateString()
-                    : "ongoing"}
+                  {format(new Date(cycle.start_date), "MMM d, yyyy")}
+                  {cycle.cycle_length === null ? "  ·  current cycle 🔄" : ""}
                 </Text>
                 <Text style={{ color: theme.textSecondary }}>
-                  Cycle: {cycle.cycle_length ?? "—"} d • Period:{" "}
-                  {cycle.period_length ?? "—"} d
+                  {cycle.cycle_length !== null ? `${cycle.cycle_length}-day cycle` : "still going"} · {cycle.period_length !== null ? `${cycle.period_length}-day period` : "period length not logged"}
                 </Text>
               </TouchableOpacity>
               <View style={styles.row}>
                 <TouchableOpacity
                   style={[styles.actionBtn, { borderColor: theme.tint }]}
-                  onPress={() => router.push(`/cycle/${cycle.id}` as any)}
+                  onPress={() => router.push(`/cycle/${cycle.id}`)}
                 >
-                  <Text style={{ color: theme.tint }}>View</Text>
+                  <Text style={{ color: theme.tint, fontWeight: "700" }}>view</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.actionBtn, { borderColor: theme.tint }]}
-                  onPress={() => router.push(`/cycle/${cycle.id}/edit` as any)}
+                  onPress={() => router.push(`/cycle/${cycle.id}/edit`)}
                 >
-                  <Text style={{ color: theme.tint }}>Edit</Text>
+                  <Text style={{ color: theme.tint, fontWeight: "700" }}>edit</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.actionBtn, { borderColor: theme.error }]}
                   onPress={() => handleDelete(cycle.id)}
                 >
-                  <Text style={{ color: theme.error }}>Delete</Text>
+                  <Text style={{ color: theme.error, fontWeight: "700" }}>delete</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -115,9 +113,9 @@ export default function HistoryScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   content: { padding: 20, paddingBottom: 40 },
-  title: { fontSize: 32, fontWeight: "bold", marginBottom: 16 },
-  card: { borderWidth: 1, borderRadius: 14, padding: 16, marginBottom: 12 },
-  cardTitle: { fontSize: 16, fontWeight: "bold", marginBottom: 4 },
+  title: { fontSize: 30, fontWeight: "800", letterSpacing: -0.5, marginBottom: 16 },
+  card: { borderRadius: Radius.lg, padding: 18, marginBottom: 12, ...Shadow },
+  cardTitle: { fontSize: 17, fontWeight: "800", marginBottom: 4 },
   row: { flexDirection: "row", marginTop: 12, gap: 10 },
-  actionBtn: { padding: 8, borderWidth: 1, borderRadius: 10 },
+  actionBtn: { paddingVertical: 8, paddingHorizontal: 14, borderWidth: 1.5, borderRadius: Radius.pill },
 });

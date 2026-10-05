@@ -41,6 +41,11 @@ export interface NotificationPrefs {
   quietHoursEnd: number;
 }
 
+/** NotificationPrefs keys that are on/off switches (excludes the hour settings). */
+export type BooleanNotificationPref = {
+  [K in keyof NotificationPrefs]: NotificationPrefs[K] extends boolean ? K : never;
+}[keyof NotificationPrefs];
+
 interface AppState {
   isOnboarded: boolean;
   currentMode: AppMode;
@@ -70,7 +75,6 @@ interface AppState {
   healthImportPrefs: HealthImportPrefs;
   dismissedInsights: string[];
 
-  consecutiveLowMoodDays: number; // For safeguarding
   lastSafeguardPrompt: string | null; // ISO date for Sec 4.7 cooldown;
   lastRedFlagPrompt: string | null;
   lastPCOSPrompt: string | null;
@@ -97,8 +101,6 @@ interface AppState {
     postPillMode: boolean,
     isTeen: boolean
   ) => void;
-  incrementLowMood: () => void;
-  resetLowMood: () => void;
   setLastPCOSPrompt: (date: string | null) => void;
   setLastSafeguardPrompt: (date: string | null) => void;
   setLastRedFlagPrompt: (date: string | null) => void;
@@ -169,7 +171,6 @@ export const useAppStore = create<AppState>()(
       postPillMode: false as boolean,
       postPillStartDate: null as string | null,
       pcosWidePrediction: false as boolean,
-      consecutiveLowMoodDays: 0 as number,
       lastSafeguardPrompt: null as string | null,
       lastRedFlagPrompt: null as string | null,
       lastPCOSPrompt: null as string | null,
@@ -242,11 +243,6 @@ export const useAppStore = create<AppState>()(
         persistSettingsToSqlite(get());
       },
 
-      incrementLowMood: () =>
-        set((state) => ({
-          consecutiveLowMoodDays: state.consecutiveLowMoodDays + 1,
-        })),
-      resetLowMood: () => set({ consecutiveLowMoodDays: 0 }),
       setFlareEnd: (endDate: string, reflection: string) => {
         const state = get();
         const durationDays = state.flareStartDate

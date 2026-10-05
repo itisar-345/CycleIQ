@@ -16,10 +16,10 @@ export default function EducationScreen() {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
       <View style={[styles.header, { borderBottomColor: theme.border }]}>
-        <Text style={[styles.title, { color: theme.text }]}>Support Hub</Text>
+        <Text style={[styles.title, { color: theme.text }]}>learn stuff 📚</Text>
         <TextInput
           style={[styles.search, { backgroundColor: theme.surface, color: theme.text, borderColor: theme.border }]}
-          placeholder="Search articles..."
+          placeholder="search anything — cramps, PCOS, sleep…"
           placeholderTextColor={theme.textSecondary}
           value={query}
           onChangeText={setQuery}
@@ -28,7 +28,7 @@ export default function EducationScreen() {
 
       <ScrollView contentContainerStyle={styles.content}>
         {articles.length === 0 ? (
-          <Text style={{ color: theme.textSecondary, textAlign: 'center', marginTop: 20 }}>No articles found.</Text>
+          <Text style={{ color: theme.textSecondary, textAlign: 'center', marginTop: 20 }}>nothing matched that 🤔 try another word?</Text>
         ) : (
           articles.map((article) => {
             const review = getArticleReviewStatus(article);
@@ -39,18 +39,18 @@ export default function EducationScreen() {
               >
                 <View style={styles.tagWrap}>
                   <Text style={[styles.tag, { backgroundColor: theme.tint + '20', color: theme.tint }]}>
-                    {article.category.toUpperCase()}
+                    {article.category}
                   </Text>
                   {review.isReviewDue && (
                     <Text style={[styles.tag, { backgroundColor: theme.error + '20', color: theme.error }]}>
-                      REVIEW DUE
+                      needs a fresh review
                     </Text>
                   )}
                 </View>
                 <Text style={[styles.cardTitle, { color: theme.text }]}>{article.title}</Text>
                 <Text style={[styles.cardPreview, { color: theme.textSecondary }]} numberOfLines={3}>{article.content}</Text>
                 <Text style={[styles.cardFooter, { color: review.isReviewDue ? theme.error : theme.textSecondary }]}>
-                  Reviewed: {article.lastReviewed.split("T")[0]} • {article.evidenceGrade} • {review.label}
+                  fact-checked {article.lastReviewed.split("T")[0]} · {article.evidenceGrade} · {review.label}
                 </Text>
               </TouchableOpacity>
             );

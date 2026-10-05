@@ -1,4 +1,6 @@
-import { NativeModules, Platform } from "react-native";
+import { Platform } from "react-native";
+import { healthBridge } from "./health/bridge";
+import type { HealthReadPermissions } from "./health/types";
 
 export type HealthProvider = "apple_health" | "health_connect";
 
@@ -16,8 +18,6 @@ export interface DailyHealthMetrics {
   source: "Apple Health" | "Health Connect";
 }
 
-const getBridge = () => (NativeModules as any).CycleIQHealthBridge;
-
 export const getActiveHealthProvider = (prefs: HealthImportPrefs): HealthProvider | null => {
   if (Platform.OS === "ios" && (prefs.appleHealthSleep || prefs.appleHealthActivity)) {
     return "apple_health";
@@ -34,25 +34,21 @@ export const getHealthSourceLabel = (provider: HealthProvider | null) => {
   return null;
 };
 
-export const isHealthBridgeAvailable = () => {
-  const bridge = getBridge();
-  return !!bridge?.requestPermissions && !!bridge?.readDailyMetrics;
-};
+/** False in Expo Go and on web, where the native health modules aren't linked. */
+export const isHealthBridgeAvailable = () => healthBridge.isLinked();
+
+const permissionsFor = (provider: HealthProvider, prefs: HealthImportPrefs): HealthReadPermissions => ({
+  sleep: provider === "apple_health" ? prefs.appleHealthSleep : prefs.healthConnectSleep,
+  activity: provider === "apple_health" ? prefs.appleHealthActivity : prefs.healthConnectActivity,
+});
 
 export const requestHealthPermissions = async (
   prefs: HealthImportPrefs,
 ): Promise<boolean> => {
   const provider = getActiveHealthProvider(prefs);
-  const bridge = getBridge();
-  if (!provider || !bridge?.requestPermissions) return false;
-
-  const permissions = {
-    sleep: provider === "apple_health" ? prefs.appleHealthSleep : prefs.healthConnectSleep,
-    activity: provider === "apple_health" ? prefs.appleHealthActivity : prefs.healthConnectActivity,
-  };
-
+  if (!provider || !healthBridge.isLinked()) return false;
   try {
-    return !!(await bridge.requestPermissions(provider, permissions));
+    return await healthBridge.requestPermissions(permissionsFor(provider, prefs));
   } catch {
     return false;
   }
@@ -64,22 +60,11 @@ export const readDailyHealthMetrics = async (
 ): Promise<DailyHealthMetrics | null> => {
   const provider = getActiveHealthProvider(prefs);
   const source = getHealthSourceLabel(provider);
-  const bridge = getBridge();
-  if (!provider || !source || !bridge?.readDailyMetrics) return null;
-
-  const permissions = {
-    sleep: provider === "apple_health" ? prefs.appleHealthSleep : prefs.healthConnectSleep,
-    activity: provider === "apple_health" ? prefs.appleHealthActivity : prefs.healthConnectActivity,
-  };
+  if (!provider || !source || !healthBridge.isLinked()) return null;
 
   try {
-    const metrics = await bridge.readDailyMetrics(provider, isoDate, permissions);
-    return {
-      sleepHours: typeof metrics?.sleepHours === "number" ? metrics.sleepHours : null,
-      steps: typeof metrics?.steps === "number" ? metrics.steps : null,
-      activityMinutes: typeof metrics?.activityMinutes === "number" ? metrics.activityMinutes : null,
-      source,
-    };
+    const metrics = await healthBridge.readDailyMetrics(isoDate, permissionsFor(provider, prefs));
+    return { ...metrics, source };
   } catch {
     return null;
   }

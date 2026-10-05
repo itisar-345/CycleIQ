@@ -10,7 +10,7 @@ import { useAppStore, PCOSSetup } from '@/store';
 export default function PCODSetupScreen() {
   const colorScheme = useColorScheme() ?? 'light';
   const theme = Colors[colorScheme];
-  const accentColor = (theme as any).pcod ?? '#80DEEA';
+  const accentColor = theme.pcod;
   const { setPCOSData } = useAppStore();
 
   const [form, setForm] = useState<PCOSSetup>({
@@ -25,19 +25,19 @@ export default function PCODSetupScreen() {
     router.push('/onboarding/consent');
   };
 
-  const renderSingleSelect = (key: keyof PCOSSetup, options: string[]) => (
+  const renderSingleSelect = (key: keyof PCOSSetup, options: { value: string; label: string }[]) => (
     <View style={styles.buttonGroup}>
       {options.map((opt) => (
         <TouchableOpacity
-          key={opt}
+          key={opt.value}
           style={[styles.optionButton, {
             borderColor: accentColor,
-            backgroundColor: form[key] === opt ? accentColor : 'transparent',
+            backgroundColor: form[key] === opt.value ? accentColor : 'transparent',
           }]}
-          onPress={() => setForm({ ...form, [key]: opt })}
+          onPress={() => setForm({ ...form, [key]: opt.value })}
         >
-          <Text style={{ color: form[key] === opt ? '#2A2422' : theme.text, fontWeight: form[key] === opt ? 'bold' : 'normal' }}>
-            {opt}
+          <Text style={{ color: form[key] === opt.value ? theme.onAccent : theme.text, fontWeight: form[key] === opt.value ? 'bold' : 'normal' }}>
+            {opt.label}
           </Text>
         </TouchableOpacity>
       ))}
@@ -50,30 +50,30 @@ export default function PCODSetupScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <Text style={[styles.backText, { color: accentColor }]}>← Back</Text>
         </TouchableOpacity>
-        <OnboardingProgress step={4} total={5} label="Step 4 — Condition details" />
+        <OnboardingProgress step={4} total={5} label="step 4 · a few details" />
       </View>
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={[styles.title, { color: theme.text }]}>PCOD Setup</Text>
+        <Text style={[styles.title, { color: theme.text }]}>Let&apos;s set up PCOD mode 💙</Text>
 
         <View style={[styles.privacyNote, { backgroundColor: theme.surface, borderColor: theme.border }]}>
           <Text style={[styles.privacyText, { color: theme.textSecondary }]}>
-            🔒 Your health data stays on this device. We never store or transmit it.
+            🔒 This stays on your phone. We never see it — we literally can&apos;t.
           </Text>
         </View>
 
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: theme.text }]}>Diagnosis status</Text>
-          {renderSingleSelect('diagnosisStatus', ['Confirmed diagnosis', 'Suspected', 'Self-identified'])}
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>Where are you at with a diagnosis?</Text>
+          {renderSingleSelect('diagnosisStatus', [{ value: 'Confirmed diagnosis', label: 'diagnosed by a doctor' }, { value: 'Suspected', label: 'doctor thinks maybe' }, { value: 'Self-identified', label: 'I think I have it' }])}
         </View>
 
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: theme.text }]}>Cycle pattern type</Text>
-          {renderSingleSelect('cyclePattern', ['Regular with cysts', 'Irregular', 'Absent (Amenorrhoea)'])}
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>What do your periods usually do?</Text>
+          {renderSingleSelect('cyclePattern', [{ value: 'Regular with cysts', label: 'regular-ish, but cysts' }, { value: 'Irregular', label: 'all over the place' }, { value: 'Absent (Amenorrhoea)', label: 'basically ghosted me 👻' }])}
         </View>
 
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: theme.text }]}>Current management</Text>
-          {renderSingleSelect('currentManagement', ['Hormonal BC', 'Lifestyle changes', 'Medication', 'None'])}
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>Managing it with anything right now?</Text>
+          {renderSingleSelect('currentManagement', [{ value: 'Hormonal BC', label: 'birth control / hormones' }, { value: 'Lifestyle changes', label: 'food & lifestyle' }, { value: 'Medication', label: 'medication' }, { value: 'None', label: 'nothing yet' }])}
         </View>
 
         <Text style={[styles.deferNote, { color: theme.textSecondary }]}>
@@ -85,7 +85,7 @@ export default function PCODSetupScreen() {
           onPress={handleNext}
           disabled={!form.diagnosisStatus}
         >
-          <Text style={styles.nextText}>Continue</Text>
+          <Text style={[styles.nextText, { color: theme.onTint }]}>Next →</Text>
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
@@ -107,5 +107,5 @@ const styles = StyleSheet.create({
   optionButton: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 20, borderWidth: 1 },
   deferNote: { fontSize: 13, textAlign: 'center', marginBottom: 16 },
   nextButton: { padding: 18, borderRadius: 16, alignItems: 'center', marginTop: 4 },
-  nextText: { color: '#FFF', fontSize: 18, fontWeight: 'bold' },
+  nextText: { fontSize: 18, fontWeight: 'bold' },
 });

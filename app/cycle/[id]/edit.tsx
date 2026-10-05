@@ -1,5 +1,5 @@
 import { Colors } from "@/constants/theme";
-import { getAllCycles, updateCycle } from "@/database";
+import { getCycle, updateCycle, type CycleRow } from "@/database";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { decryptField, encryptField } from "@/utils/fieldEncryption";
 import { router, useLocalSearchParams } from "expo-router";
@@ -19,21 +19,29 @@ export default function CycleEdit() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const colorScheme = useColorScheme() ?? "light";
   const theme = Colors[colorScheme];
-  const [cycle, setCycle] = useState<any>(null);
+  const [cycle, setCycle] = useState<CycleRow | null>(null);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [notes, setNotes] = useState("");
+  // Decrypted notes as loaded, so Save only re-encrypts when the text actually changed.
+  const [originalNotes, setOriginalNotes] = useState("");
 
   useEffect(() => {
     if (!id) return;
     const load = async () => {
-      const allCycles = await getAllCycles();
-      const thisCycle = allCycles.find((c) => c.id === id);
+      const thisCycle = await getCycle(id);
       if (thisCycle) {
         setCycle(thisCycle);
         setStartDate(thisCycle.start_date.slice(0, 10)); // YYYY-MM-DD
         setEndDate(thisCycle.end_date ? thisCycle.end_date.slice(0, 10) : "");
-        setNotes(thisCycle.notes_encrypted ? await decryptField(thisCycle.notes_encrypted) : "");
+        let decrypted = "";
+        try {
+          decrypted = thisCycle.notes_encrypted ? await decryptField(thisCycle.notes_encrypted) : "";
+        } catch {
+          Alert.alert("can't open these notes 🔒", "They were encrypted with a key this phone doesn't have anymore.");
+        }
+        setNotes(decrypted);
+        setOriginalNotes(decrypted);
       }
     };
     load();
@@ -41,31 +49,31 @@ export default function CycleEdit() {
 
   const handleSave = async () => {
     if (!cycle || !id) return;
-    const updates: any = {};
+    const updates: Parameters<typeof updateCycle>[1] = {};
     if (startDate !== cycle.start_date.slice(0, 10))
       updates.start_date = startDate;
     if (endDate !== (cycle.end_date?.slice(0, 10) || ""))
       updates.end_date = endDate || null;
-    if (notes !== (cycle.notes_encrypted || ""))
+    if (notes !== originalNotes)
       updates.notes_encrypted = notes ? await encryptField(notes) : "";
 
-    await updateCycle(id as string, updates);
-    Alert.alert("Saved", "Cycle updated.");
+    await updateCycle(id, updates);
+    Alert.alert("updated ✅", "Your cycle's been fixed up.");
     router.back();
   };
 
-  if (!cycle) return <Text>Loading...</Text>;
+  if (!cycle) return <Text style={{ color: theme.textSecondary, padding: 20 }}>loading…</Text>;
 
   return (
     <SafeAreaView
       style={[styles.container, { backgroundColor: theme.background }]}
     >
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={[styles.title, { color: theme.text }]}>Edit Cycle</Text>
+        <Text style={[styles.title, { color: theme.text }]}>edit this cycle ✏️</Text>
 
         <View style={[styles.field, { borderColor: theme.border }]}>
           <Text style={[styles.label, { color: theme.textSecondary }]}>
-            Start Date
+            when did it start?
           </Text>
           <TextInput
             style={[
@@ -80,7 +88,7 @@ export default function CycleEdit() {
 
         <View style={[styles.field, { borderColor: theme.border }]}>
           <Text style={[styles.label, { color: theme.textSecondary }]}>
-            End Date
+            when did your period end?
           </Text>
           <TextInput
             style={[
@@ -95,7 +103,7 @@ export default function CycleEdit() {
 
         <View style={[styles.field, { borderColor: theme.border }]}>
           <Text style={[styles.label, { color: theme.textSecondary }]}>
-            Notes (encrypted)
+            notes 🔒 (encrypted)
           </Text>
           <TextInput
             style={[
@@ -106,7 +114,7 @@ export default function CycleEdit() {
             onChangeText={setNotes}
             multiline
             numberOfLines={4}
-            placeholder="Private notes..."
+            placeholder="anything worth remembering about this cycle…"
           />
         </View>
 
@@ -114,7 +122,7 @@ export default function CycleEdit() {
           style={[styles.saveBtn, { backgroundColor: theme.tint }]}
           onPress={handleSave}
         >
-          <Text style={styles.saveText}>Update Cycle</Text>
+          <Text style={[styles.saveText, { color: theme.onTint }]}>save changes</Text>
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
@@ -136,5 +144,5 @@ const styles = StyleSheet.create({
     minHeight: 80,
   },
   saveBtn: { padding: 16, borderRadius: 16, alignItems: "center" },
-  saveText: { color: "#FFF", fontSize: 18, fontWeight: "bold" },
+  saveText: { fontSize: 18, fontWeight: "bold" },
 });

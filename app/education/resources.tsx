@@ -1,122 +1,152 @@
+import { Colors, Radius, Shadow, Spacing } from "@/constants/theme";
+import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useAppStore } from "@/store";
 import { router } from "expo-router";
 import React from "react";
 import {
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  Linking,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-const RESOURCES = [
+type Region = "IN" | "US" | "UK" | "AU" | "CA";
+
+interface Resource {
+  label: string;
+  /** Dialable number, if this is a phone line. */
+  phone?: string;
+  /** Only shown in this region; omit for everywhere. */
+  region?: Region;
+}
+
+const CRISIS_LINES: Resource[] = [
+  { label: "Tele-MANAS (24/7, free, many languages)", phone: "14416", region: "IN" },
+  { label: "KIRAN mental health helpline (24/7)", phone: "18005990019", region: "IN" },
+  { label: "988 Suicide & Crisis Lifeline (24/7)", phone: "988", region: "US" },
+  { label: "Samaritans (24/7)", phone: "116123", region: "UK" },
+  { label: "Lifeline (24/7)", phone: "131114", region: "AU" },
+  { label: "9-8-8 Suicide Crisis Helpline (24/7)", phone: "988", region: "CA" },
+];
+
+const SECTIONS: { title: string; emoji: string; items: Resource[] }[] = [
   {
-    title: "Immediate Crisis Support",
-    items: [
-      "US: National Suicide Prevention Lifeline - 988 (24/7)",
-      "UK: Samaritans - 116 123 (24/7)",
-      "Australia: Lifeline - 13 11 14 (24/7)",
-      "Canada: Crisis Services Canada - 1 833 456 4566",
-    ],
-    color: "#FF4757",
+    title: "Talk to someone right now",
+    emoji: "📞",
+    items: CRISIS_LINES,
   },
   {
-    title: "Mental Health Therapy",
+    title: "Find a therapist",
+    emoji: "🛋️",
     items: [
-      "Psychology Today Directory (find therapists by insurance/location)",
-      "BetterHelp (online therapy, text/video)",
-      "Open Path Collective (affordable therapy $30-60/session)",
-      'Local: Search "mental health therapy near me"',
+      { label: "Psychology Today directory (filter by location & cost)" },
+      { label: "Open Path Collective (lower-cost therapy)" },
+      { label: 'Search "mental health therapy near me"' },
     ],
-    color: "#3742FA",
   },
   {
-    title: "Chronic Pain & Mood Resources",
+    title: "Chronic pain & mood support",
+    emoji: "💜",
     items: [
-      "Pain Connection (chronic pain support)",
-      "Anxiety & Depression Association of America (ADAA)",
-      "Mind.org.uk (UK mental health charity)",
-      "Beyond Blue (Australia mood/pain support)",
+      { label: "Pain Connection (chronic pain peer support)" },
+      { label: "Anxiety & Depression Association of America (ADAA)" },
+      { label: "Mind.org.uk (UK mental health charity)" },
+      { label: "Beyond Blue (Australia)" },
     ],
-    color: "#2ED573",
   },
 ];
 
-const getUserRegion = () => {
-    try {
-        const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-        if (tz.includes('Europe/London')) return 'UK';
-        if (tz.includes('Australia')) return 'Australia';
-        if (tz.includes('America/Toronto') || tz.includes('America/Vancouver')) return 'Canada';
-    } catch(e) {}
-    return 'US';
+const getUserRegion = (): Region | null => {
+  try {
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (tz === "Asia/Kolkata" || tz === "Asia/Calcutta") return "IN";
+    if (tz === "Europe/London") return "UK";
+    if (tz.startsWith("Australia/")) return "AU";
+    if (["America/Toronto", "America/Vancouver", "America/Edmonton", "America/Winnipeg", "America/Halifax", "America/St_Johns"].includes(tz)) return "CA";
+    if (tz.startsWith("America/")) return "US";
+  } catch {}
+  return null;
 };
 
 export default function ResourcesScreen() {
+  const theme = Colors[useColorScheme() ?? "light"];
   const currentMode = useAppStore((state) => state.currentMode);
+  const region = getUserRegion();
+
+  const visible = (item: Resource) => !item.region || item.region === region;
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Text style={styles.backText}>Back</Text>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
+      <View style={[styles.header, { borderBottomColor: theme.border }]}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backButton} accessibilityRole="button">
+          <Text style={[styles.backText, { color: theme.tint }]}>‹ Back</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Resources</Text>
-        <View style={{ width: 56 }} />
+        <Text style={[styles.headerTitle, { color: theme.text }]}>Support</Text>
+        <View style={{ width: 64 }} />
       </View>
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.subtitle}>
-          Non-clinical support options. These are not substitutes for
-          professional care.
+        <Text style={[styles.title, { color: theme.text }]}>You don&apos;t have to do this alone 🫶</Text>
+        <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
+          Reaching out is a strong move, not a weak one. These are support options — not a
+          replacement for professional care.
         </Text>
 
-        {RESOURCES.map((section, i) => {
-          const region = getUserRegion();
-          // Filter items that start with a region tag (e.g. "US:", "UK:"), explicitly ignoring items that don't match the region.
-          // Generic items (without a colon-separated region prefix) will always be included.
-          const filteredItems = section.items.filter(item => {
-            const match = item.match(/^([A-Za-z]+):/);
-            if (match) {
-                return match[1] === region;
-            }
-            return true;
-          });
+        <View style={[styles.emergency, { backgroundColor: theme.tintSoft }]}>
+          <Text style={[styles.emergencyText, { color: theme.onTintSoft }]}>
+            If you&apos;re in danger right now, call your local emergency number
+            {region === "IN" ? " (112)" : region === "UK" ? " (999)" : region === "AU" ? " (000)" : " (911)"}.
+          </Text>
+        </View>
 
+        {SECTIONS.map((section) => {
+          const items = section.items.filter(visible);
+          // Outside a known region, show every crisis line rather than none.
+          const shown = items.length > 0 ? items : section.items;
           return (
-          <View
-            key={i}
-            style={[styles.section, { borderColor: section.color + "20" }]}
-          >
-            <Text style={[styles.sectionTitle, { color: section.color }]}>
-              {section.title}
-            </Text>
-            {filteredItems.map((item, j) => (
-              <TouchableOpacity
-                key={j}
-                style={styles.resourceItem}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.resourceText}>{item.replace(/^([A-Za-z]+):\s*/, '')}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        )})}
+            <View key={section.title} style={[styles.section, { backgroundColor: theme.surface }, Shadow]}>
+              <Text style={[styles.sectionTitle, { color: theme.text }]}>
+                {section.emoji}  {section.title}
+              </Text>
+              {shown.map((item, j) => {
+                const callable = !!item.phone;
+                return (
+                  <TouchableOpacity
+                    key={item.label}
+                    style={[styles.resourceItem, j > 0 && { borderTopWidth: 1, borderTopColor: theme.border }]}
+                    activeOpacity={callable ? 0.6 : 1}
+                    disabled={!callable}
+                    onPress={() => item.phone && Linking.openURL(`tel:${item.phone}`)}
+                    accessibilityRole={callable ? "button" : "text"}
+                    accessibilityLabel={callable ? `Call ${item.label}, ${item.phone}` : item.label}
+                  >
+                    <Text style={[styles.resourceText, { color: theme.text }]}>{item.label}</Text>
+                    {callable && (
+                      <View style={[styles.callPill, { backgroundColor: theme.tint }]}>
+                        <Text style={[styles.callText, { color: theme.onTint }]}>Call {item.phone}</Text>
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          );
+        })}
 
         {currentMode === "endo" && (
-          <View style={styles.note}>
-            <Text style={styles.noteText}>
-              For endometriosis-related pain and mental health, EndoFound.org
-              offers peer support and resources.
+          <View style={[styles.note, { backgroundColor: theme.surfaceAlt }]}>
+            <Text style={[styles.noteText, { color: theme.text }]}>
+              💜 Endo-specific: EndoFound.org has peer support for the pain and the mental load.
             </Text>
           </View>
         )}
 
         {currentMode === "pcos" && (
-          <View style={styles.note}>
-            <Text style={styles.noteText}>
-              PCOS Awareness Association provides mental health resources
-              specific to PCOS experiences.
+          <View style={[styles.note, { backgroundColor: theme.surfaceAlt }]}>
+            <Text style={[styles.noteText, { color: theme.text }]}>
+              💚 PCOS-specific: the PCOS Awareness Association has mental health resources made for PCOS life.
             </Text>
           </View>
         )}
@@ -126,47 +156,29 @@ export default function ResourcesScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F8F9FA" },
-  header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: "#E5E7EB" },
-  headerTitle: { fontSize: 18, fontWeight: "bold", color: "#2A2422" },
-  backButton: { width: 56, paddingVertical: 8 },
-  backText: { fontWeight: "700", color: "#FFB8A1" },
-  content: { padding: 20, paddingBottom: 40 },
-  title: {
-    fontSize: 28,
-    fontWeight: "bold",
-    marginBottom: 12,
-    color: "#2A2422",
-  },
-  subtitle: {
-    fontSize: 16,
-    lineHeight: 22,
-    marginBottom: 24,
-    color: "#6B7280",
-  },
-  section: {
-    backgroundColor: "#FFF",
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 20,
-    borderWidth: 1,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-  },
-  sectionTitle: { fontSize: 20, fontWeight: "bold", marginBottom: 16 },
-  resourceItem: {
-    paddingVertical: 12,
+  container: { flex: 1 },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: "#F3F4F6",
   },
-  resourceText: { fontSize: 16, color: "#1F2937", lineHeight: 24 },
-  note: {
-    backgroundColor: "#FEF3C7",
-    padding: 16,
-    borderRadius: 12,
-    marginTop: 16,
-  },
-  noteText: { color: "#92400E", fontSize: 15, lineHeight: 22 },
+  headerTitle: { fontSize: 17, fontWeight: "700" },
+  backButton: { width: 64, paddingVertical: Spacing.sm },
+  backText: { fontWeight: "700", fontSize: 16 },
+  content: { padding: Spacing.xl, paddingBottom: 40 },
+  title: { fontSize: 26, fontWeight: "800", marginBottom: Spacing.sm, letterSpacing: -0.3 },
+  subtitle: { fontSize: 15, lineHeight: 22, marginBottom: Spacing.xl },
+  emergency: { padding: Spacing.lg, borderRadius: Radius.md, marginBottom: Spacing.xl },
+  emergencyText: { fontSize: 15, fontWeight: "700", lineHeight: 21 },
+  section: { borderRadius: Radius.lg, padding: Spacing.xl, marginBottom: Spacing.lg },
+  sectionTitle: { fontSize: 18, fontWeight: "800", marginBottom: Spacing.sm },
+  resourceItem: { paddingVertical: Spacing.md, gap: Spacing.sm },
+  resourceText: { fontSize: 15, lineHeight: 22 },
+  callPill: { alignSelf: "flex-start", paddingHorizontal: 14, paddingVertical: 8, borderRadius: Radius.pill },
+  callText: { fontWeight: "800", fontSize: 14 },
+  note: { padding: Spacing.lg, borderRadius: Radius.md, marginTop: Spacing.sm },
+  noteText: { fontSize: 15, lineHeight: 22 },
 });

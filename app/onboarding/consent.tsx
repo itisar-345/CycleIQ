@@ -1,5 +1,6 @@
 import { seedInitialCycleFromOnboarding } from "@/database";
-import { Colors } from "@/constants/theme";
+import { Colors, Radius, Shadow } from "@/constants/theme";
+import { runPredictionEngine } from "@/utils/predictions";
 import { OnboardingProgress } from "@/components/onboarding-progress";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useAppStore } from "@/store";
@@ -12,52 +13,52 @@ import { SafeAreaView } from "react-native-safe-area-context";
 const MODE_META: Record<string, { icon: string; headline: string; bullets: string[] }> = {
   standard: {
     icon: "🗓️",
-    headline: "Here's what we'll track",
+    headline: "Here's what you'll get ✨",
     bullets: [
-      "Period start & end, flow intensity",
-      "Daily mood, pain, energy, and sleep",
-      "Lifestyle triggers — stress, diet, exercise",
-      "Pattern insights, e.g. sleep vs. pain correlation",
+      "Period start & end + flow, in two taps",
+      "Daily vibe check: mood, pain, energy, sleep",
+      "Lifestyle stuff — stress, food, movement",
+      "Patterns you'd never spot yourself (like sleep vs. pain)",
     ],
   },
   peri: {
     icon: "🌙",
-    headline: "Here's what we'll track",
+    headline: "Here's what you'll get ✨",
     bullets: [
-      "Adaptive predictions — no fixed cycle assumed",
-      "Hot flashes, night sweats, cognitive changes",
-      "Mood and energy across irregular phases",
-      "Post-pill baseline (predictions unlock after 90 days)",
+      "Predictions that adapt — no 28-day assumptions",
+      "Hot flashes, night sweats, brain blanks",
+      "Mood & energy across unpredictable phases",
+      "Post-pill? Predictions unlock after a 90-day baseline",
     ],
   },
   pcos: {
     icon: "💚",
-    headline: "Here's what we'll track for PCOS",
+    headline: "Here's what you'll get for PCOS ✨",
     bullets: [
-      "Wider prediction window for irregular cycles",
-      "Acne, cravings, weight, hormonal symptoms",
-      "Metabolic proxy signals",
-      "Alert if period is absent for 90+ days",
+      "Honest prediction windows built for irregular cycles",
+      "Skin, cravings, weight & hormone symptoms",
+      "Patterns your doctor will actually want to see",
+      "A heads-up if your period goes missing for 90+ days",
     ],
   },
   pcod: {
-    icon: "🌿",
-    headline: "Here's what we'll track for PCOD",
+    icon: "💙",
+    headline: "Here's what you'll get for PCOD ✨",
     bullets: [
-      "Cycle regularity and cyst-linked patterns",
-      "Hormonal acne, hair thinning, weight trends",
+      "Cycle regularity & cyst-linked patterns",
+      "Skin, hair & weight trends",
       "Ovarian symptom logging",
-      "Personalised phase insights",
+      "Insights tuned to your phases",
     ],
   },
   endo: {
     icon: "💜",
-    headline: "Here's what we'll track for Endometriosis",
+    headline: "Here's what you'll get for endo ✨",
     bullets: [
-      "Flare timer, severity, and reflection prompts",
-      "Bowel, bladder, and referred shoulder pain",
-      "Red-flag alerts — pain 8+ for 3 consecutive days",
-      "Flare-onset pattern detection across cycles",
+      "Flare mode: a 3-question log for bad days + reflections",
+      "Bowel, bladder & shoulder pain tracking",
+      "A gentle alert if pain is 8+ three days in a row",
+      "Flare patterns across cycles",
     ],
   },
 };
@@ -65,31 +66,39 @@ const MODE_META: Record<string, { icon: string; headline: string; bullets: strin
 export default function ConsentScreen() {
   const colorScheme = useColorScheme() ?? "light";
   const theme = Colors[colorScheme];
-  const { setOnboarded, setActivePeriod, currentMode, averageCycleLength, lastPeriodDate, cycleVarianceDays } = useAppStore();
+  const { setOnboarded, setActivePeriod, currentMode, averageCycleLength, lastPeriodDate, postPillMode, postPillStartDate } = useAppStore();
   const [completing, setCompleting] = useState(false);
 
   const meta = MODE_META[currentMode] ?? MODE_META.standard;
   const isCondition = ["pcos", "pcod", "endo"].includes(currentMode);
 
-  // Single-date anchor for all modes — paired with a legible confidence bar and mode-specific qualifier.
-  // A window label alone ("May 12 – Jun 1") doesn't tell the user how confident we are; the bar does.
+  // Preview with the same engine and the same seeded cycles Home will use, so the date,
+  // window and confidence here match what the user sees right after setup.
   const predictionDisplay = (() => {
     if (!lastPeriodDate || !averageCycleLength) return null;
     try {
-      const center = addDays(parseISO(lastPeriodDate), averageCycleLength);
-      const variance = cycleVarianceDays ?? (currentMode === "peri" ? 14 : isCondition ? 10 : 4);
-      // Confidence: inversely proportional to variance, capped 0.3–0.85
-      const confidence = Math.max(0.30, Math.min(0.85, 1 - variance / 28));
+      const start = lastPeriodDate.includes("T") ? lastPeriodDate : `${lastPeriodDate}T12:00:00.000Z`;
+      const previousStart = addDays(parseISO(start), -averageCycleLength).toISOString();
+      const prediction = runPredictionEngine({
+        cycles: [
+          { start_date: start, cycle_length: null },
+          { start_date: previousStart, cycle_length: averageCycleLength },
+        ],
+        currentMode,
+        postPillMode,
+        postPillStartDate,
+      });
+      if (!prediction.predictedStartISO || !prediction.windowStartISO || !prediction.windowEndISO) return null;
       const qualifier =
         currentMode === "peri"
-          ? "Your cycles vary, so this is a best guess — it will sharpen as you log."
+          ? "Your cycles like to freestyle, so this is a best guess — it gets sharper every time you log 🎯"
           : isCondition
-          ? "Based on limited data — this gets more accurate with each logged cycle."
-          : "Based on your reported cycle length. Refines as you log."
+          ? "Early days! This gets way more accurate with each period you log 🎯"
+          : "Based on the cycle length you gave us. It learns your real rhythm as you log 🎯";
       return {
-        date: format(center, "MMMM d, yyyy"),
-        confidence,
-        windowDays: variance,
+        date: format(parseISO(prediction.predictedStartISO), "MMMM d"),
+        window: `${format(parseISO(prediction.windowStartISO), "MMM d")} – ${format(parseISO(prediction.windowEndISO), "MMM d")}`,
+        confidence: prediction.confidence,
         qualifier,
       };
     } catch {
@@ -114,7 +123,7 @@ export default function ConsentScreen() {
         }
       }
       setOnboarded(true);
-      router.replace("/(tabs)" as any);
+      router.replace("/(tabs)");
     } catch (error) {
       console.error("Onboarding completion failed", error);
       setCompleting(false);
@@ -127,25 +136,26 @@ export default function ConsentScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <Text style={[styles.backText, { color: theme.tint }]}>← Back</Text>
         </TouchableOpacity>
-        <OnboardingProgress step={isCondition ? 5 : 3} total={isCondition ? 5 : 3} label="Almost there" />
+        <OnboardingProgress step={isCondition ? 5 : 3} total={isCondition ? 5 : 3} label="last step ✨" />
       </View>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
 
         {/* 1. AHA MOMENT — single-date anchor + confidence bar + mode-specific qualifier */}
         {predictionDisplay ? (
           <View style={[styles.ahaCard, { backgroundColor: theme.surface, borderColor: theme.tint }]}>
-            <Text style={[styles.ahaLabel, { color: theme.textSecondary }]}>ESTIMATED NEXT PERIOD</Text>
+            <Text style={[styles.ahaLabel, { color: theme.textSecondary }]}>your next period, probably 🔮</Text>
             <Text style={[styles.ahaDate, { color: theme.tint }]}>{predictionDisplay.date}</Text>
+            <Text style={[styles.ahaWindow, { color: theme.textSecondary }]}>likely window: {predictionDisplay.window}</Text>
 
             {/* Confidence bar — same pattern as the Home prediction card */}
             <View style={styles.ahaBarRow}>
-              <Text style={[styles.ahaBarLabel, { color: theme.textSecondary }]}>Confidence</Text>
+              <Text style={[styles.ahaBarLabel, { color: theme.textSecondary }]}>how sure we are</Text>
               <Text style={[styles.ahaBarLabel, { color: theme.tint, fontWeight: "700" }]}>
                 {Math.round(predictionDisplay.confidence * 100)}%
               </Text>
             </View>
             <View style={[styles.ahaBarTrack, { backgroundColor: theme.border }]}>
-              <View style={[styles.ahaBarFill, { backgroundColor: theme.tint, width: `${Math.round(predictionDisplay.confidence * 100)}%` as any }]} />
+              <View style={[styles.ahaBarFill, { backgroundColor: theme.tint, width: `${Math.round(predictionDisplay.confidence * 100)}%` }]} />
             </View>
 
             {/* One-line qualifier — legible, mode-specific, not footnote-sized */}
@@ -157,7 +167,7 @@ export default function ConsentScreen() {
           <View style={[styles.ahaCard, { backgroundColor: theme.surface, borderColor: theme.tint }]}>
             <Text style={styles.ahaIcon}>{meta.icon}</Text>
             <Text style={[styles.ahaNote, { color: theme.textSecondary }]}>
-              Log your first period to unlock your personalised prediction.
+              Log your first period and your personal prediction unlocks ✨
             </Text>
           </View>
         )}
@@ -175,20 +185,20 @@ export default function ConsentScreen() {
 
         <Text style={[styles.deferNote, { color: theme.textSecondary }]}>
           {isCondition
-            ? "Comorbidities, pain locations, and flare history can be added from your profile after setup."
-            : "Notifications, age, and language preferences can be set from your profile after setup."}
+            ? "More details (other conditions, pain spots, flare history) can go in Profile later — no rush."
+            : "Reminders, age and language live in Profile — set them whenever."}
         </Text>
 
         {/* 3. PRIVACY — minimal, with link to full policy */}
         <View style={[styles.privacyRow, { borderColor: theme.border, backgroundColor: theme.surface }]}>
           <View style={styles.privacyText}>
-            <Text style={[styles.privacyTitle, { color: theme.text }]}>🔒 Local-only storage</Text>
+            <Text style={[styles.privacyTitle, { color: theme.text }]}>🔒 your data, your phone</Text>
             <Text style={[styles.privacyBody, { color: theme.textSecondary }]}>
-              No accounts, no servers, no analytics. Your data never leaves this device unless you export it.
+              No account, no cloud, no tracking. Nothing leaves this device unless you export it yourself.
             </Text>
           </View>
-          <TouchableOpacity onPress={() => router.push("/privacy" as any)}>
-            <Text style={[styles.privacyLink, { color: theme.tint }]}>Full policy →</Text>
+          <TouchableOpacity onPress={() => router.push("/privacy")}>
+            <Text style={[styles.privacyLink, { color: theme.tint }]}>read it →</Text>
           </TouchableOpacity>
         </View>
 
@@ -199,9 +209,9 @@ export default function ConsentScreen() {
           disabled={completing}
         >
           {completing ? (
-            <ActivityIndicator color="#FFF" />
+            <ActivityIndicator color={theme.onTint} />
           ) : (
-            <Text style={styles.finishText}>Start tracking</Text>
+            <Text style={[styles.finishText, { color: theme.onTint }]}>let&apos;s go ✨</Text>
           )}
         </TouchableOpacity>
 
@@ -216,9 +226,10 @@ const styles = StyleSheet.create({
   backBtn: { alignSelf: "flex-start", paddingVertical: 6 },
   backText: { fontSize: 16, fontWeight: "600" },
   content: { padding: 24, paddingBottom: 48, gap: 18 },
-  ahaCard: { padding: 22, borderRadius: 18, borderWidth: 2, gap: 6 },
-  ahaLabel: { fontSize: 11, fontWeight: "700", letterSpacing: 0.8, textTransform: "uppercase" },
-  ahaDate: { fontSize: 32, fontWeight: "bold", marginBottom: 12 },
+  ahaCard: { padding: 22, borderRadius: Radius.lg, borderWidth: 2, gap: 6, ...Shadow },
+  ahaLabel: { fontSize: 13, fontWeight: "700" },
+  ahaDate: { fontSize: 36, fontWeight: "800", letterSpacing: -1 },
+  ahaWindow: { fontSize: 14, fontWeight: "600", marginBottom: 12 },
   ahaNote: { fontSize: 13, lineHeight: 19 },
   ahaIcon: { fontSize: 40, textAlign: "center", marginBottom: 6 },
   ahaBarRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: 4 },
@@ -226,8 +237,8 @@ const styles = StyleSheet.create({
   ahaBarTrack: { height: 8, borderRadius: 4, overflow: "hidden", marginBottom: 10 },
   ahaBarFill: { height: 8, borderRadius: 4 },
   ahaQualifier: { fontSize: 14, lineHeight: 20, fontWeight: "500" },
-  sectionLabel: { fontSize: 18, fontWeight: "700" },
-  bulletCard: { padding: 18, borderRadius: 16, gap: 10 },
+  sectionLabel: { fontSize: 19, fontWeight: "800" },
+  bulletCard: { padding: 18, borderRadius: Radius.lg, gap: 12, ...Shadow },
   bulletRow: { flexDirection: "row", gap: 10, alignItems: "flex-start" },
   bullet: { fontWeight: "bold", fontSize: 15, marginTop: 1 },
   bulletText: { flex: 1, fontSize: 15, lineHeight: 22 },
@@ -237,6 +248,6 @@ const styles = StyleSheet.create({
   privacyTitle: { fontSize: 15, fontWeight: "700" },
   privacyBody: { fontSize: 13, lineHeight: 19 },
   privacyLink: { fontSize: 13, fontWeight: "700", flexShrink: 0 },
-  finishBtn: { padding: 18, borderRadius: 16, alignItems: "center" },
-  finishText: { color: "#FFF", fontSize: 18, fontWeight: "bold" },
+  finishBtn: { paddingVertical: 18, borderRadius: Radius.pill, alignItems: "center", ...Shadow },
+  finishText: { fontSize: 18, fontWeight: "800" },
 });

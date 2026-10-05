@@ -1,6 +1,7 @@
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import { PHASE_COPY } from "@/constants/copy";
 import { Colors } from "@/constants/theme";
-import { getAllCycles, getPhaseAverages, generateInsights, persistAndRetireInsights, CycleInsight, PhaseAverage, getCyclePredictions } from "@/database";
+import { getAllCycles, getPhaseAverages, generateInsights, persistAndRetireInsights, CycleInsight, PhaseAverage, getCyclePredictions, type CycleRow } from "@/database";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useAppStore } from "@/store";
 import { scheduleInsightNotification, scheduleFlareWarning } from "@/utils/notifications";
@@ -20,9 +21,9 @@ import { SafeAreaView } from "react-native-safe-area-context";
 export default function AnalyticsScreen() {
   const colorScheme = useColorScheme() ?? "light";
   const theme = Colors[colorScheme];
-  const { currentMode, dismissedInsights, dismissInsight: storeDismissInsight, notificationPrefs } = useAppStore();
+  const { currentMode, postPillMode, postPillStartDate, dismissedInsights, dismissInsight: storeDismissInsight, notificationPrefs } = useAppStore();
 
-  const [cycles, setCycles] = useState<any[]>([]);
+  const [cycles, setCycles] = useState<CycleRow[]>([]);
   const [phaseAverages, setPhaseAverages] = useState<PhaseAverage[]>([]);
   const [insights, setInsights] = useState<CycleInsight[]>([]);
   const [prediction, setPrediction] = useState<PredictionResult | null>(null);
@@ -31,10 +32,10 @@ export default function AnalyticsScreen() {
     const loadData = async () => {
       const allCycles = await getAllCycles();
       setCycles(allCycles);
-      const pred = await getCyclePredictions(currentMode, false, null);
+      const pred = await getCyclePredictions(currentMode, postPillMode, postPillStartDate ?? null);
       setPrediction(pred);
       if (allCycles.length > 0) {
-        const avgs = await getPhaseAverages(allCycles[0].id);
+        const avgs = await getPhaseAverages(allCycles[0].id, pred.model !== "none" ? pred.mean : 28);
         setPhaseAverages(avgs);
       }
       const fetchedInsights = await generateInsights(currentMode);
@@ -77,7 +78,7 @@ export default function AnalyticsScreen() {
       }
     };
     loadData();
-  }, [currentMode, notificationPrefs.flares, notificationPrefs.insights]);
+  }, [currentMode, postPillMode, postPillStartDate, notificationPrefs.flares, notificationPrefs.insights]);
   const visibleInsights = insights.filter((i) => !dismissedInsights.includes(i.title));
 
   const dismissInsight = (title: string) => {
@@ -90,10 +91,10 @@ export default function AnalyticsScreen() {
     >
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={[styles.title, { color: theme.text }]}>
-          Smart Coaching
+          your patterns 👀
         </Text>
         <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
-          Patterns we&apos;ve noticed in your data.
+          the tea from your own logs ☕ — stuff that tends to happen together for you.
         </Text>
 
         {/* Prediction Summary Card */}
@@ -101,7 +102,7 @@ export default function AnalyticsScreen() {
           <View style={[styles.predCard, { backgroundColor: theme.surface, borderColor: theme.tint }]}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 }}>
               <Text style={{ fontSize: 20 }}>🔮</Text>
-              <Text style={{ fontSize: 18, fontWeight: 'bold', color: theme.text }}>Next Period Prediction</Text>
+              <Text style={{ fontSize: 18, fontWeight: 'bold', color: theme.text }}>next period, probably</Text>
             </View>
             {prediction.predictedStartISO && (
               <Text style={{ fontSize: 26, fontWeight: 'bold', color: theme.tint, marginBottom: 2 }}>
@@ -114,14 +115,14 @@ export default function AnalyticsScreen() {
               </Text>
             )}
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
-              <Text style={{ color: theme.textSecondary, fontSize: 13 }}>Confidence</Text>
+              <Text style={{ color: theme.textSecondary, fontSize: 13 }}>how sure we are</Text>
               <Text style={{ color: theme.tint, fontWeight: 'bold', fontSize: 13 }}>{Math.round(prediction.confidence * 100)}%</Text>
             </View>
             <View style={{ width: '100%', height: 8, borderRadius: 4, backgroundColor: theme.border, overflow: 'hidden', marginBottom: 8 }}>
               <View style={{ width: `${Math.round(prediction.confidence * 100)}%`, height: 8, borderRadius: 4, backgroundColor: theme.tint }} />
             </View>
             {prediction.mae !== null && (
-              <Text style={{ color: theme.textSecondary, fontSize: 13 }}>Historical accuracy: ±{prediction.mae} days</Text>
+              <Text style={{ color: theme.textSecondary, fontSize: 13 }}>past guesses were off by ~{prediction.mae} days on average</Text>
             )}
             {prediction.outlierFlagged && (
               <Text style={{ color: theme.error ?? '#E53E3E', fontSize: 13, marginTop: 4 }}>
@@ -142,13 +143,13 @@ export default function AnalyticsScreen() {
             ]}
           >
             <Text style={[styles.placeholderTitle, { color: theme.text }]}>
-              Building your pattern
+              patterns loading… 🔍
             </Text>
             <Text
               style={[styles.placeholderText, { color: theme.textSecondary }]}
             >
-              Keep logging for 3+ cycles to unlock personalized insights.
-              We&apos;re learning what makes your body unique!
+              Keep logging daily — after about 20 days we start spotting what affects what for you.
+              we&apos;re learning what makes your body, well, yours 💫
             </Text>
           </View>
         )}
@@ -159,15 +160,15 @@ export default function AnalyticsScreen() {
             style={[styles.sectionCard, { backgroundColor: theme.surface }]}
           >
             <Text style={[styles.sectionTitle, { color: theme.text }]}>
-              Cycle Phase Trends
+              how you feel by phase 📊
             </Text>
             {phaseAverages.map((avg, i) => (
               <View key={i} style={styles.avgRow}>
                 <Text style={{ fontWeight: "600", color: theme.text }}>
-                  {avg.phase}
+                  {PHASE_COPY[avg.phase]?.vibe ?? avg.phase}
                 </Text>
                 <Text style={{ color: theme.textSecondary }}>
-                  Mood: {avg.mood_avg} | Energy: {avg.energy_avg} | Fog:{" "}
+                  mood {avg.mood_avg ?? "—"} · energy {avg.energy_avg ?? "—"} · fog{" "}
                   {avg.brain_fog_avg} (n={avg.count})
                 </Text>
               </View>
@@ -176,7 +177,7 @@ export default function AnalyticsScreen() {
         )}
         {phaseAverages.length === 0 && cycles.length >= 3 && (
           <Text style={{ color: theme.textSecondary, textAlign: "center" }}>
-            Log symptoms across cycle phases to see trends.
+            log across different phases and your trends show up here ✨
           </Text>
         )}
 
@@ -197,13 +198,13 @@ export default function AnalyticsScreen() {
                 </Text>
               </View>
               <TouchableOpacity onPress={() => dismissInsight(insight.title)}>
-                <Text style={{ color: theme.textSecondary, fontSize: 12 }}>Not useful ×</Text>
+                <Text style={{ color: theme.textSecondary, fontSize: 12 }}>not for me ×</Text>
               </TouchableOpacity>
             </View>
 
             {/* Sec 9: "Patterns we've noticed" label on every card */}
             <Text style={[styles.patternLabel, { color: theme.textSecondary }]}>
-              Pattern we’ve noticed
+              pattern spotted 👀
             </Text>
 
             <Text style={[styles.insightTitle, { color: theme.text }]}>{insight.title}</Text>
@@ -213,20 +214,20 @@ export default function AnalyticsScreen() {
             {insight.isMentalHealth && (
               <View style={[styles.mhDisclaimer, { backgroundColor: theme.border + "60" }]}>
                 <Text style={{ color: theme.textSecondary, fontSize: 12, lineHeight: 18 }}>
-                  ⚠️ Mood and stress patterns can have many contributing factors. This is not a clinical assessment — if you’re struggling, please reach out to a healthcare professional.
+                  💛 Mood and stress have lots of moving parts — this isn&apos;t a diagnosis. If you&apos;re struggling, talking to a professional is a power move, not a weakness.
                 </Text>
               </View>
             )}
 
-            <View style={styles.cardFooter}>
+            <View style={[styles.cardFooter, { borderTopColor: theme.border }]}>
               <Text style={{ color: theme.textSecondary, fontSize: 11 }}>
-                Not medical advice · 90-day history
+                not medical advice · based on your last 90 days
               </Text>
               <TouchableOpacity
                 onPress={() =>
                   Alert.alert(
-                    "How we calculated this",
-                    "We run a Spearman correlation across 90 days of your logged data. Patterns require n≥20 days and p<0.05. This shows association only — not causation."
+                    "how we figured this out 🧪",
+                    "We compare your last 90 days of logs. A pattern only shows up if it's based on 20+ days AND still holds after correcting for all the comparisons we check at once — so it's unlikely to be a fluke. It shows things that tend to happen together, not proof that one causes the other."
                   )
                 }
               >
@@ -239,7 +240,7 @@ export default function AnalyticsScreen() {
         {visibleInsights.length === 0 && cycles.length >= 3 && (
           <View style={{ alignItems: "center", marginTop: 40 }}>
             <Text style={{ color: theme.textSecondary }}>
-              No new insights right now. Keep logging!
+              no new patterns rn — keep logging and we&apos;ll keep looking 🔍
             </Text>
           </View>
         )}
@@ -251,8 +252,8 @@ export default function AnalyticsScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   content: { padding: 20, paddingBottom: 40 },
-  title: { fontSize: 32, fontWeight: "bold" },
-  subtitle: { fontSize: 16, marginBottom: 24 },
+  title: { fontSize: 30, fontWeight: "800", letterSpacing: -0.5 },
+  subtitle: { fontSize: 15, lineHeight: 21, marginTop: 4, marginBottom: 24 },
   insightCard: {
     padding: 20,
     borderRadius: 16,
@@ -282,7 +283,6 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     borderTopWidth: 1,
-    borderTopColor: "#F2DED7",
     paddingTop: 12,
   },
   disclaimer: { marginTop: 12, padding: 10, borderRadius: 8 },

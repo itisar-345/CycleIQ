@@ -1,21 +1,41 @@
+import { EndoSection, PcosSection, PeriSection } from "@/components/log/sections";
+import { Card, Divider, Question } from "@/components/log/card";
+import { MoodFaces, MultiSelect, RadioGroup, Scale, ToggleRow } from "@/components/log/inputs";
+import { logStyles as styles } from "@/components/log/styles";
+import { Captions, Options } from "@/constants/copy";
 import { Colors } from "@/constants/theme";
 import {
   SAFEGUARDING_CLINICAL_REVIEW_REQUIRED,
   SAFEGUARDING_LOW_MOOD_SCORE,
   SAFEGUARDING_RESOURCES_ROUTE,
 } from "@/constants/safeguarding";
-import { createRedFlagPromptLog, createSymptomEntry, getAllEntries, saveFlareEnd } from "@/database";
+import { createRedFlagPromptLog, createSymptomEntry, getAllEntries, parseJsonColumn, saveFlareEnd } from "@/database";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useAppStore } from "@/store";
-import { encryptField, decryptField } from "@/utils/fieldEncryption";
+import { encryptField, decryptFieldOrEmpty } from "@/utils/fieldEncryption";
 import { readDailyHealthMetrics } from "@/utils/healthIntegrations";
-import { evaluateEndoRedFlag, shouldShowSafeguardingPrompt } from "@/utils/safetyRules";
+import {
+  buildExtendedSymptoms,
+  EMPTY_ENDO_LOG,
+  EMPTY_FLARE_LOG,
+  EMPTY_PCOS_LOG,
+  EMPTY_PERI_LOG,
+  type EndoLog,
+  type FlareLog,
+  type PcosLog,
+  type PeriLog,
+} from "@/utils/logEntry";
+import {
+  countConsecutivePriorDays,
+  evaluateEndoRedFlag,
+  shouldShowSafeguardingPrompt,
+  valuesForPreviousDays,
+} from "@/utils/safetyRules";
 import { router } from "expo-router";
 import React, { useState, useEffect } from "react";
 import {
   Alert,
   ScrollView,
-  StyleSheet,
   Switch,
   Text,
   TextInput,
@@ -32,9 +52,6 @@ export default function LogScreen() {
     activePeriodId,
     inFlare,
     setInFlare,
-    consecutiveLowMoodDays,
-    incrementLowMood,
-    resetLowMood,
     setFlareEnd,
     flareStartDate,
     isTeen,
@@ -43,23 +60,26 @@ export default function LogScreen() {
     healthImportPrefs
   } = useAppStore();
 
-  const [pain, setPain] = useState<number>(0);
+  // Scores start unanswered (null) so an untouched control is saved as "not logged",
+  // never as a made-up 0 or 3 that would skew insights and predictions.
+  const [pain, setPain] = useState<number | null>(null);
   const [painLocations, setPainLocations] = useState<string[]>([]);
   const [painTypes, setPainTypes] = useState<string[]>([]);
-  const [mood, setMood] = useState<number>(3); // 1-5 faces (1=very low, 5=very good)
+  const [mood, setMood] = useState<number | null>(null); // 1-5 faces (1=very low, 5=very good)
   const [moodTags, setMoodTags] = useState<string[]>([]);
-  const [brainFog, setBrainFog] = useState<number>(0);
-  const [energy, setEnergy] = useState<number>(0);
+  const [brainFog, setBrainFog] = useState<number | null>(null);
+  const [energy, setEnergy] = useState<number | null>(null);
   const [bloating, setBloating] = useState<string | null>(null);
   const [nausea, setNausea] = useState<boolean>(false);
   const [headache, setHeadache] = useState<boolean>(false);
-  const [fatigue, setFatigue] = useState<number>(0);
+  const [fatigue, setFatigue] = useState<number | null>(null);
   const [flow, setFlow] = useState<string | null>(null);
   const [clots, setClots] = useState<boolean>(false);
+  const [clotsSize, setClotsSize] = useState<string | null>(null);
   const [spotting, setSpotting] = useState<boolean>(false);
-  const [stressScore, setStressScore] = useState<number>(3);
-  const [sleepHours, setSleepHours] = useState<number>(8);
-  const [sleepQuality, setSleepQuality] = useState<number>(3);
+  const [stressScore, setStressScore] = useState<number | null>(null);
+  const [sleepHours, setSleepHours] = useState<number | null>(null);
+  const [sleepQuality, setSleepQuality] = useState<number | null>(null);
   const [exerciseType, setExerciseType] = useState<string>("None");
   const [exerciseDuration, setExerciseDuration] = useState<number>(0);
   const [stepsCount, setStepsCount] = useState<number | null>(null);
@@ -69,42 +89,13 @@ export default function LogScreen() {
   const [medicationLog, setMedicationLog] = useState<string>("");
   const [autoFillYesterday, setAutoFillYesterday] = useState<boolean>(false);
 
-  // Extended
-  // PCOS Sec5 extended
-  const [acneSeverity, setAcneSeverity] = useState<number>(0);
-  const [acneLocations, setAcneLocations] = useState<string[]>([]);
-  const [hairThinningNote, setHairThinningNote] = useState<string>('');
-  const [hirsutism, setHirsutism] = useState<boolean>(false);
-  const [weightDir, setWeightDir] = useState<string | null>(null);
-  const [weightNote, setWeightNote] = useState<string>('');
-  const [cravingsInt, setCravingsInt] = useState<number>(0);
-  const [cravingsTypes, setCravingsTypes] = useState<string[]>([]);
-  const [pelvicPressurePain, setPelvicPressurePain] = useState<number>(0);
-  const [sleepDisruptTypes, setSleepDisruptTypes] = useState<string[]>([]);
-  const [anxietySpike, setAnxietySpike] = useState<boolean>(false);
-
-  // Endo Sec6 extended
-  const [clotsSize, setClotsSize] = useState<string | null>(null);
-  const [bowelSymptoms, setBowelSymptoms] = useState<string[]>([]);
-  const [bladderSymptoms, setBladderSymptoms] = useState<string[]>([]);
-  const [shoulderSide, setShoulderSide] = useState<string | null>(null);
-  const [dyspareunia, setDyspareunia] = useState<boolean>(false);
-  const [nauseaSeverity, setNauseaSeverity] = useState<number>(0);
-
-  // Flare Sec6.10
-  const [flareModePain, setFlareModePain] = useState<number>(0);
-  const [flareModeNausea, setFlareModeNausea] = useState<boolean>(false);
-  const [flareModeMovement, setFlareModeMovement] = useState<string>('normal');
+  // Condition-specific sections
+  const [pcos, setPcos] = useState<PcosLog>(EMPTY_PCOS_LOG);
+  const [endo, setEndo] = useState<EndoLog>(EMPTY_ENDO_LOG);
+  const [peri, setPeri] = useState<PeriLog>(EMPTY_PERI_LOG);
+  const [flare, setFlare] = useState<FlareLog>(EMPTY_FLARE_LOG);
   const [flareReflection, setFlareReflection] = useState<string>('');
-
-  // Peri Sec14 extended
-  const [hotFlashes, setHotFlashes] = useState<boolean>(false);
-  const [hotFlashFrequency, setHotFlashFrequency] = useState<number>(0);
-  const [hotFlashSeverity, setHotFlashSeverity] = useState<number>(0);
-  const [hotFlashTimeOfDay, setHotFlashTimeOfDay] = useState<string | null>(null);
-  const [nightSweats, setNightSweats] = useState<boolean>(false);
-  const [vaginalChanges, setVaginalChanges] = useState<boolean>(false);
-  const [memoryIssues, setMemoryIssues] = useState<boolean>(false);
+  const [endingFlare, setEndingFlare] = useState<boolean>(false);
 
   // Dynamic terminology tokens
   const term = {
@@ -140,150 +131,150 @@ export default function LogScreen() {
       const entries = await getAllEntries();
       if (entries.length > 0) {
         const latest = entries[0];
-        setPain(latest.pain_score ?? 0);
-        setPainLocations(
-          latest.pain_locations ? JSON.parse(latest.pain_locations) : [],
-        );
-        setPainTypes(latest.pain_type ? JSON.parse(latest.pain_type) : []);
-        setMood(latest.mood_score ?? 3);
-        setMoodTags(latest.mood_tags ? JSON.parse(latest.mood_tags) : []);
-        setBrainFog(latest.brain_fog_score ?? 0);
-        setEnergy(latest.energy_score ?? 0);
-        setBloating(latest.bloating ?? null);
+        setPain(latest.pain_score);
+        setPainLocations(parseJsonColumn<string[]>(latest.pain_locations) ?? []);
+        setPainTypes(parseJsonColumn<string[]>(latest.pain_type) ?? []);
+        setMood(latest.mood_score);
+        setMoodTags(parseJsonColumn<string[]>(latest.mood_tags) ?? []);
+        setBrainFog(latest.brain_fog_score);
+        setEnergy(latest.energy_score);
+        setBloating(latest.bloating);
         setNausea(!!latest.nausea);
         setHeadache(!!latest.headache);
-        setFatigue(latest.fatigue_score ?? 0);
-        setFlow(latest.flow_intensity ?? null);
+        setFatigue(latest.fatigue_score);
+        setFlow(latest.flow_intensity);
         setClots(!!latest.clots_present || !!latest.clots_size);
-        setClotsSize(latest.clots_size ?? null);
+        setClotsSize(latest.clots_size);
         setSpotting(!!latest.spotting);
-        setStressScore(latest.stress_score ?? 3);
-        setSleepHours(latest.sleep_hours ?? 8);
-        setHealthSleepSource(latest.health_sleep_source ?? null);
-        setSleepQuality(latest.sleep_quality ?? 3);
+        setStressScore(latest.stress_score);
+        setSleepHours(latest.sleep_hours);
+        setHealthSleepSource(latest.health_sleep_source);
+        setSleepQuality(latest.sleep_quality);
         setExerciseType(latest.exercise_type ?? "None");
         setExerciseDuration(latest.exercise_duration ?? 0);
-        setStepsCount(latest.steps_count ?? null);
-        setHealthActivitySource(latest.health_activity_source ?? null);
-        setDietNotes(latest.diet_notes_encrypted ? await decryptField(latest.diet_notes_encrypted) : "");
-        setMedicationLog(latest.medication_log_encrypted ? await decryptField(latest.medication_log_encrypted) : "");
+        setStepsCount(latest.steps_count);
+        setHealthActivitySource(latest.health_activity_source);
+        setDietNotes(await decryptFieldOrEmpty(latest.diet_notes_encrypted));
+        setMedicationLog(await decryptFieldOrEmpty(latest.medication_log_encrypted));
       }
     };
     populateYesterday();
   }, [autoFillYesterday]);
 
-  const handleSave = async () => {
+  /** Safeguarding and endo red-flag prompts. Both look at whole calendar days of history. */
+  const runSafetyChecks = async () => {
     if (__DEV__ && SAFEGUARDING_CLINICAL_REVIEW_REQUIRED) {
       console.warn(
         "[CycleIQ] Safeguarding thresholds require clinical review before public release — see docs/CLINICAL_REVIEW.md",
       );
     }
+    const needsSafeguardCheck = mood === SAFEGUARDING_LOW_MOOD_SCORE;
+    const needsRedFlagCheck = currentMode === "endo" && useAppStore.getState().checkRedFlagCooldown();
+    if (!needsSafeguardCheck && !needsRedFlagCheck) return;
+
+    const history = await getAllEntries();
+    const today = new Date();
 
     // Safeguarding — thresholds in constants/safeguarding.ts (clinical review required)
-    if (mood === SAFEGUARDING_LOW_MOOD_SCORE) {
-      const needsCooldown = useAppStore.getState().checkSafeguardCooldown();
-      if (shouldShowSafeguardingPrompt(mood, consecutiveLowMoodDays, needsCooldown)) {
+    if (needsSafeguardCheck) {
+      const cooldownOpen = useAppStore.getState().checkSafeguardCooldown();
+      const priorLowMoodDays = countConsecutivePriorDays(
+        history.map((e) => ({ logged_date: e.logged_date, value: e.mood_score })),
+        today,
+        (value) => value <= SAFEGUARDING_LOW_MOOD_SCORE,
+        "min",
+      );
+      if (shouldShowSafeguardingPrompt(mood, priorLowMoodDays, cooldownOpen)) {
         useAppStore.getState().setLastSafeguardPrompt(new Date().toISOString());
         Alert.alert(
-          "We're here for you",
-          "It looks like you've been having a tough few days. You don't have to manage this alone — would it help to look at some resources?",
+          "Hey, checking in 🫶",
+          "You've had a few really hard days in a row. You don't have to carry this alone — want to see some people you can talk to?",
           [
-            { text: "Dismiss", style: "cancel" },
-            { text: "View Resources", onPress: () => router.push(SAFEGUARDING_RESOURCES_ROUTE as any) },
+            { text: "Not right now", style: "cancel" },
+            { text: "Show me support", onPress: () => router.push(SAFEGUARDING_RESOURCES_ROUTE) },
           ],
         );
-        resetLowMood();
-      } else {
-        incrementLowMood();
       }
-    } else {
-      resetLowMood();
     }
 
-    // Endo Red Flags
-    if (currentMode === "endo") {
-      const needsRedFlagCooldown = useAppStore.getState().checkRedFlagCooldown();
-      if (needsRedFlagCooldown) {
-        const entries = pain >= 8 ? await getAllEntries() : [];
-        const redFlag = evaluateEndoRedFlag({
-          painScore: pain,
-          previousPainScores: entries.slice(0, 2).map((entry) => Number(entry.pain_score ?? 0)),
-          bowelSymptoms,
-          shoulderSide,
-          flowIntensity: flow,
-        });
+    // Endo red flags
+    if (needsRedFlagCheck) {
+      const painToday = pain ?? 0;
+      const redFlag = evaluateEndoRedFlag({
+        painScore: painToday,
+        previousPainScores: valuesForPreviousDays(
+          history.map((e) => ({ logged_date: e.logged_date, value: e.pain_score })),
+          today,
+          2,
+          "max",
+        ),
+        bowelSymptoms: endo.bowelSymptoms,
+        shoulderSide: endo.shoulderSide,
+        flowIntensity: flow,
+      });
 
-        if (redFlag.shouldPrompt && redFlag.triggerType) {
-          useAppStore.getState().setLastRedFlagPrompt(new Date().toISOString());
-          await createRedFlagPromptLog({
-            trigger_type: redFlag.triggerType,
-            logged_date: new Date().toISOString(),
-            message: redFlag.message,
-            severity: pain,
-            cycle_id: activePeriodId ?? null,
-            entry_context: {
-              pain_score: pain,
-              bowel_symptoms: bowelSymptoms,
-              shoulder_side: shoulderSide,
-              flow_intensity: flow,
-            },
-          });
-          Alert.alert("Red Flag Notice", redFlag.message, [{ text: "Got it" }]);
-        }
+      if (redFlag.shouldPrompt && redFlag.triggerType) {
+        useAppStore.getState().setLastRedFlagPrompt(new Date().toISOString());
+        await createRedFlagPromptLog({
+          trigger_type: redFlag.triggerType,
+          logged_date: new Date().toISOString(),
+          message: redFlag.message,
+          severity: painToday,
+          cycle_id: activePeriodId ?? null,
+          entry_context: {
+            pain_score: pain,
+            bowel_symptoms: endo.bowelSymptoms,
+            shoulder_side: endo.shoulderSide,
+            flow_intensity: flow,
+          },
+        });
+        Alert.alert("Please check this out 💛", redFlag.message, [{ text: "Okay, noted" }]);
       }
+    }
+  };
+
+  const handleSave = async () => {
+    try {
+      await runSafetyChecks();
+    } catch (error) {
+      // A failed safety lookup must not block saving the log.
+      console.error("Safety checks failed:", error);
     }
 
     try {
-      const extended: Record<string, any> = {};
-      if (currentMode === 'pcos') {
-        extended.pcos = {
-          acne: {severity: acneSeverity, locations: acneLocations},
-          hair_thinning: hairThinningNote,
-          hirsutism,
-          weight: {dir: weightDir, note: weightNote},
-          cravings: {int: cravingsInt, types: cravingsTypes},
-          pelvic_pressure: pelvicPressurePain,
-          sleep_disruption: sleepDisruptTypes,
-          anxiety_spike: anxietySpike
-        };
-      } else if (currentMode === 'endo') {
-        extended.endo = {
-          clots: clotsSize,
-          bowel: bowelSymptoms,
-          bladder: bladderSymptoms,
-          shoulder: shoulderSide,
-          dyspareunia,
-          nausea: nauseaSeverity
-        };
-      } else if (currentMode === 'peri') {
-        extended.peri = { hotFlashes, hotFlashFrequency, hotFlashSeverity, hotFlashTimeOfDay, nightSweats, vaginalChanges, memoryIssues };
-      }
-      if (inFlare) {
-        extended.flare = {start: new Date().toISOString(), mode: {pain: flareModePain, nausea: flareModeNausea, movement: flareModeMovement}};
-      }
+      const nowISO = new Date().toISOString();
       await createSymptomEntry({
         cycle_id: activePeriodId ?? null,
-        logged_date: new Date().toISOString(),
-        pain_score: pain,
+        logged_date: nowISO,
+        pain_score: pain ?? undefined,
         pain_locations: painLocations,
         pain_type: painTypes,
-        mood_score: mood,
+        mood_score: mood ?? undefined,
         mood_tags: moodTags,
-        brain_fog_score: brainFog,
-        energy_score: energy,
-        stress_score: stressScore,
+        brain_fog_score: brainFog ?? undefined,
+        energy_score: energy ?? undefined,
+        stress_score: stressScore ?? undefined,
         bloating,
         nausea,
         headache,
-        fatigue_score: fatigue,
-        extended_symptoms: extended,
-        flare_start: inFlare ? (flareStartDate ?? new Date().toISOString()) : undefined,
+        fatigue_score: fatigue ?? undefined,
+        extended_symptoms: buildExtendedSymptoms({
+          mode: currentMode,
+          pcos,
+          endo,
+          peri,
+          clotsSize,
+          inFlare,
+          flare,
+          nowISO,
+        }),
+        flare_start: inFlare ? (flareStartDate ?? nowISO) : undefined,
         flow_intensity: flow,
         clots_present: clots,
         clots_size: clotsSize,
         spotting,
-        sleep_hours: sleepHours,
-        sleep_quality: sleepQuality,
+        sleep_hours: sleepHours ?? undefined,
+        sleep_quality: sleepQuality ?? undefined,
         exercise_type: exerciseType,
         exercise_duration: exerciseDuration,
         steps_count: stepsCount ?? undefined,
@@ -293,763 +284,248 @@ export default function LogScreen() {
         diet_notes_encrypted: dietNotes ? await encryptField(dietNotes) : undefined,
         medication_log_encrypted: medicationLog ? await encryptField(medicationLog) : undefined,
       });
-      Alert.alert("Saved", "Log saved securely to local database.");
+      Alert.alert("Logged ✨", "Saved to your phone. Future-you says thanks.");
       router.push("/");
     } catch (error) {
       console.error("Failed saving log entry:", error);
-      Alert.alert("Error", "Failed to save log entry. Please try again.");
+      Alert.alert("Hmm, that didn't save 😕", "Nothing was lost on screen — give it another tap.");
     }
-  };
-
-  const toggleArrayItem = (setter: any, arr: string[], item: string) => {
-    setter(arr.includes(item) ? arr.filter((i) => i !== item) : [...arr, item]);
   };
 
   const handleFlareToggle = (val: boolean) => {
     if (!val && inFlare) {
-      Alert.alert(
-        "Flare Ended",
-        "What helped you during this flare? (Optional — tap Save to record)",
-        [
-          {
-            text: "Skip",
-            style: "cancel",
-            onPress: async () => {
-              const endDate = new Date().toISOString();
-              const { flareStartDate: startISO, flareDurationDays } = useAppStore.getState();
-              setFlareEnd(endDate, "");
-              await saveFlareEnd(activePeriodId ?? null, startISO ?? endDate, endDate, "", flareDurationDays ?? 1);
-            }
-          },
-          {
-            text: "Save Reflection",
-            onPress: async () => {
-              const endDate = new Date().toISOString();
-              const { flareStartDate: startISO, flareDurationDays } = useAppStore.getState();
-              setFlareEnd(endDate, flareReflection);
-              await saveFlareEnd(activePeriodId ?? null, startISO ?? endDate, endDate, flareReflection, flareDurationDays ?? 1);
-            }
-          }
-        ]
-      );
+      setEndingFlare(true);
     } else {
+      setEndingFlare(false);
       setInFlare(val);
     }
   };
 
-  const renderMultiSelect = (
-    options: string[],
-    selectedArr: string[],
-    setter: any,
-  ) => (
-    <View style={styles.buttonGroup}>
-      {options.map((opt) => {
-        const isSelected = selectedArr.includes(opt);
-        return (
-          <TouchableOpacity
-            key={opt}
-            style={[
-              styles.chip,
-              {
-                borderColor: theme.tint,
-                backgroundColor: isSelected ? theme.tint : "transparent",
-              },
-            ]}
-            onPress={() => toggleArrayItem(setter, selectedArr, opt)}
-          >
-            <Text
-              style={{
-                color: isSelected ? "#FFF" : theme.text,
-                fontSize: 13,
-                fontWeight: isSelected ? "bold" : "normal",
-              }}
-            >
-              {opt}
-            </Text>
-          </TouchableOpacity>
-        );
-      })}
-    </View>
-  );
-
-  const renderRadio = (
-    options: string[],
-    selected: string | null,
-    setter: any,
-  ) => (
-    <View style={styles.buttonGroup}>
-      {options.map((opt) => (
-        <TouchableOpacity
-          key={opt}
-          style={[
-            styles.chip,
-            {
-              borderColor: theme.tint,
-              backgroundColor: selected === opt ? theme.tint : "transparent",
-            },
-          ]}
-          onPress={() => setter(opt)}
-        >
-          <Text
-            style={{
-              color: selected === opt ? "#FFF" : theme.text,
-              fontSize: 13,
-            }}
-          >
-            {opt}
-          </Text>
-        </TouchableOpacity>
-      ))}
-    </View>
-  );
-
-  const renderSlider4 = (
-    value: number,
-    onValueChange: (val: number) => void,
-  ) => (
-    <View style={styles.sliderContainer}>
-      {[0,1,2,3].map((num) => (
-        <TouchableOpacity key={num} onPress={() => onValueChange(num)} style={{ paddingVertical: 10, width: 60, alignItems: 'center' }}>
-          <View style={[
-            styles.dot,
-            { backgroundColor: value >= num ? theme.tint : theme.border, width: value === num ? 20 : 12, height: value === num ? 20 : 12 }
-          ]} />
-          <Text style={{ fontSize: 12 }}>{num}</Text>
-        </TouchableOpacity>
-      ))}
-    </View>
-  );
-
-  const renderSlider10 = (
-    value: number,
-    onValueChange: (val: number) => void,
-  ) => (
-    <View style={styles.sliderContainer}>
-      <Text style={[styles.sliderHint, { color: theme.textSecondary }]}>0</Text>
-      <View
-        style={{
-          flex: 1,
-          flexDirection: "row",
-          justifyContent: "space-between",
-          paddingHorizontal: 10,
-        }}
-      >
-        {[...Array(11).keys()].map((num) => (
-          <TouchableOpacity
-            key={num}
-            onPress={() => onValueChange(num)}
-            style={{ paddingVertical: 10, alignItems: "center", width: 25 }}
-          >
-            <View
-              style={[
-                styles.dot,
-                {
-                  backgroundColor: value >= num ? theme.tint : theme.border,
-                  width: value === num ? 14 : 10,
-                  height: value === num ? 14 : 10,
-                },
-              ]}
-            />
-          </TouchableOpacity>
-        ))}
-      </View>
-      <Text style={[styles.sliderHint, { color: theme.textSecondary }]}>
-        10
-      </Text>
-    </View>
-  );
-
-  const renderMoodFaces = () => {
-    const faces = ["😢", "🙁", "😐", "🙂", "😁"];
-    return (
-      <View style={styles.facesContainer}>
-        {faces.map((f, i) => {
-          const val = i + 1;
-          const isSelected = mood === val;
-          return (
-            <TouchableOpacity key={val} onPress={() => setMood(val)}>
-              <Text
-                style={{
-                  fontSize: isSelected ? 48 : 32,
-                  opacity: isSelected ? 1 : 0.4,
-                }}
-              >
-                {f}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
-    );
+  const finishFlare = async (reflection: string) => {
+    const endDate = new Date().toISOString();
+    const { flareStartDate: startISO, flareDurationDays } = useAppStore.getState();
+    setFlareEnd(endDate, reflection);
+    setEndingFlare(false);
+    setFlareReflection("");
+    try {
+      await saveFlareEnd(activePeriodId ?? null, startISO ?? endDate, endDate, reflection, flareDurationDays ?? 1);
+    } catch (error) {
+      console.error("Failed saving flare end:", error);
+      Alert.alert("Hmm, that didn't save 😕", "Couldn't record the end of your flare — try once more.");
+    }
   };
 
-  const renderToggle = (label: string, value: boolean, setter: any) => (
-    <View style={styles.toggleRow}>
-      <Text style={[styles.label, { color: theme.text, marginBottom: 0 }]}>
-        {label}
-      </Text>
-      <Switch value={value} onValueChange={setter} trackColor={{ true: theme.tint }} />
-    </View>
-  );
-
+  const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+  const flowTitle = `${capitalize(term.flow)} check 🩸`;
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
-      <ScrollView contentContainerStyle={styles.content}>
-        <Text style={[styles.title, { color: theme.text }]}>Daily Log</Text>
-        <Text style={[styles.subtitle, { color: theme.textSecondary }]}>Under 30 seconds to lock in data.</Text>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]} edges={["top"]}>
+      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        <Text style={[styles.eyebrow, { color: theme.tint }]}>{new Date().toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" })}</Text>
+        <Text style={[styles.title, { color: theme.text }]}>How we doing today?</Text>
+        <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
+          30 seconds, no wrong answers. Skip anything you don&apos;t feel like answering 💅
+        </Text>
 
         {/* Teen simplified view — only core fields */}
         {isTeen ? (
           <>
-            <View style={styles.card}>
-              <Text style={[styles.sectionTitle, { color: theme.text }]}>How are you feeling?</Text>
-              {renderMoodFaces()}
-            </View>
-            <View style={styles.card}>
-              <Text style={[styles.sectionTitle, { color: theme.text }]}>Pain (0-10)</Text>
-              {renderSlider10(pain, setPain)}
-            </View>
-            <View style={styles.card}>
-              <Text style={[styles.sectionTitle, { color: theme.text }]}>Energy (0-10)</Text>
-              {renderSlider10(energy, setEnergy)}
-            </View>
+            <Card title="Vibe check ✨">
+              <MoodFaces value={mood} onChange={setMood} />
+            </Card>
+            <Card title="Any pain?">
+              <Scale min={0} max={10} value={pain} onChange={setPain} caption={Captions.pain} lowLabel="none" highLabel="worst" />
+            </Card>
+            <Card title="Energy battery 🔋">
+              <Scale min={0} max={10} value={energy} onChange={setEnergy} caption={Captions.energy} lowLabel="empty" highLabel="full" />
+            </Card>
             {activePeriodId && (
-              <View style={[styles.card, { borderColor: theme.error, borderWidth: 2 }]}>
-                <Text style={[styles.sectionTitle, { color: theme.error }]}>Flow</Text>
-                {renderRadio(["None", "Light", "Medium", "Heavy"], flow, setFlow)}
-              </View>
+              <Card title={flowTitle} accent={theme.error}>
+                <RadioGroup options={Options.flowTeen} selected={flow} onChange={setFlow} />
+              </Card>
             )}
-            <View style={styles.card}>
-              <Text style={[styles.sectionTitle, { color: theme.text }]}>Sleep Hours</Text>
-              <View style={styles.sliderContainer}>
-                <Text style={[styles.sliderHint, { color: theme.textSecondary }]}>0</Text>
-                <View style={{ flex: 1, flexDirection: "row", justifyContent: "space-between", paddingHorizontal: 10 }}>
-                  {[...Array(13).keys()].map((num) => (
-                    <TouchableOpacity key={num} onPress={() => setSleepHours(num)} style={{ paddingVertical: 10, alignItems: "center", width: 25 }}>
-                      <View style={[styles.dot, { backgroundColor: sleepHours >= num ? theme.tint : theme.border, width: sleepHours === num ? 14 : 10, height: sleepHours === num ? 14 : 10 }]} />
-                    </TouchableOpacity>
-                  ))}
-                </View>
-                <Text style={[styles.sliderHint, { color: theme.textSecondary }]}>12</Text>
-              </View>
-            </View>
+            <Card title="Sleep last night 😴">
+              <Scale min={0} max={12} value={sleepHours === null ? null : Math.round(sleepHours)} onChange={setSleepHours} caption={Captions.sleepHours} lowLabel="0h" highLabel="12h" />
+            </Card>
           </>
         ) : (
           <>
-        <View style={[styles.toggleRow, { marginVertical: 12 }]}>
-          <Text style={[styles.label, { color: theme.text, marginBottom: 0 }]}>Auto-fill yesterday’s values</Text>
-          <Switch value={autoFillYesterday} onValueChange={setAutoFillYesterday} trackColor={{ true: theme.tint }} />
-        </View>
-        <View style={styles.card}>
-          <Text style={[styles.sectionTitle, { color: theme.text }]}>
-            Pain Score (0-10)
-          </Text>
-          {renderSlider10(pain, setPain)}
-
-          <Text
-            style={[
-              styles.label,
-              { color: theme.textSecondary, marginTop: 16 },
-            ]}
-          >
-            Pain Locations
-          </Text>
-          {renderMultiSelect(
-            [
-              "Pelvic",
-              "Lower back",
-              "Head",
-              "Legs",
-              "Neck/shoulders",
-              "Chest",
-              "Other",
-            ],
-            painLocations,
-            setPainLocations,
-          )}
-
-          <Text
-            style={[
-              styles.label,
-              { color: theme.textSecondary, marginTop: 16 },
-            ]}
-          >
-            Pain Type
-          </Text>
-          {renderMultiSelect(
-            [
-              "Cramping",
-              "Stabbing",
-              "Aching",
-              "Burning",
-              "Pressure",
-              "Throbbing",
-            ],
-            painTypes,
-            setPainTypes,
-          )}
-        </View>
-
-        <View style={styles.card}>
-          <Text style={[styles.sectionTitle, { color: theme.text }]}>Mood</Text>
-          {renderMoodFaces()}
-          <Text
-            style={[
-              styles.label,
-              { color: theme.textSecondary, marginTop: 16 },
-            ]}
-          >
-            Mood Tags
-          </Text>
-          {renderMultiSelect(
-            [
-              "Anxious",
-              "Irritable",
-              "Low",
-              "Hopeful",
-              "Stable",
-              "Overwhelmed",
-              "Calm",
-              "Tearful",
-              "Dissociated",
-              "Angry",
-            ],
-            moodTags,
-            setMoodTags,
-          )}
-        </View>
-
-        <View style={styles.card}>
-          <Text style={[styles.sectionTitle, { color: theme.text }]}>
-            Physical & Cognitive
-          </Text>
-          <Text style={[styles.label, { color: theme.textSecondary }]}>
-            Brain Fog (0-10) &quot;How clear is your thinking?&quot;
-          </Text>
-          {renderSlider10(brainFog, setBrainFog)}
-
-          <Text
-            style={[
-              styles.label,
-              { color: theme.textSecondary, marginTop: 16 },
-            ]}
-          >
-            Energy Level (0-10)
-          </Text>
-          {renderSlider10(energy, setEnergy)}
-
-          <Text
-            style={[
-              styles.label,
-              { color: theme.textSecondary, marginTop: 16 },
-            ]}
-          >
-            Fatigue Level (0-10)
-          </Text>
-          {renderSlider10(fatigue, setFatigue)}
-
-          <Text
-            style={[
-              styles.label,
-              { color: theme.textSecondary, marginTop: 16 },
-            ]}
-          >
-            Bloating
-          </Text>
-          {renderRadio(
-            ["None", "Mild", "Moderate", "Severe"],
-            bloating,
-            setBloating,
-          )}
-
-          <View
-            style={{
-              marginTop: 16,
-              borderTopWidth: 1,
-              borderTopColor: theme.border,
-              paddingTop: 16,
-            }}
-          >
-            {!isTeen && renderToggle("Spotting", spotting, setSpotting)}
-            {renderToggle("Headache", headache, setHeadache)}
-            {renderToggle("Nausea", nausea, setNausea)}
+        <View style={[styles.autofill, { backgroundColor: theme.surfaceAlt }]}>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.autofillTitle, { color: theme.text }]}>Same as yesterday?</Text>
+            <Text style={[styles.autofillHint, { color: theme.textSecondary }]}>copy yesterday&apos;s answers, then tweak</Text>
           </View>
+          <Switch
+            value={autoFillYesterday}
+            onValueChange={setAutoFillYesterday}
+            trackColor={{ true: theme.tint, false: theme.border }}
+          />
         </View>
+
+        <Card title="Vibe check ✨" subtitle="how are you feeling, honestly?">
+          <MoodFaces value={mood} onChange={setMood} />
+          <Question hint="pick any that fit">What&apos;s the mood made of?</Question>
+          <MultiSelect options={Options.moodTags} selected={moodTags} onChange={setMoodTags} />
+        </Card>
+
+        <Card title="Pain check 🔥">
+          <Question first>How bad is it?</Question>
+          <Scale min={0} max={10} value={pain} onChange={setPain} caption={Captions.pain} lowLabel="none" highLabel="worst" />
+          {(pain ?? 0) > 0 && (
+            <>
+              <Question hint="pick all that apply">Where&apos;s it hitting?</Question>
+              <MultiSelect options={Options.painLocations} selected={painLocations} onChange={setPainLocations} />
+              <Question>What kind of pain?</Question>
+              <MultiSelect options={Options.painTypes} selected={painTypes} onChange={setPainTypes} />
+            </>
+          )}
+        </Card>
+
+        <Card title="Body & brain 🧠">
+          <Question first>Energy battery 🔋</Question>
+          <Scale min={0} max={10} value={energy} onChange={setEnergy} caption={Captions.energy} lowLabel="empty" highLabel="full" />
+          <Question>How foggy is it up there?</Question>
+          <Scale min={0} max={10} value={brainFog} onChange={setBrainFog} caption={Captions.brainFog} lowLabel="clear" highLabel="foggy" />
+          <Question>How drained are you?</Question>
+          <Scale min={0} max={10} value={fatigue} onChange={setFatigue} caption={Captions.fatigue} lowLabel="fresh" highLabel="wiped" />
+          <Question>Bloat status 🎈</Question>
+          <RadioGroup options={Options.bloating} selected={bloating} onChange={setBloating} />
+          <Divider />
+          <ToggleRow label="Spotting" value={spotting} onChange={setSpotting} />
+          <ToggleRow label="Headache 🤕" value={headache} onChange={setHeadache} />
+          <ToggleRow label="Nauseous 🤢" value={nausea} onChange={setNausea} />
+        </Card>
 
         {activePeriodId && (
-          <View
-            style={[styles.card, { borderColor: theme.error, borderWidth: 2 }]}
-          >
-            <Text style={[styles.sectionTitle, { color: theme.error }]}>
-              Active {term.cycle.charAt(0).toUpperCase() + term.cycle.slice(1)} — {term.flow.charAt(0).toUpperCase() + term.flow.slice(1)} & Clots
-            </Text>
-            <Text style={[styles.label, { color: theme.textSecondary }]}>
-              {term.flow.charAt(0).toUpperCase() + term.flow.slice(1)} Intensity
-            </Text>
-            {renderRadio(
-              ["None", "Spotting", "Light", "Medium", "Heavy", "Very Heavy"],
-              flow,
-              setFlow,
+          <Card title={flowTitle} subtitle={`your ${term.cycle} is on — how's the ${term.flow}?`} accent={theme.error}>
+            <RadioGroup options={Options.flow} selected={flow} onChange={setFlow} />
+            <Divider />
+            <ToggleRow label="Any clots?" hint="totally normal to track — helps spot heavy days" value={clots} onChange={setClots} />
+            {clots && (
+              <>
+                <Question>How big?</Question>
+                <RadioGroup options={Options.clotSize} selected={clotsSize} onChange={setClotsSize} />
+              </>
             )}
-            {!isTeen && (
-              <View style={{ marginTop: 16 }}>
-                {renderToggle("Clotting Present", clots, setClots)}
-                {clots && (
-                  <>
-                    <Text style={[styles.label, { color: theme.textSecondary, marginTop: 12 }]}>
-                      Clot Size
-                    </Text>
-                    {renderRadio(["Small", "Medium", "Large"], clotsSize, setClotsSize)}
-                  </>
-                )}
-              </View>
-            )}
-          </View>
+          </Card>
         )}
 
         {currentMode === "pcos" && (
-          <View style={[styles.card, { borderColor: theme.pcos, borderWidth: 2 }]}>
-            <Text style={[styles.sectionTitle, { color: theme.text }]}>PCOS Symptoms Sec5</Text>
-            <Text style={[styles.label, { color: theme.textSecondary }]}>Acne severity (0-3)</Text>
-            {renderSlider4(acneSeverity, setAcneSeverity)}
-            <Text style={[styles.label, { color: theme.textSecondary, marginTop: 8 }]}>Acne locations</Text>
-            {renderMultiSelect(['face', 'back', 'chest'], acneLocations, setAcneLocations)}
-        {renderToggle('Hair thinning', hairThinningNote.length > 0, () => setHairThinningNote(hairThinningNote ? '' : 'yes'))}
-            <TextInput style={[styles.inputText, { color: theme.text }]} value={hairThinningNote} onChangeText={setHairThinningNote} placeholder="Hair thinning note" />
-            {renderToggle('Hirsutism', hirsutism, setHirsutism)}
-            <Text style={[styles.label, { color: theme.textSecondary, marginTop: 16 }]}>Weight change</Text>
-            {renderRadio(['Gaining', 'Losing', 'Stable'], weightDir, setWeightDir)}
-            <TextInput style={[styles.inputText, { color: theme.text }]} value={weightNote} onChangeText={setWeightNote} placeholder="Weight note" />
-            <Text style={[styles.label, { color: theme.textSecondary, marginTop: 16 }]}>Cravings intensity (0-3)</Text>
-            {renderSlider4(cravingsInt, setCravingsInt)}
-            {renderMultiSelect(['sugar', 'carbs', 'salty', 'general'], cravingsTypes, setCravingsTypes)}
-            <Text style={[styles.label, { color: theme.textSecondary }]}>Pelvic pressure pain (0-10)</Text>
-            {renderSlider10(pelvicPressurePain, setPelvicPressurePain)}
-            {renderMultiSelect(['nightmares', 'insomnia', 'waking'], sleepDisruptTypes, setSleepDisruptTypes)}
-            {renderToggle('Anxiety spike', anxietySpike, setAnxietySpike)}
-          </View>
+          <PcosSection value={pcos} onChange={(patch) => setPcos((prev) => ({ ...prev, ...patch }))} />
         )}
 
         {currentMode === "peri" && (
-          <View style={[styles.card, { borderColor: theme.tint, borderWidth: 2 }]}>
-            <Text style={[styles.sectionTitle, { color: theme.text }]}>
-              {languagePreset === 'inclusive' ? 'Body Changes (Peri)' : 'Perimenopause Tracking'}
-            </Text>
-            {renderToggle("Hot Flashes", hotFlashes, setHotFlashes)}
-            {hotFlashes && (
-              <View style={{ marginTop: 8 }}>
-                <Text style={[styles.label, { color: theme.textSecondary }]}>Frequency today (episodes)</Text>
-                <View style={styles.durationRow}>
-                  <TouchableOpacity style={[styles.adjustBtn, { borderColor: theme.tint }]} onPress={() => setHotFlashFrequency(Math.max(0, hotFlashFrequency - 1))}>
-                    <Text style={{ color: theme.tint }}>-1</Text>
-                  </TouchableOpacity>
-                  <Text style={[styles.valueText, { color: theme.text }]}>{hotFlashFrequency}</Text>
-                  <TouchableOpacity style={[styles.adjustBtn, { borderColor: theme.tint }]} onPress={() => setHotFlashFrequency(hotFlashFrequency + 1)}>
-                    <Text style={{ color: theme.tint }}>+1</Text>
-                  </TouchableOpacity>
-                </View>
-                <Text style={[styles.label, { color: theme.textSecondary, marginTop: 12 }]}>Severity (0-3)</Text>
-                {renderSlider4(hotFlashSeverity, setHotFlashSeverity)}
-                <Text style={[styles.label, { color: theme.textSecondary, marginTop: 12 }]}>Time of day</Text>
-                {renderRadio(['Morning', 'Afternoon', 'Evening', 'Night'], hotFlashTimeOfDay, setHotFlashTimeOfDay)}
-              </View>
-            )}
-            {renderToggle("Night Sweats", nightSweats, setNightSweats)}
-            {renderToggle("Vaginal Dryness/Changes", vaginalChanges, setVaginalChanges)}
-            {renderToggle("Cognitive / Memory Blanks", memoryIssues, setMemoryIssues)}
-          </View>
+          <PeriSection
+            value={peri}
+            onChange={(patch) => setPeri((prev) => ({ ...prev, ...patch }))}
+            inclusiveLanguage={languagePreset === 'inclusive'}
+          />
         )}
 
         {currentMode === "endo" && (
-          <View
-            style={[styles.card, { borderColor: theme.endo, borderWidth: 2 }]}
-          >
-            <Text style={[styles.sectionTitle, { color: theme.text }]}>
-              Endo Extended Symptoms
-            </Text>
-            {renderToggle("Declare Endo Flare", inFlare, handleFlareToggle)}
-
-            {inFlare ? (
-              // Condensed 3-field flare mode
-              <View style={{ marginTop: 12 }}>
-                <Text style={[styles.label, { color: theme.endo, fontWeight: 'bold', marginBottom: 8 }]}>⚡ Flare Mode — Quick Log</Text>
-                <Text style={[styles.label, { color: theme.textSecondary }]}>Flare Pain (0-10)</Text>
-                {renderSlider10(flareModePain, setFlareModePain)}
-                {renderToggle("Nausea", flareModeNausea, setFlareModeNausea)}
-                <Text style={[styles.label, { color: theme.textSecondary, marginTop: 12 }]}>Movement Ability</Text>
-                {renderRadio(["Normal", "Limited", "Bed-bound"], flareModeMovement, setFlareModeMovement)}
-              </View>
-            ) : (
-              // Full endo symptom palette
-              <View>
-                <Text style={[styles.label, { color: theme.textSecondary, marginTop: 16 }]}>Clot Size</Text>
-                {renderRadio(["None", "Small", "Medium", "Large"], clotsSize, setClotsSize)}
-
-                <Text style={[styles.label, { color: theme.textSecondary, marginTop: 16 }]}>Bowel Symptoms</Text>
-                {renderMultiSelect(["Constipation", "Diarrhoea", "Pain", "Bleeding"], bowelSymptoms, setBowelSymptoms)}
-
-                <Text style={[styles.label, { color: theme.textSecondary, marginTop: 16 }]}>Bladder Symptoms</Text>
-                {renderMultiSelect(["Pain", "Frequency", "Urgency", "Blood"], bladderSymptoms, setBladderSymptoms)}
-
-                <Text style={[styles.label, { color: theme.textSecondary, marginTop: 16 }]}>Shoulder/Referred Pain</Text>
-                {renderRadio(["None", "Left", "Right", "Both"], shoulderSide, setShoulderSide)}
-
-                <Text style={[styles.label, { color: theme.textSecondary, marginTop: 16 }]}>Nausea Severity (0-3)</Text>
-                {renderSlider4(nauseaSeverity, setNauseaSeverity)}
-
-                {!isTeen && (
-                  <View style={{ marginTop: 16 }}>
-                    {renderToggle("Dyspareunia (Pain during sex)", dyspareunia, setDyspareunia)}
-                  </View>
-                )}
-              </View>
-            )}
-          </View>
+          <EndoSection
+            value={endo}
+            onChange={(patch) => setEndo((prev) => ({ ...prev, ...patch }))}
+            clotsSize={clotsSize}
+            onClotsSizeChange={setClotsSize}
+            isTeen={isTeen}
+            flareActive={inFlare && !endingFlare}
+            onFlareToggle={handleFlareToggle}
+            endingFlare={endingFlare}
+            reflection={flareReflection}
+            onReflectionChange={setFlareReflection}
+            onFinishFlare={finishFlare}
+            flare={flare}
+            onFlareChange={(patch) => setFlare((prev) => ({ ...prev, ...patch }))}
+          />
         )}
 
         {/* 4.5 Lifestyle & Trigger Analysis */}
-        <View
-          style={[styles.card, { borderColor: theme.border, borderWidth: 1 }]}
-        >
-          <Text style={[styles.sectionTitle, { color: theme.text }]}>
-            Lifestyle Triggers
-          </Text>
-
-          <Text style={[styles.label, { color: theme.textSecondary }]}>
-            Sleep Quality (1-5)
-          </Text>
-          {renderSlider10(sleepQuality, setSleepQuality)}
-
-          <Text
-            style={[
-              styles.label,
-              { color: theme.textSecondary, marginTop: 16 },
-            ]}
-          >
-            Sleep Hours (0-12)
-          </Text>
+        <Card title="Lifestyle stuff 🌙" subtitle="sleep, movement and stress — the usual suspects">
+          <Question first>Sleep last night</Question>
           {healthSleepSource && (
             <Text style={[styles.sourceTag, { color: theme.tint }]}>
-              from {healthSleepSource}
+              ⌚ synced from {healthSleepSource}
             </Text>
           )}
-          <View style={styles.sliderContainer}>
-            <Text style={[styles.sliderHint, { color: theme.textSecondary }]}>0</Text>
-            <View
-              style={{
-                flex: 1,
-                flexDirection: "row",
-                justifyContent: "space-between",
-                paddingHorizontal: 10,
-              }}
-            >
-              {[...Array(13).keys()].map((num) => (
-                <TouchableOpacity
-                  key={num}
-                  onPress={() => setSleepHours(num)}
-                  style={{ paddingVertical: 10, alignItems: "center", width: 25 }}
-                >
-                  <View
-                    style={[
-                      styles.dot,
-                      {
-                        backgroundColor: sleepHours >= num ? theme.tint : theme.border,
-                        width: sleepHours === num ? 14 : 10,
-                        height: sleepHours === num ? 14 : 10,
-                      },
-                    ]}
-                  />
-                </TouchableOpacity>
-              ))}
-            </View>
-            <Text style={[styles.sliderHint, { color: theme.textSecondary }]}>
-              12
-            </Text>
-          </View>
+          <Scale min={0} max={12} value={sleepHours === null ? null : Math.round(sleepHours)} onChange={setSleepHours} caption={Captions.sleepHours} lowLabel="0h" highLabel="12h" />
 
-          <Text
-            style={[
-              styles.label,
-              { color: theme.textSecondary, marginTop: 16 },
-            ]}
-          >
-            Exercise Type
-          </Text>
-          {renderMultiSelect(
-            ["Walking", "Yoga", "Running", "Cycling", "Strength", "None"],
-            exerciseType ? [exerciseType] : ['None'],
-            (vals: string[]) => setExerciseType(vals[0] ?? 'None'),
-          )}
+          <Question>And how was it?</Question>
+          <Scale min={1} max={5} value={sleepQuality} onChange={setSleepQuality} caption={Captions.sleepQuality} lowLabel="awful" highLabel="amazing" />
 
-          <Text
-            style={[
-              styles.label,
-              { color: theme.textSecondary, marginTop: 16 },
-            ]}
-          >
-            Exercise Duration (minutes)
-          </Text>
-          {healthActivitySource && (
-            <Text style={[styles.sourceTag, { color: theme.tint }]}>
-              from {healthActivitySource}{stepsCount !== null ? ` • ${stepsCount.toLocaleString()} steps` : ""}
-            </Text>
-          )}
-          <View style={styles.durationRow}>
-            <TouchableOpacity style={[styles.adjustBtn, { borderColor: theme.tint }]} onPress={() => setExerciseDuration(Math.max(0, exerciseDuration - 5))}>
-              <Text style={{ color: theme.tint }}>-5</Text>
-            </TouchableOpacity>
-            <Text style={[styles.valueText, { color: theme.text }]}>{exerciseDuration} min</Text>
-            <TouchableOpacity style={[styles.adjustBtn, { borderColor: theme.tint }]} onPress={() => setExerciseDuration(exerciseDuration + 5)}>
-              <Text style={{ color: theme.tint }}>+5</Text>
-            </TouchableOpacity>
-          </View>
-
-          <Text
-            style={[
-              styles.label,
-              { color: theme.textSecondary, marginTop: 16 },
-            ]}
-          >
-            Stress Score (1-5)
-          </Text>
-          <View style={styles.buttonGroup}>
-            {[1, 2, 3, 4, 5].map((num) => (
-              <TouchableOpacity
-                key={num}
-                style={[
-                  styles.chip,
-                  {
-                    borderColor: theme.tint,
-                    backgroundColor: stressScore === num ? theme.tint : "transparent",
-                  },
-                ]}
-                onPress={() => setStressScore(num)}
-              >
-                <Text style={{ color: stressScore === num ? "#FFF" : theme.text, fontWeight: stressScore === num ? "bold" : "normal" }}>
-                  {num}
+          <Question>Did you move today?</Question>
+          <RadioGroup
+            options={exerciseType === "Health activity" ? [...Options.exercise, Options.exerciseFromHealth] : Options.exercise}
+            selected={exerciseType}
+            onChange={(type) => {
+              setExerciseType(type);
+              if (type === "None") setExerciseDuration(0);
+            }}
+          />
+          {exerciseType !== "None" && (
+            <>
+              <Question>For how long?</Question>
+              {healthActivitySource && (
+                <Text style={[styles.sourceTag, { color: theme.tint }]}>
+                  ⌚ synced from {healthActivitySource}{stepsCount !== null ? ` • ${stepsCount.toLocaleString()} steps` : ""}
                 </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+              )}
+              <View style={styles.durationRow}>
+                <TouchableOpacity
+                  style={[styles.adjustBtn, { borderColor: theme.tint }]}
+                  onPress={() => setExerciseDuration(Math.max(0, exerciseDuration - 5))}
+                  accessibilityLabel="5 minutes less"
+                >
+                  <Text style={[styles.adjustText, { color: theme.tint }]}>−5</Text>
+                </TouchableOpacity>
+                <Text style={[styles.valueText, { color: theme.text }]}>{exerciseDuration} min</Text>
+                <TouchableOpacity
+                  style={[styles.adjustBtn, { borderColor: theme.tint }]}
+                  onPress={() => setExerciseDuration(exerciseDuration + 5)}
+                  accessibilityLabel="5 minutes more"
+                >
+                  <Text style={[styles.adjustText, { color: theme.tint }]}>+5</Text>
+                </TouchableOpacity>
+              </View>
+            </>
+          )}
 
-          <Text style={[styles.label, { color: theme.textSecondary, marginTop: 16 }]}>Diet Notes</Text>
+          <Question>Stress level?</Question>
+          <Scale min={1} max={5} value={stressScore} onChange={setStressScore} caption={Captions.stress} lowLabel="chill" highLabel="maxed" />
+
+          <Question hint="🔒 encrypted on your phone">What did you eat? (optional)</Question>
           <TextInput
-            style={[styles.inputText, { color: theme.text, borderColor: theme.border }]}
+            style={[styles.inputText, { color: theme.text, borderColor: theme.border, backgroundColor: theme.surfaceAlt }]}
             value={dietNotes}
             onChangeText={setDietNotes}
-            placeholder="Brief notes about meals or intolerances"
+            placeholder="meals, snacks, anything that didn't agree with you…"
             placeholderTextColor={theme.textSecondary}
             multiline
           />
 
-          <Text style={[styles.label, { color: theme.textSecondary, marginTop: 16 }]}>Medication / Supplements</Text>
+          <Question hint="🔒 encrypted on your phone">Meds or supplements? (optional)</Question>
           <TextInput
-            style={[styles.inputText, { color: theme.text, borderColor: theme.border }]}
+            style={[styles.inputText, { color: theme.text, borderColor: theme.border, backgroundColor: theme.surfaceAlt }]}
             value={medicationLog}
             onChangeText={setMedicationLog}
-            placeholder="List medications or supplements taken today"
+            placeholder="e.g. ibuprofen 400mg, iron, magnesium"
             placeholderTextColor={theme.textSecondary}
             multiline
           />
-        </View>
+        </Card>
         </> /* end non-teen */
         )}
 
         <TouchableOpacity
           style={[styles.saveButton, { backgroundColor: theme.tint }]}
           onPress={handleSave}
+          activeOpacity={0.85}
+          accessibilityRole="button"
         >
-          <Text style={styles.saveButtonText}>Save Log</Text>
+          <Text style={[styles.saveButtonText, { color: theme.onTint }]}>Save today&apos;s log ✨</Text>
         </TouchableOpacity>
+        <Text style={[styles.privacyNote, { color: theme.textSecondary }]}>🔒 stays on your phone. always.</Text>
       </ScrollView>
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1 },
-  content: { padding: 20, paddingBottom: 50 },
-  title: { fontSize: 32, fontWeight: "bold" },
-  subtitle: { fontSize: 16, marginBottom: 20 },
-  card: {
-    padding: 20,
-    borderRadius: 16,
-    backgroundColor: "#FFF",
-    marginBottom: 20,
-    elevation: 1,
-    shadowColor: "#000",
-    shadowOpacity: 0.05,
-    shadowRadius: 5,
-  },
-  sectionTitle: { fontSize: 18, fontWeight: "bold", marginBottom: 12 },
-  label: { fontSize: 14, marginBottom: 8, fontWeight: "500" },
-  buttonGroup: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  chip: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
-    borderWidth: 1,
-  },
-  sliderContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginVertical: 4,
-  },
-  dot: { borderRadius: 10 },
-  sliderHint: { fontSize: 16, fontWeight: "bold" },
-  facesContainer: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    height: 60,
-    paddingHorizontal: 10,
-  },
-  toggleRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingVertical: 6,
-  },
-  durationRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginTop: 8,
-  },
-  adjustBtn: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderWidth: 1,
-    borderRadius: 10,
-  },
-  valueText: {
-    fontSize: 16,
-    fontWeight: "bold",
-  },
-  sourceTag: {
-    fontSize: 12,
-    fontWeight: "700",
-    marginTop: -4,
-    marginBottom: 8,
-  },
-  inputText: {
-    borderWidth: 1,
-    borderRadius: 12,
-    minHeight: 80,
-    padding: 12,
-    marginTop: 8,
-  },
-  saveButton: {
-    padding: 18,
-    borderRadius: 16,
-    alignItems: "center",
-    marginTop: 10,
-    elevation: 2,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-  },
-  saveButtonText: { color: "#FFF", fontSize: 18, fontWeight: "bold" },
-});

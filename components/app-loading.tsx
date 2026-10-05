@@ -7,7 +7,7 @@ type Props = {
   message?: string;
 };
 
-export function AppLoading({ message = "Preparing your secure vault…" }: Props) {
+export function AppLoading({ message = "locking in your private vault 🔒…" }: Props) {
   const colorScheme = useColorScheme() ?? "light";
   const theme = Colors[colorScheme];
   const pulse = useRef(new Animated.Value(0.85)).current;

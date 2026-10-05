@@ -26,19 +26,19 @@ export default function EndoSetupScreen() {
     router.push('/onboarding/consent');
   };
 
-  const renderSingleSelect = (key: keyof EndoSetup, options: string[]) => (
+  const renderSingleSelect = (key: keyof EndoSetup, options: { value: string; label: string }[]) => (
     <View style={styles.buttonGroup}>
       {options.map((opt) => (
         <TouchableOpacity
-          key={opt}
+          key={opt.value}
           style={[styles.optionButton, {
             borderColor: theme.endo,
-            backgroundColor: form[key] === opt ? theme.endo : 'transparent',
+            backgroundColor: form[key] === opt.value ? theme.endo : 'transparent',
           }]}
-          onPress={() => setForm({ ...form, [key]: opt })}
+          onPress={() => setForm({ ...form, [key]: opt.value })}
         >
-          <Text style={{ color: form[key] === opt ? '#FFF' : theme.text, fontWeight: form[key] === opt ? 'bold' : 'normal' }}>
-            {opt}
+          <Text style={{ color: form[key] === opt.value ? theme.onAccent : theme.text, fontWeight: form[key] === opt.value ? 'bold' : 'normal' }}>
+            {opt.label}
           </Text>
         </TouchableOpacity>
       ))}
@@ -51,32 +51,32 @@ export default function EndoSetupScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <Text style={[styles.backText, { color: theme.endo }]}>← Back</Text>
         </TouchableOpacity>
-        <OnboardingProgress step={4} total={5} label="Step 4 — Condition details" />
+        <OnboardingProgress step={4} total={5} label="step 4 · a few details" />
       </View>
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={[styles.title, { color: theme.text }]}>Endometriosis Setup</Text>
+        <Text style={[styles.title, { color: theme.text }]}>Let&apos;s set up endo mode 💜</Text>
 
         <View style={[styles.privacyNote, { backgroundColor: theme.surface, borderColor: theme.border }]}>
           <Text style={[styles.privacyText, { color: theme.textSecondary }]}>
-            🔒 Your health data stays on this device. We never store or transmit it.
+            🔒 This stays on your phone. We never see it — we literally can&apos;t.
           </Text>
         </View>
 
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: theme.text }]}>Diagnosis & stage</Text>
-          {renderSingleSelect('diagnosisStage', ['Stage I-II', 'Stage III-IV', 'Suspected', 'Undiagnosed'])}
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>Where are you at with a diagnosis?</Text>
+          {renderSingleSelect('diagnosisStage', [{ value: 'Stage I-II', label: 'stage I–II' }, { value: 'Stage III-IV', label: 'stage III–IV' }, { value: 'Suspected', label: 'suspected' }, { value: 'Undiagnosed', label: 'no diagnosis yet' }])}
         </View>
 
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: theme.text }]}>Current management</Text>
-          {renderSingleSelect('currentManagement', ['Hormonal suppression', 'Excision surgery', 'Pain medication', 'None'])}
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>Managing it with anything right now?</Text>
+          {renderSingleSelect('currentManagement', [{ value: 'Hormonal suppression', label: 'hormonal treatment' }, { value: 'Excision surgery', label: 'had excision surgery' }, { value: 'Pain medication', label: 'pain meds' }, { value: 'None', label: 'nothing yet' }])}
         </View>
 
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: theme.text }]}>Are you currently in a flare?</Text>
-          <Text style={[styles.hint, { color: theme.textSecondary }]}>A flare is a period of intensified pain or symptoms, with or without menstruation.</Text>
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>In a flare right now?</Text>
+          <Text style={[styles.hint, { color: theme.textSecondary }]}>A flare = pain or symptoms ramping up, period or not. We&apos;ll keep logging extra short while it lasts.</Text>
           <View style={styles.buttonGroup}>
-            {([['Yes', true], ['No', false]] as const).map(([label, val]) => (
+            {([['yep, flaring 😮‍💨', true], ['nope, all good', false]] as const).map(([label, val]) => (
               <TouchableOpacity
                 key={label}
                 style={[styles.optionButton, {
@@ -85,7 +85,7 @@ export default function EndoSetupScreen() {
                 }]}
                 onPress={() => setForm({ ...form, currentlyInFlare: val })}
               >
-                <Text style={{ color: form.currentlyInFlare === val ? '#FFF' : theme.text, fontWeight: form.currentlyInFlare === val ? 'bold' : 'normal' }}>
+                <Text style={{ color: form.currentlyInFlare === val ? theme.onAccent : theme.text, fontWeight: form.currentlyInFlare === val ? 'bold' : 'normal' }}>
                   {label}
                 </Text>
               </TouchableOpacity>
@@ -94,7 +94,7 @@ export default function EndoSetupScreen() {
         </View>
 
         <Text style={[styles.deferNote, { color: theme.textSecondary }]}>
-          You can add pain locations and flare history from your profile after setup.
+          You can add more detail later in Profile — zero pressure.
         </Text>
 
         <TouchableOpacity
@@ -102,7 +102,7 @@ export default function EndoSetupScreen() {
           onPress={handleNext}
           disabled={!form.diagnosisStage}
         >
-          <Text style={styles.nextText}>Continue</Text>
+          <Text style={[styles.nextText, { color: theme.onTint }]}>Next →</Text>
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
@@ -125,5 +125,5 @@ const styles = StyleSheet.create({
   hint: { fontSize: 13, lineHeight: 19, marginBottom: 10 },
   deferNote: { fontSize: 13, textAlign: 'center', marginBottom: 16 },
   nextButton: { padding: 18, borderRadius: 16, alignItems: 'center', marginTop: 4 },
-  nextText: { color: '#FFF', fontSize: 18, fontWeight: 'bold' },
+  nextText: { fontSize: 18, fontWeight: 'bold' },
 });

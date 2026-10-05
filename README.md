@@ -8,7 +8,7 @@
 
 - **Core tracking** — Period start/end, flow/clots, pain, mood, energy, brain fog, lifestyle triggers
 - **Condition flows** — PCOS, PCOD, endometriosis, perimenopause, teen, post-pill modes with tailored log fields
-- **Predictions** — Tiered on-device engine (Bayesian blend → adaptive EW → full rules → GPR); wide priors for PCOS/peri
+- **Predictions** — Tiered on-device engine (prior blend → adaptive EW → full rules) with backtest-calibrated windows; wide priors for PCOS/PCOD/peri
 - **Insights** — Spearman correlations, cycle-phase overlays, dismissible coaching cards
 - **Flare management** — Endo flare timer, reflection prompts, pattern analysis
 - **Safeguards** — In-app mood alerts (3+ low days), red-flag prompts (pain 8+ × 3 days)
@@ -55,8 +55,8 @@ See [CycleIQ-Feature-Checklist.md](CycleIQ-Feature-Checklist.md) for the full sp
 | Framework | Expo 56, React Native 0.75, React 19 |
 | Routing | Expo Router (file-based) |
 | State | Zustand + AsyncStorage (prefs/flags) |
-| Database | expo-sqlite + SQLCipher PRAGMA key |
-| Encryption | AES-256-GCM for diet/medication/notes fields |
+| Database | expo-sqlite + SQLCipher (`useSQLCipher` build flag; requires a dev/production build, not Expo Go) |
+| Encryption | AES-256-GCM (@noble/ciphers) for diet/medication/notes/flare-reflection fields |
 | Charts | react-native-chart-kit |
 | Dates | date-fns |
 
@@ -79,6 +79,23 @@ npx expo start
 
 Press `i` for iOS simulator, `a` for Android, or scan the QR code with Expo Go.
 
+> **Expo Go limits:** SQLCipher encryption and Apple Health / Health Connect import need a
+> development build (`npx expo prebuild` + `npx expo run:ios` / `run:android`, or EAS).
+> Expo Go runs the app with a plaintext database and no health import, and Settings says so.
+
+### Tests
+
+```bash
+npm test          # unit tests, prediction backtest gate, and database tests on real SQLite
+npm run backtest  # prediction accuracy report vs simple baselines
+npm run lint
+npx tsc --noEmit
+```
+
+The database tests run the real `database/` modules against SQLite (better-sqlite3) behind the
+expo-sqlite API — see `tests/support/`. The stand-in rejects SQL that device builds of
+expo-sqlite don't support (e.g. `UPDATE … LIMIT`).
+
 ### Suggested test flow
 
 1. **Onboard** — Goal → cycle history → (condition setup) → consent → lands on Home with seeded cycle data
@@ -99,11 +116,14 @@ app/           Screens & routing (Expo Router)
   (tabs)/      Home, Log, Calendar, Education, History, Insights, Profile
   onboarding/  First-run flow
   cycle/[id]/  Cycle detail & edit
-components/    Shared UI (loading, onboarding progress, icons)
+components/    Shared UI (loading, onboarding progress, icons, log/ inputs & sections)
 constants/     Theme colors
-database/      SQLite layer (+ index.web.ts stub)
+database/      SQLite layer: connection, schema, cycles, symptoms, predictionStore,
+               insights, phases, settings, privacy, types (+ index.web.ts stub)
 store/         Zustand global state
-utils/         Predictions, stats, notifications, reports, encryption
+utils/         Predictions, stats, notifications, reports, encryption,
+               health/ (HealthKit + Health Connect bridges)
+tests/         Unit, backtest and database tests (support/ = native module stand-ins)
 data/          Bundled education articles
 ```
 
@@ -111,7 +131,6 @@ data/          Bundled education articles
 
 - [ ] Clinical safeguarding sign-off ([docs/CLINICAL_REVIEW.md](docs/CLINICAL_REVIEW.md))
 - [ ] IAP tiers (Care / Clinical)
-- [ ] Native HealthKit / Health Connect bridge (JS contract exists; native module pending)
 - [ ] Biometric app lock
 - [ ] App Store / Play Store submission
 
@@ -120,7 +139,7 @@ data/          Bundled education articles
 1. Fork and open a PR against `main`
 2. Follow [CycleIQ-Feature-Checklist.md](CycleIQ-Feature-Checklist.md) for feature scope
 3. Test on **native** targets (`npx expo start --ios` / `--android`) — not web alone
-4. Run `npm run lint` before submitting
+4. Run `npm test`, `npm run lint` and `npx tsc --noEmit` before submitting
 
 ## 📄 License
 

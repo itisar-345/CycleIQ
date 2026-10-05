@@ -1,4 +1,5 @@
-import { Colors } from "@/constants/theme";
+import { MODE_BADGE, PHASE_COPY } from "@/constants/copy";
+import { Colors, getModeColor, Radius, Shadow } from "@/constants/theme";
 import { closeCycle, createCycle, getLatestCycle, getDayOfCycle, getPhaseForDay, getCyclePredictions, generateInsights, CycleInsight, getLatestPredictionFeedback } from "@/database";
 import { PredictionResult } from "@/utils/predictions";
 import { scheduleAllCycleNotifications, requestNotificationPermission } from "@/utils/notifications";
@@ -6,7 +7,7 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useAppStore } from "@/store";
 import { differenceInDays, format, parseISO } from "date-fns";
-import { router, useFocusEffect } from "expo-router";
+import { router, useFocusEffect, type Href } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Alert,
@@ -17,8 +18,10 @@ import {
   TouchableOpacity,
   View,
   ActivityIndicator,
+  Animated,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { InteractivePressable } from "@/components/interactive-pressable";
 
 export default function HomeScreen() {
   const colorScheme = useColorScheme() ?? "light";
@@ -31,7 +34,6 @@ export default function HomeScreen() {
     setActivePeriod,
     inFlare,
     flareStartDate,
-    setInFlare,
     checkPCOSPromptCooldown,
     setLastPCOSPrompt,
     age,
@@ -39,12 +41,10 @@ export default function HomeScreen() {
     setNotificationPrefs,
     postPillMode,
     postPillStartDate,
-    isTeen,
     dismissedInsights,
     languagePreset,
     customTerms,
     healthImportPrefs,
-    lastNotificationPrompt,
     setLastNotificationPrompt,
     checkNotificationPromptCooldown,
   } = useAppStore();
@@ -61,16 +61,37 @@ export default function HomeScreen() {
   const [lastMissErrorDays, setLastMissErrorDays] = useState<number | null>(null);
   const missShownRef = useRef(false);
 
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1.03,
+          duration: 2500,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 2500,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [pulseAnim]);
+
   // Profile completion checklist — deferred items from onboarding
   // Spec: detailed condition profile, notifications, age/language, health data import
   const healthImportEnabled = healthImportPrefs.appleHealthSleep || healthImportPrefs.appleHealthActivity ||
     healthImportPrefs.healthConnectSleep || healthImportPrefs.healthConnectActivity;
   const profileItems = [
-    !notificationsEnabled && { label: "Enable reminders", route: "/profile" },
-    !age && { label: "Add your age", route: "/profile" },
-    ["pcos","pcod","endo"].includes(currentMode) && !useAppStore.getState().pcosData && !useAppStore.getState().endoData && { label: "Complete condition profile", route: "/profile" },
-    !healthImportEnabled && { label: "Connect health data", route: "/profile" },
-  ].filter(Boolean) as { label: string; route: string }[];
+    !notificationsEnabled && { label: "turn on reminders", route: "/profile" },
+    !age && { label: "add your age", route: "/profile" },
+    ["pcos","pcod","endo"].includes(currentMode) && !useAppStore.getState().pcosData && !useAppStore.getState().endoData && { label: "finish your condition profile", route: "/profile" },
+    !healthImportEnabled && { label: "connect your Health app", route: "/profile" },
+  ].filter(Boolean) as { label: string; route: Href }[];
 
   // Dynamic terminology
   const flowTerm = languagePreset === 'custom' ? customTerms.flow : 'flow';
@@ -79,21 +100,20 @@ export default function HomeScreen() {
   const loadLatestCycle = useCallback(async () => {
     try {
       const latest = await getLatestCycle();
-      if (latest && latest.cycle_length) {
-        setCycleLength(latest.cycle_length);
-      }
+      const stats = await getCyclePredictions(currentMode, postPillMode, postPillStartDate ?? null);
+      setPredictionStats(stats);
+      // The current cycle is in progress, so its expected length comes from the prediction.
+      const expectedLength = stats.model !== "none" ? stats.mean : 28;
+      setCycleLength(expectedLength);
 
       if (latest && latest.start_date) {
         setLatestStartDate(latest.start_date);
         const cycleDay = getDayOfCycle(new Date().toISOString(), latest.start_date);
         setCurrentCycleDay(cycleDay);
-        setCurrentPhase(getPhaseForDay(cycleDay, latest.cycle_length || 28));
+        setCurrentPhase(getPhaseForDay(cycleDay, expectedLength));
       } else {
         setLatestStartDate(null);
       }
-
-      const stats = await getCyclePredictions(currentMode, postPillMode, postPillStartDate ?? null);
-      setPredictionStats(stats);
 
       if (stats.predictedStartISO) {
         await scheduleAllCycleNotifications(stats);
@@ -107,7 +127,7 @@ export default function HomeScreen() {
       const { getAllEntries } = await import("@/database");
       const todayStr = new Date().toISOString().split("T")[0];
       const allEntries = await getAllEntries();
-      const todayEntry = allEntries.find((e: any) => e.logged_date?.startsWith(todayStr));
+      const todayEntry = allEntries.find((e) => e.logged_date.startsWith(todayStr));
       setMedicationLoggedToday(!!(todayEntry?.medication_log_encrypted));
 
       if (!missShownRef.current) {
@@ -125,12 +145,12 @@ export default function HomeScreen() {
           const is120 = daysSinceStart >= 120;
           if (checkPCOSPromptCooldown()) {
             setLastPCOSPrompt(new Date().toISOString());
-            const title = is120 ? "Time to check in?" : "It's been a while";
+            const title = is120 ? "checking in on you 💛" : "it's been a minute 👀";
             const message = is120
-              ? `It's been ${daysSinceStart} days since your last period. It might be a good idea to chat with a healthcare provider just to be safe.`
-              : `It's been ${daysSinceStart} days since your last period — is everything okay? Remember to log any symptoms.`;
+              ? `It's been ${daysSinceStart} days since your last period. Worth a quick chat with a healthcare provider, just to be safe 🫶`
+              : `It's been ${daysSinceStart} days since your last period. All good? Logging symptoms helps us (and your doctor) spot patterns.`;
             setTimeout(() => {
-              Alert.alert(title, message, [{ text: "Got it" }]);
+              Alert.alert(title, message, [{ text: "okay, noted" }]);
             }, 500);
           }
         }
@@ -158,7 +178,7 @@ export default function HomeScreen() {
   };
 
   const handleStartPeriod = () => {
-    Alert.alert("Log Period", "Is today the first day of your period?", [
+    Alert.alert("period started? 🩸", "Is today day 1?", [
       { text: "Cancel", style: "cancel" },
       {
         text: "Log Today",
@@ -175,12 +195,12 @@ export default function HomeScreen() {
               setLastNotificationPrompt(new Date().toISOString());
               setTimeout(() => {
                 Alert.alert(
-                  "Want a reminder next time?",
-                  "We can notify you 2 days before your next predicted period. You control all notification types in Settings.",
+                  "want a heads-up next time? 🔔",
+                  "We'll ping you ~2 days before your next predicted period. You can tweak every reminder in Profile.",
                   [
                     { text: "Not now", style: "cancel" },
                     {
-                      text: "Yes, remind me",
+                      text: "yes pls",
                       onPress: async () => {
                         const granted = await requestNotificationPermission();
                         if (granted) setNotificationPrefs({ period: true, dailyLog: true });
@@ -192,7 +212,7 @@ export default function HomeScreen() {
             }
           } catch (error) {
             console.error("Failed starting period", error);
-            Alert.alert("Error", "Could not log period start. Please try again.");
+            Alert.alert("hmm, that didn't save 😕", "Couldn't log your period start — give it another tap.");
           }
         },
       },
@@ -210,7 +230,7 @@ export default function HomeScreen() {
       setPredictionStats(stats);
     } catch (error) {
       console.error("Failed closing period", error);
-      Alert.alert("Error", "Could not close period. Please try again.");
+      Alert.alert("hmm, that didn't save 😕", "Couldn't mark your period as ended — try once more.");
     }
   };
 
@@ -230,7 +250,7 @@ export default function HomeScreen() {
       <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
         <View style={styles.loadingWrap}>
           <ActivityIndicator size="large" color={theme.tint} />
-          <Text style={[styles.loadingText, { color: theme.textSecondary }]}>Loading your dashboard…</Text>
+          <Text style={[styles.loadingText, { color: theme.textSecondary }]}>getting your stuff ready…</Text>
         </View>
       </SafeAreaView>
     );
@@ -242,23 +262,23 @@ export default function HomeScreen() {
       <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
         <View style={styles.emptyState}>
           <Text style={styles.emptyIcon}>🩸</Text>
-          <Text style={[styles.emptyTitle, { color: theme.text }]}>{"You're all set"}</Text>
+          <Text style={[styles.emptyTitle, { color: theme.text }]}>{"you're all set ✨"}</Text>
           <Text style={[styles.emptyDesc, { color: theme.textSecondary }]}>
-            Log your last period to unlock your cycle dashboard, predictions, and insights.
+            Log your last period and your dashboard, predictions and insights unlock.
           </Text>
           <TouchableOpacity
             style={[styles.emptyCTA, { backgroundColor: theme.error }]}
             onPress={handleStartPeriod}
             activeOpacity={0.8}
           >
-            <Text style={styles.emptyCTAText}>Log my last period</Text>
+            <Text style={[styles.emptyCTAText, { color: theme.onAccent }]}>log my last period</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.emptySecondary, { borderColor: theme.border }]}
             onPress={() => router.push("/log")}
           >
             <Text style={[styles.emptySecondaryText, { color: theme.textSecondary }]}>
-              {"Just log today's symptoms instead"}
+              {"just log how today's going instead"}
             </Text>
           </TouchableOpacity>
         </View>
@@ -279,38 +299,40 @@ export default function HomeScreen() {
         {/* Header */}
         <View style={styles.header}>
           <Text style={[styles.greeting, { color: theme.textSecondary }]}>
-            Hello{userName ? `, ${userName}` : ""}
+            {format(new Date(), "EEEE, MMM d")}
           </Text>
-          <Text style={[styles.title, { color: theme.text }]}>CycleIQ</Text>
+          <Text style={[styles.title, { color: theme.text }]}>
+            hey{userName ? ` ${userName}` : ""} 👋
+          </Text>
           <View
             style={[
               styles.badge,
-              { backgroundColor: (theme as any)[currentMode] || theme.tint },
+              { backgroundColor: getModeColor(theme, currentMode) },
             ]}
           >
-            <Text style={styles.badgeText}>
-              {currentMode.toUpperCase()} SETTINGS
+            <Text style={[styles.badgeText, { color: theme.onAccent }]}>
+              {MODE_BADGE[currentMode] ?? "tracking mode"}
             </Text>
           </View>
         </View>
 
         {/* Profile completion banner — shown until all deferred items are done */}
         {profileItems.length > 0 && (
-          <TouchableOpacity
+          <InteractivePressable
             style={[styles.profileBanner, { backgroundColor: theme.surface, borderColor: theme.tint }]}
-            onPress={() => router.push("/profile" as any)}
-            activeOpacity={0.8}
+            onPress={() => router.push("/profile")}
+            haptic="light"
           >
             <View style={{ flex: 1 }}>
               <Text style={[styles.profileBannerTitle, { color: theme.text }]}>
-                Complete your profile
+                finish setting up ✨
               </Text>
               <Text style={[styles.profileBannerDesc, { color: theme.textSecondary }]}>
                 {profileItems.map(i => i.label).join(" · ")}
               </Text>
             </View>
             <Text style={[styles.profileBannerArrow, { color: theme.tint }]}>→</Text>
-          </TouchableOpacity>
+          </InteractivePressable>
         )}
 
         {/* Post-pill progress bar */}
@@ -320,9 +342,9 @@ export default function HomeScreen() {
           const remaining = Math.max(0, 90 - elapsed);
           return (
             <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.tint, borderWidth: 1, alignItems: 'flex-start' }]}>
-              <Text style={[styles.cardTitle, { color: theme.text }]}>Post-Pill Baseline</Text>
+              <Text style={[styles.cardTitle, { color: theme.text }]}>post-pill reset 💊</Text>
               <Text style={{ color: theme.textSecondary, marginBottom: 8 }}>
-                Day {progress} of 90 — {remaining > 0 ? `${remaining} days until predictions unlock` : 'Baseline complete — predictions now active'}
+                day {progress} of 90 — {remaining > 0 ? `${remaining} days till predictions unlock. your body's recalibrating, be patient with it 🫶` : 'baseline done — predictions are live ✨'}
               </Text>
               <View style={{ width: '100%', height: 8, borderRadius: 4, backgroundColor: theme.border, overflow: 'hidden' }}>
                 <View style={{ width: `${(progress / 90) * 100}%`, height: 8, borderRadius: 4, backgroundColor: theme.tint }} />
@@ -333,13 +355,13 @@ export default function HomeScreen() {
 
         {currentMode === "endo" && inFlare && (
           <View style={[styles.periodBanner, { backgroundColor: theme.endo + '15', borderColor: theme.endo }]}>
-             <Text style={[styles.bannerTitle, { color: theme.endo }]}>Endo Flare Active</Text>
+             <Text style={[styles.bannerTitle, { color: theme.endo }]}>flare mode is on 💜</Text>
              <Text style={{ marginTop: 8, color: theme.textSecondary }}>
-                 Day {getFlareDuration()} of active flare. Ensure you log your symptoms daily to generate accurate reports.
+                 day {getFlareDuration()} of this flare. Quick logs each day = way better reports for your doctor. You&apos;ve got this.
              </Text>
-             <TouchableOpacity style={[styles.bannerBtn, { backgroundColor: theme.endo, marginTop: 16 }]} onPress={() => router.push('/log')}>
-                 <Text style={styles.bannerBtnText}>Log Flare Details</Text>
-             </TouchableOpacity>
+             <InteractivePressable style={[styles.bannerBtn, { backgroundColor: theme.endo, marginTop: 16 }]} onPress={() => router.push('/log')} haptic="medium">
+                 <Text style={[styles.bannerBtnText, { color: theme.onAccent }]}>quick flare log</Text>
+             </InteractivePressable>
           </View>
         )}
 
@@ -352,48 +374,58 @@ export default function HomeScreen() {
             ]}
           >
             <Text style={[styles.bannerTitle, { color: theme.error }]}>
-              Day {getDayOfPeriod()} of your {cycleTerm}
+              day {getDayOfPeriod()} of your {cycleTerm} 🩸
+            </Text>
+            <Text style={{ marginTop: 6, color: theme.textSecondary }}>
+              be gentle with yourself today — rest counts as productive.
             </Text>
 
             <View style={{ flexDirection: "row", gap: 10, marginTop: 16 }}>
-              <TouchableOpacity
+              <InteractivePressable
                 style={[styles.bannerBtn, { backgroundColor: theme.error }]}
                 onPress={() => router.push("/log")}
+                haptic="medium"
               >
-                <Text style={styles.bannerBtnText}>Log {flowTerm.charAt(0).toUpperCase() + flowTerm.slice(1)} & Pain</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
+                <Text style={[styles.bannerBtnText, { color: theme.onAccent }]}>log {flowTerm} & pain</Text>
+              </InteractivePressable>
+              <InteractivePressable
                 style={[styles.bannerBtnOutline, { borderColor: theme.error }]}
                 onPress={handleEndPeriod}
+                haptic="heavy"
               >
                 <Text style={[styles.bannerBtnText, { color: theme.error }]}>
-                  Period Ended
+                  it&apos;s over 🎉
                 </Text>
-              </TouchableOpacity>
+              </InteractivePressable>
             </View>
           </View>
         ) : (
-          <TouchableOpacity
+          <InteractivePressable
             style={[styles.startPeriodBtn, { backgroundColor: theme.error }]}
             onPress={handleStartPeriod}
-            activeOpacity={0.8}
+            haptic="heavy"
           >
-            <Text style={styles.startPeriodText}>🩸 Log period start</Text>
-          </TouchableOpacity>
+            <Text style={[styles.startPeriodText, { color: theme.onAccent }]}>🩸 my period started</Text>
+          </InteractivePressable>
         )}
 
         {/* Cycle Overview */}
         <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-          <Text style={[styles.cardTitle, { color: theme.text }]}>Cycle Status</Text>
+          <Text style={[styles.cardTitle, { color: theme.text }]}>where you&apos;re at</Text>
           <View style={styles.circleContainer}>
-            <View style={[styles.cycleCircle, { borderColor: theme.tint }]}>
+            <Animated.View style={[styles.cycleCircle, { borderColor: theme.tint, transform: [{ scale: pulseAnim }] }]}>
               <Text style={[styles.dayText, { color: theme.tint }]}>Day {currentCycleDay}</Text>
-              <Text style={[styles.subDayText, { color: theme.textSecondary }]}>of approx. {cycleLength}</Text>
-              <Text style={{ color: theme.text, marginTop: 8, fontWeight: 'bold' }}>
-                {currentPhase.toUpperCase()} PHASE
-              </Text>
-            </View>
+              <Text style={[styles.subDayText, { color: theme.textSecondary }]}>of ~{cycleLength}</Text>
+            </Animated.View>
           </View>
+          <View style={[styles.phaseChip, { backgroundColor: theme.tintSoft }]}>
+            <Text style={[styles.phaseChipText, { color: theme.onTintSoft }]}>
+              {PHASE_COPY[currentPhase]?.name ?? currentPhase} · {PHASE_COPY[currentPhase]?.vibe ?? ""}
+            </Text>
+          </View>
+          {PHASE_COPY[currentPhase] && (
+            <Text style={[styles.phaseHint, { color: theme.textSecondary }]}>{PHASE_COPY[currentPhase].hint}</Text>
+          )}
         </View>
 
         {/* Next Period Prediction Card */}
@@ -401,7 +433,7 @@ export default function HomeScreen() {
           <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.tint, borderWidth: 2, alignItems: 'flex-start' }]}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }}>
               <Text style={{ fontSize: 22 }}>🔮</Text>
-              <Text style={[styles.cardTitle, { color: theme.text, marginBottom: 0 }]}>Next {cycleTerm.charAt(0).toUpperCase() + cycleTerm.slice(1)} Prediction</Text>
+              <Text style={[styles.cardTitle, { color: theme.text, marginBottom: 0 }]}>next {cycleTerm}, probably</Text>
             </View>
 
             {predictionStats.predictedStartISO && (
@@ -412,14 +444,14 @@ export default function HomeScreen() {
 
             {predictionStats.windowStartISO && predictionStats.windowEndISO && (
               <Text style={{ color: theme.textSecondary, fontSize: 15, marginBottom: 12 }}>
-                Window: {format(parseISO(predictionStats.windowStartISO), 'MMM d')} – {format(parseISO(predictionStats.windowEndISO), 'MMM d')}
+                likely between {format(parseISO(predictionStats.windowStartISO), 'MMM d')} – {format(parseISO(predictionStats.windowEndISO), 'MMM d')}
               </Text>
             )}
 
             {/* Confidence bar */}
             <View style={{ width: '100%', marginBottom: 8 }}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
-                <Text style={{ color: theme.textSecondary, fontSize: 13 }}>Confidence</Text>
+                <Text style={{ color: theme.textSecondary, fontSize: 13 }}>how sure we are</Text>
                 <Text style={{ color: theme.tint, fontWeight: 'bold', fontSize: 13 }}>
                   {Math.round(predictionStats.confidence * 100)}%
                 </Text>
@@ -431,13 +463,13 @@ export default function HomeScreen() {
 
             {predictionStats.mae !== null && (
               <Text style={{ color: theme.textSecondary, fontSize: 13, marginTop: 4 }}>
-                Historical accuracy: ±{predictionStats.mae} days
+                past guesses were off by ~{predictionStats.mae} days on average
               </Text>
             )}
 
             {predictionStats.outlierFlagged && (
               <Text style={{ color: theme.error, fontSize: 13, marginTop: 6 }}>
-                ⚠️ Last cycle was unusually long — window is wider than normal.
+                heads up: your last cycle ran long, so the window&apos;s a bit wider this time.
               </Text>
             )}
 
@@ -445,8 +477,8 @@ export default function HomeScreen() {
               <View style={[styles.predictionNote, { backgroundColor: theme.tint + "12", borderColor: theme.tint }]}>
                 <Text style={{ color: theme.text, fontSize: 13, lineHeight: 19 }}>
                   {currentMode === "pcos"
-                    ? "PCOS can make cycle timing vary. This wider window is expected, and CycleIQ will narrow it as your pattern builds."
-                    : "Your cycles vary, so this wider window is normal. CycleIQ will narrow it as your pattern builds."}
+                    ? "PCOS keeps timing unpredictable, so a wide window is totally expected. It narrows as we learn your pattern 💚"
+                    : "Your cycles vary, so a wider window is normal. It narrows as we learn your pattern."}
                 </Text>
               </View>
             )}
@@ -458,20 +490,20 @@ export default function HomeScreen() {
                 activeOpacity={0.7}
               >
                 <Text style={{ color: theme.text, fontSize: 13, lineHeight: 19 }}>
-                  Last prediction was {Math.abs(lastMissErrorDays)}d {lastMissErrorDays > 0 ? "early" : "late"} — {"we're learning your pattern. Tap to dismiss."}
+                  our last guess was {Math.abs(lastMissErrorDays)}d {lastMissErrorDays > 0 ? "early" : "late"} — {"we're learning, promise 🫡 (tap to hide)"}
                 </Text>
               </TouchableOpacity>
             )}
 
             <Text style={{ color: theme.textSecondary, fontSize: 11, marginTop: 10 }}>
-              {predictionStats.label} · Not medical advice
+              {predictionStats.label} · not medical advice
             </Text>
           </View>
         ) : predictionStats?.model === "none" ? (
           <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border, alignItems: 'flex-start' }]}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
               <Text style={{ fontSize: 22 }}>🔮</Text>
-              <Text style={[styles.cardTitle, { color: theme.text, marginBottom: 0 }]}>Predictions</Text>
+              <Text style={[styles.cardTitle, { color: theme.text, marginBottom: 0 }]}>predictions</Text>
             </View>
             <Text style={{ color: theme.textSecondary }}>{predictionStats.label}</Text>
           </View>
@@ -482,61 +514,54 @@ export default function HomeScreen() {
           <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.error, borderWidth: 2 }]}>
             <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8, gap: 8 }}>
               <IconSymbol name="heart.fill" size={20} color={theme.error} />
-              <Text style={[styles.cardTitle, { color: theme.error, flex: 1 }]}>Pain Management</Text>
+              <Text style={[styles.cardTitle, { color: theme.error, flex: 1 }]}>cramp care 🔥</Text>
             </View>
-            <Text style={{ color: theme.text, marginBottom: 12 }}>Applying heat therapy directly to your lower abdomen or lower back can significantly reduce muscle tension and cramping.</Text>
-            <TouchableOpacity onPress={() => router.push('/(tabs)/education' as any)} style={[styles.bannerBtn, { backgroundColor: theme.error }]}>
-              <Text style={styles.bannerBtnText}>View Protocols</Text>
-            </TouchableOpacity>
+            <Text style={{ color: theme.text, marginBottom: 12 }}>A heat pad on your lower belly or back for ~20 mins can really take the edge off cramps.</Text>
+            <InteractivePressable onPress={() => router.push('/(tabs)/education')} style={[styles.bannerBtn, { backgroundColor: theme.error }]} haptic="light">
+              <Text style={[styles.bannerBtnText, { color: theme.onAccent }]}>more comfort tips</Text>
+            </InteractivePressable>
           </View>
         )}
 
         {latestInsight && (
           <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.tint, borderWidth: 1 }]}>
-            <Text style={[styles.cardTitle, { color: theme.text }]}>Latest Insight</Text>
+            <Text style={[styles.cardTitle, { color: theme.text }]}>new pattern unlocked 👀</Text>
             <Text style={{ color: theme.textSecondary, fontWeight: 'bold', marginBottom: 4 }}>{latestInsight.title}</Text>
             <Text style={{ color: theme.text, marginBottom: 12 }}>{latestInsight.description}</Text>
-            <TouchableOpacity onPress={() => router.push('/analytics' as any)} style={[styles.bannerBtnOutline, { borderColor: theme.tint }]}>
-              <Text style={[styles.bannerBtnText, { color: theme.tint }]}>Explore Analytics</Text>
-            </TouchableOpacity>
+            <InteractivePressable onPress={() => router.push('/analytics')} style={[styles.bannerBtnOutline, { borderColor: theme.tint }]} haptic="light">
+              <Text style={[styles.bannerBtnText, { color: theme.tint }]}>see all insights</Text>
+            </InteractivePressable>
           </View>
         )}
 
         {/* Quick actions */}
         <View style={styles.quickActions}>
-          {[
-            { label: "Log today", icon: "✏️", route: "/log" },
-            { label: "Calendar", icon: "📅", route: "/calendar" },
-            { label: "Insights", icon: "📊", route: "/analytics" },
-          ].map((action) => (
-            <TouchableOpacity
+          {([
+            { label: "calendar", icon: "📅", route: "/calendar" },
+            { label: "insights", icon: "📊", route: "/analytics" },
+            { label: "history", icon: "🗂️", route: "/history" },
+          ] as const).map((action) => (
+            <InteractivePressable
               key={action.route}
               style={[styles.quickAction, { backgroundColor: theme.surface, borderColor: theme.border }]}
-              onPress={() => router.push(action.route as any)}
-              activeOpacity={0.7}
+              onPress={() => router.push(action.route)}
+              haptic="selection"
             >
               <Text style={styles.quickIcon}>{action.icon}</Text>
               <Text style={[styles.quickLabel, { color: theme.text }]}>{action.label}</Text>
-            </TouchableOpacity>
+            </InteractivePressable>
           ))}
         </View>
 
         {/* Quick Log Action */}
-        <TouchableOpacity
+        <InteractivePressable
           style={[styles.logButton, { backgroundColor: theme.tint }]}
           onPress={() => router.push("/log")}
+          haptic="medium"
         >
-          <Text style={styles.logButtonText}>+ Log Today&apos;s Data</Text>
-        </TouchableOpacity>
+          <Text style={[styles.logButtonText, { color: theme.onTint }]}>✏️ log today</Text>
+        </InteractivePressable>
 
-        <TouchableOpacity
-          style={[styles.secondaryButton, { borderColor: theme.tint }]}
-          onPress={() => router.push("/history")}
-        >
-          <Text style={[styles.secondaryText, { color: theme.tint }]}>
-            View Cycle History
-          </Text>
-        </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
   );
@@ -546,70 +571,59 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   scrollContent: { padding: 20, paddingBottom: 40 },
   header: { marginBottom: 24, paddingVertical: 10 },
-  greeting: { fontSize: 16, marginBottom: 4 },
-  title: { fontSize: 32, fontWeight: "bold", marginBottom: 12 },
+  greeting: { fontSize: 13, fontWeight: "800", textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 4 },
+  title: { fontSize: 32, fontWeight: "800", letterSpacing: -0.6, marginBottom: 12 },
   badge: {
     alignSelf: "flex-start",
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 12,
+    borderRadius: Radius.pill,
   },
-  badgeText: { fontSize: 12, fontWeight: "bold", color: "#2A2422" },
+  badgeText: { fontSize: 13, fontWeight: "800" },
+  phaseChip: { alignSelf: "center", paddingHorizontal: 14, paddingVertical: 8, borderRadius: Radius.pill },
+  phaseChipText: { fontSize: 14, fontWeight: "800" },
+  phaseHint: { fontSize: 14, lineHeight: 20, textAlign: "center", marginTop: 10, paddingHorizontal: 8 },
   periodBanner: {
     padding: 20,
-    borderRadius: 16,
-    borderWidth: 2,
-    marginBottom: 24,
+    borderRadius: Radius.lg,
+    borderWidth: 1.5,
+    marginBottom: 20,
   },
-  bannerTitle: { fontSize: 20, fontWeight: "bold" },
+  bannerTitle: { fontSize: 20, fontWeight: "800" },
   bannerBtn: {
     flex: 1,
-    paddingVertical: 12,
-    borderRadius: 12,
+    paddingVertical: 13,
+    borderRadius: Radius.pill,
     alignItems: "center",
   },
   bannerBtnOutline: {
     flex: 1,
-    paddingVertical: 12,
-    borderRadius: 12,
-    borderWidth: 2,
+    paddingVertical: 13,
+    borderRadius: Radius.pill,
+    borderWidth: 1.5,
     alignItems: "center",
-    backgroundColor: "#FFF",
+    backgroundColor: "transparent",
   },
-  bannerBtnText: { color: "#FFF", fontWeight: "bold", fontSize: 14 },
+  bannerBtnText: { fontWeight: "800", fontSize: 14 },
   startPeriodBtn: {
-    padding: 20,
-    borderRadius: 16,
-    marginBottom: 24,
+    paddingVertical: 18,
+    borderRadius: Radius.pill,
+    marginBottom: 20,
     alignItems: "center",
-    elevation: 2,
-    shadowColor: "#000",
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 2 },
+    ...Shadow,
   },
-  startPeriodText: { color: "#FFF", fontSize: 18, fontWeight: "bold" },
-  secondaryButton: {
-    padding: 14,
-    borderRadius: 14,
-    borderWidth: 1,
-    alignItems: "center",
-    marginTop: 12,
-  },
-  secondaryText: {
-    fontSize: 16,
-    fontWeight: "bold",
-  },
+  startPeriodText: { fontSize: 17, fontWeight: "800" },
   card: {
-    padding: 24,
-    borderRadius: 20,
-    borderWidth: 1,
-    marginBottom: 24,
+    padding: 22,
+    borderRadius: Radius.lg,
+    borderWidth: 0,
+    marginBottom: 20,
     alignItems: "center",
+    ...Shadow,
   },
   cardTitle: {
-    fontSize: 20,
-    fontWeight: "600",
+    fontSize: 19,
+    fontWeight: "800",
     marginBottom: 16,
     width: "100%",
   },
@@ -626,19 +640,19 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  dayText: { fontSize: 40, fontWeight: "bold" },
+  dayText: { fontSize: 40, fontWeight: "800", letterSpacing: -1 },
   subDayText: { fontSize: 16, marginTop: 4 },
-  logButton: { padding: 18, borderRadius: 16, alignItems: "center" },
-  logButtonText: { color: "#FFF", fontSize: 18, fontWeight: "bold" },
+  logButton: { paddingVertical: 18, borderRadius: Radius.pill, alignItems: "center", ...Shadow },
+  logButtonText: { fontSize: 17, fontWeight: "800" },
   emptyState: { flex: 1, justifyContent: "center", alignItems: "center", padding: 36, gap: 16 },
   emptyIcon: { fontSize: 64 },
-  emptyTitle: { fontSize: 28, fontWeight: "bold", textAlign: "center" },
+  emptyTitle: { fontSize: 28, fontWeight: "800", textAlign: "center" },
   emptyDesc: { fontSize: 16, textAlign: "center", lineHeight: 24 },
-  emptyCTA: { width: "100%", padding: 20, borderRadius: 16, alignItems: "center", marginTop: 8 },
-  emptyCTAText: { color: "#FFF", fontSize: 18, fontWeight: "bold" },
-  emptySecondary: { width: "100%", padding: 14, borderRadius: 14, borderWidth: 1, alignItems: "center" },
+  emptyCTA: { width: "100%", paddingVertical: 18, borderRadius: Radius.pill, alignItems: "center", marginTop: 8, ...Shadow },
+  emptyCTAText: { fontSize: 17, fontWeight: "800" },
+  emptySecondary: { width: "100%", padding: 14, borderRadius: Radius.pill, borderWidth: 1.5, alignItems: "center" },
   emptySecondaryText: { fontSize: 15 },
-  profileBanner: { flexDirection: "row", alignItems: "center", padding: 14, borderRadius: 14, borderWidth: 1, marginBottom: 20 },
+  profileBanner: { flexDirection: "row", alignItems: "center", padding: 14, borderRadius: Radius.md, borderWidth: 1.5, marginBottom: 20 },
   profileBannerTitle: { fontSize: 15, fontWeight: "700", marginBottom: 2 },
   profileBannerDesc: { fontSize: 13, lineHeight: 18 },
   profileBannerArrow: { fontSize: 20, fontWeight: "bold", paddingLeft: 8 },
@@ -649,11 +663,12 @@ const styles = StyleSheet.create({
   quickActions: { flexDirection: "row", gap: 10, marginBottom: 20 },
   quickAction: {
     flex: 1,
-    padding: 14,
-    borderRadius: 14,
-    borderWidth: 1,
+    paddingVertical: 14,
+    borderRadius: Radius.md,
+    borderWidth: 0,
     alignItems: "center",
     gap: 6,
+    ...Shadow,
   },
   quickIcon: { fontSize: 22 },
   quickLabel: { fontSize: 12, fontWeight: "700", textAlign: "center" },

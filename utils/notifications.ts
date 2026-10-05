@@ -1,7 +1,7 @@
 import { NotificationPrefs, useAppStore } from "@/store";
 import { addDays, format } from "date-fns";
 import Constants from "expo-constants";
-import type { PredictionResult } from "./predictions";
+import { LUTEAL_PHASE_DAYS, type PredictionResult } from "./predictions";
 
 const isExpoGo = Constants.executionEnvironment === "storeClient";
 
@@ -120,7 +120,7 @@ export const schedulePeriodReminder = async (predictedStartDate: Date, enabled: 
   if (isExpoGo) return;
   await cancelId("period-reminder");
   if (!enabled) return;
-  await scheduleAt("period-reminder", "Period due soon 🩸", "Your next period is predicted to start in ~2 days. Stay prepared!", addDays(predictedStartDate, -2));
+  await scheduleAt("period-reminder", "period incoming 🩸", "Heads up — your period's likely in ~2 days. Pads/cups/heat pad on standby?", addDays(predictedStartDate, -2));
 };
 
 export const scheduleDailyLogReminder = async (enabled: boolean, hourOfDay = 20) => {
@@ -131,7 +131,7 @@ export const scheduleDailyLogReminder = async (enabled: boolean, hourOfDay = 20)
     const N = await getNotifications();
     await N.scheduleNotificationAsync({
       identifier: "daily-log",
-      content: { title: "Daily check-in 📋", body: "30 seconds to log today's symptoms — your future self will thank you 💕" },
+      content: { title: "daily check-in ✨", body: "30 secs to log how today went — future-you will thank you 💕" },
       trigger: { type: N.SchedulableTriggerInputTypes.DAILY, hour: safeHour(hourOfDay), minute: 0 },
     });
   } catch { /* non-fatal */ }
@@ -178,7 +178,7 @@ export const scheduleInsightNotification = async (insightTitle: string, enabled:
     const N = await getNotifications();
     await N.scheduleNotificationAsync({
       identifier: `insight-${Date.now()}`,
-      content: { title: "✨ New pattern spotted!", body: `We noticed: "${insightTitle}". Tap to explore.` },
+      content: { title: "ooh, new pattern spotted 👀", body: `We noticed something: "${insightTitle}". Tap to see the tea ☕` },
       trigger: { type: N.SchedulableTriggerInputTypes.DATE, date: new Date(Date.now() + 5000) },
     });
   } catch { /* non-fatal */ }
@@ -188,50 +188,50 @@ export const scheduleOvulationReminder = async (cycleStartDate: Date, cycleLengt
   if (isExpoGo) return;
   await cancelId("ovulation-window");
   if (!enabled) return;
-  const ovulationDate = addDays(cycleStartDate, cycleLength - 14 - 1);
-  await scheduleAt("ovulation-window", "Ovulation window approaching 🌸", `Predicted ovulation around ${format(ovulationDate, "MMM d")}. Your energy is about to peak!`, addDays(ovulationDate, -1));
+  const ovulationDate = addDays(cycleStartDate, cycleLength - LUTEAL_PHASE_DAYS - 1);
+  await scheduleAt("ovulation-window", "ovulation szn approaching 🌸", `Predicted ovulation around ${format(ovulationDate, "MMM d")}. Energy might be about to peak ✨`, addDays(ovulationDate, -1));
 };
 
 export const scheduleFlareWarning = async (predictedFlareDate: Date, confidence: number, enabled: boolean) => {
   if (isExpoGo) return;
   await cancelId("flare-warning");
   if (!enabled || confidence < 0.7) return;
-  await scheduleAt("flare-warning", "Possible flare approaching 💜", `A flare may be coming around ${format(predictedFlareDate, "MMM d")}. Be gentle with yourself 🫶`, addDays(predictedFlareDate, -1));
+  await scheduleAt("flare-warning", "flare might be coming 💜", `Possible flare around ${format(predictedFlareDate, "MMM d")}. Plan a soft day if you can 🫶`, addDays(predictedFlareDate, -1));
 };
 
 export const schedulePadReminder = async (predictedStartDate: Date, enabled: boolean) => {
   if (isExpoGo) return;
   await cancelId("pad-reminder");
   if (!enabled) return;
-  await scheduleAt("pad-reminder", "Time to stock up! 🛍️", "Your period is ~5 days away — grab your supplies before you need them 💕", addDays(predictedStartDate, -5));
+  await scheduleAt("pad-reminder", "restock check 🛍️", "Period's ~5 days out — future-you will appreciate the supplies run 💅", addDays(predictedStartDate, -5));
 };
 
 export const scheduleHydrationNudge = async (predictedStartDate: Date, enabled: boolean) => {
   if (isExpoGo) return;
   await cancelId("hydration-nudge");
   if (!enabled) return;
-  await scheduleAt("hydration-nudge", "Drink up 💧", "Your period is ~3 days away. Staying hydrated now can reduce bloating & cramps 🌊", addDays(predictedStartDate, -3));
+  await scheduleAt("hydration-nudge", "water check 💧", "Period in ~3 days. Staying hydrated may help with bloating & cramps 🌊", addDays(predictedStartDate, -3));
 };
 
 export const scheduleAntiInflammatoryReminder = async (predictedStartDate: Date, enabled: boolean) => {
   if (isExpoGo) return;
   await cancelId("anti-inflam-food");
   if (!enabled) return;
-  await scheduleAt("anti-inflam-food", "Eat to beat cramps 🥑", "Period in ~2 days! Load up on anti-inflammatory foods: salmon, walnuts, leafy greens, berries 🍫", addDays(predictedStartDate, -2), 12);
+  await scheduleAt("anti-inflam-food", "cramp-fighting snacks 🥑", "Period in ~2 days. Salmon, walnuts, leafy greens & berries may help calm inflammation 🍫", addDays(predictedStartDate, -2), 12);
 };
 
 export const scheduleHeatPadReminder = async (predictedStartDate: Date, enabled: boolean) => {
   if (isExpoGo) return;
   await cancelId("heat-pad");
   if (!enabled) return;
-  await scheduleAt("heat-pad", "Heat pad time 🔥", "Your period may be starting today! Grab your heat pad — 20 mins can ease cramps 💪", predictedStartDate, 8);
+  await scheduleAt("heat-pad", "heat pad era 🔥", "Period might start today. 20 mins of heat can take the edge off cramps 🤍", predictedStartDate, 8);
 };
 
 export const scheduleMoodCheckIn = async (cycleStartDate: Date, cycleLength: number, enabled: boolean) => {
   if (isExpoGo) return;
   await cancelId("mood-checkin");
   if (!enabled) return;
-  await scheduleAt("mood-checkin", "How are you feeling? 💭", "You're in your luteal phase — mood dips are normal. Log how you're feeling 🫶", addDays(cycleStartDate, cycleLength - 7), 18);
+  await scheduleAt("mood-checkin", "vibe check 💭", "Luteal phase mood dips are real and valid. Wanna log how you're feeling? 🫶", addDays(cycleStartDate, cycleLength - 7), 18);
 };
 
 export const schedulePeriodDayNotifications = async (periodStartDate: Date, enabled: boolean) => {
@@ -239,16 +239,16 @@ export const schedulePeriodDayNotifications = async (periodStartDate: Date, enab
   await Promise.all(PERIOD_DAY_IDS.map(cancelId));
   if (!enabled) return;
   const d = (n: number) => addDays(periodStartDate, n);
-  await scheduleAt("pd1-am", "Day 1 🩸 You've got this", "Grab your heat pad 🔥, take ibuprofen if needed & sip warm ginger tea. Be gentle with yourself 🤍", d(0), 8);
-  await scheduleAt("pd1-pm", "Evening comfort ritual 🛁", "A warm bath with Epsom salts can relax your muscles tonight 💕", d(0), 19);
-  await scheduleAt("pd2-am", "Fuel up 🥩", "Day 2 — eat iron-rich foods & pair with OJ to absorb 3x more iron 🍊", d(1), 9);
-  await scheduleAt("pd2-pm", "Magnesium magic ✨", "Snack on dark chocolate, almonds or avocado — magnesium relaxes uterine muscles 🍫", d(1), 20);
-  await scheduleAt("pd3-am", "Hydrate & energise 💧", "Day 3 — drink 8+ glasses of water to reduce bloating 🌴", d(2), 9);
-  await scheduleAt("pd3-pm", "Iron top-up 🌿", "Pumpkin seeds, dark chocolate & fortified cereals — halfway through, you're crushing it 💪", d(2), 18);
-  await scheduleAt("pd4-am", "Gentle movement 🧘‍♀️", "Light yoga or a short walk can boost your mood & reduce lingering cramps 🌸", d(3), 9);
-  await scheduleAt("pd4-pm", "Treat yourself 🍿", "Tonight is for your fave comfort food, a feel-good movie, or a face mask 💖", d(3), 19);
-  await scheduleAt("pd5-am", "Almost done! 🌟", "Day 5 — keep eating iron-rich foods & stay hydrated ✨", d(4), 9);
-  await scheduleAt("pd5-pm", "You did it! 🎉", "Last day! Celebrate with something you love tonight 💕", d(4), 19);
+  await scheduleAt("pd1-am", "day 1 — you got this 🩸", "Heat pad on, pain relief if you need it, warm ginger tea. Go easy on yourself today 🤍", d(0), 8);
+  await scheduleAt("pd1-pm", "cozy mode 🛁", "Warm bath tonight? Epsom salts can help those muscles chill out 💕", d(0), 19);
+  await scheduleAt("pd2-am", "fuel up 🍊", "Day 2 — iron-rich food + something with vitamin C (like OJ) helps your body absorb the iron 💪", d(1), 9);
+  await scheduleAt("pd2-pm", "magnesium moment ✨", "Dark chocolate, almonds or avocado — magnesium may help cramps. Science-approved snacking 🍫", d(1), 20);
+  await scheduleAt("pd3-am", "hydrate check 💧", "Day 3 — keep the water coming, it can help with bloating 🌴", d(2), 9);
+  await scheduleAt("pd3-pm", "halfway there 🌿", "Pumpkin seeds or fortified cereal for an iron top-up. You're doing amazing 💪", d(2), 18);
+  await scheduleAt("pd4-am", "gentle movement? 🧘", "A slow walk or light yoga can lift your mood & ease leftover cramps — only if you feel like it 🌸", d(3), 9);
+  await scheduleAt("pd4-pm", "treat yourself 🍿", "Comfort food, fave show, face mask. This is self-care, not being lazy 💖", d(3), 19);
+  await scheduleAt("pd5-am", "almost done 🌟", "Day 5 — keep the iron & water going ✨", d(4), 9);
+  await scheduleAt("pd5-pm", "you did it 🎉", "Period (probably) wrapping up. Celebrate with something you love tonight 💕", d(4), 19);
 };
 
 export const scheduleEndoNotifications = async (prediction: PredictionResult, enabled: boolean) => {
@@ -258,24 +258,24 @@ export const scheduleEndoNotifications = async (prediction: PredictionResult, en
   const base = prediction.predictedStartISO ? new Date(prediction.predictedStartISO) : new Date();
   const d = (n: number) => addDays(base, n);
   const cycleLength = prediction.mean;
-  await scheduleAt("endo-pre3", "Endo prep: 3 days to go 💜", "Start anti-inflammatory protocol: turmeric, ginger, omega-3s, leafy greens 🌿", d(-3), 9);
-  await scheduleAt("endo-pre1", "Stock comfort kit 🧸", "Period tomorrow! Heat pad 🔥, TENS, pain meds, comfy clothes & snacks ready? 💜", d(-1), 10);
-  await scheduleAt("endo-d1-am", "Endo Day 1 💜 Pain first-aid", "Take pain meds BEFORE cramps peak. Heat pad on abdomen + lower back 🤍", d(0), 8);
-  await scheduleAt("endo-d1-pm", "Evening: bowel care 🌿", "Stay hydrated, avoid dairy & gluten if triggers. Warm peppermint tea can ease bloating 🍵", d(0), 19);
-  await scheduleAt("endo-d2-am", "Pace yourself 🛌", "Day 2 is often hardest. Rest is medicine. Log your pain score 📊", d(1), 9);
-  await scheduleAt("endo-d2-pm", "Anti-inflam dinner 🥑", "Try salmon, sweet potato & steamed greens. Avoid alcohol & processed sugar 🚫", d(1), 18);
-  await scheduleAt("endo-d3-am", "Bladder care 💧", "Drink plenty of water, avoid caffeine & try a warm compress 🌿", d(2), 9);
-  await scheduleAt("endo-d3-pm", "Gentle stretch 🧘‍♀️", "Child's pose or supine twist can release pelvic tension 🌸", d(2), 19);
-  await scheduleAt("endo-d4-am", "Energy returning? ✨", "Keep up iron-rich foods: lentils, spinach, tofu & pumpkin seeds 💪", d(3), 9);
-  await scheduleAt("endo-d4-pm", "Emotional check-in 💭", "Endo is exhausting physically AND emotionally. Log your mood tonight 🫶", d(3), 20);
-  await scheduleAt("endo-d5-am", "Almost through it 🌟", "Keep hydrating & eating well. Note anything new for your doctor 📝", d(4), 9);
-  await scheduleAt("endo-d5-pm", "You are so strong 💜", "You made it through another endo period. Rest tonight 🌸", d(4), 19);
-  await scheduleAt("endo-post1", "Recovery day 🌿", "Endo fatigue can linger. Ease back slowly. Prioritise sleep 💤", d(6), 9);
-  await scheduleAt("endo-post3", "Reintroduce gently 🧘‍♀️", "Try a gentle walk or restorative yoga today 🌸", d(8), 9);
-  const ovDay = prediction.ovulationPainDay ?? cycleLength - 14;
-  await scheduleAt("endo-mid", "Ovulation pain heads-up 💜", `Cycle day ${ovDay}: mittelschmerz possible. Heat pad ready 🌸`, d(ovDay - 2), 9);
+  await scheduleAt("endo-pre3", "endo prep: 3 days out 💜", "Anti-inflammatory foods may help — turmeric, ginger, omega-3s, leafy greens 🌿", d(-3), 9);
+  await scheduleAt("endo-pre1", "comfort kit check 🧸", "Period likely tomorrow. Heat pad, TENS, meds, comfy fits & snacks — all set? 💜", d(-1), 10);
+  await scheduleAt("endo-d1-am", "endo day 1 💜 pain plan", "Taking pain relief before cramps peak tends to work better. Heat on belly + lower back 🤍", d(0), 8);
+  await scheduleAt("endo-d1-pm", "tummy care 🍵", "Warm peppermint tea may ease bloating. Skip any foods you know set you off 🌿", d(0), 19);
+  await scheduleAt("endo-d2-am", "pace yourself 🛌", "Day 2 is often the hardest. Rest is medicine, not a weakness. Log your pain when you can 📊", d(1), 9);
+  await scheduleAt("endo-d2-pm", "anti-inflam dinner 🥑", "Salmon, sweet potato & greens are great picks. Maybe skip alcohol & sugary stuff tonight 🫶", d(1), 18);
+  await scheduleAt("endo-d3-am", "bladder care 💧", "Lots of water, go easy on caffeine, and a warm compress can help 🌿", d(2), 9);
+  await scheduleAt("endo-d3-pm", "gentle stretch 🧘", "Child's pose or a supine twist can release pelvic tension. 5 mins counts 🌸", d(2), 19);
+  await scheduleAt("endo-d4-am", "energy coming back? ✨", "Keep the iron going: lentils, spinach, tofu, pumpkin seeds 💪", d(3), 9);
+  await scheduleAt("endo-d4-pm", "feelings check 💭", "Endo is exhausting physically AND emotionally. How are you really doing? 🫶", d(3), 20);
+  await scheduleAt("endo-d5-am", "almost through 🌟", "Keep hydrating & eating well. Jot down anything new for your doctor 📝", d(4), 9);
+  await scheduleAt("endo-d5-pm", "you're so strong 💜", "Another endo period survived. Rest up tonight, you earned it 🌸", d(4), 19);
+  await scheduleAt("endo-post1", "recovery day 🌿", "Endo fatigue can hang around. Ease back in & protect your sleep 💤", d(6), 9);
+  await scheduleAt("endo-post3", "ease back in 🧘", "Gentle walk or restorative yoga today? Only if your body's into it 🌸", d(8), 9);
+  const ovDay = prediction.ovulationPainDay ?? cycleLength - LUTEAL_PHASE_DAYS;
+  await scheduleAt("endo-mid", "ovulation pain heads-up 💜", `Around cycle day ${ovDay} some people get mid-cycle pain. Keep the heat pad close 🌸`, d(ovDay - 2), 9);
   const flareDay = prediction.flareRiskWindowStart ?? cycleLength - 7;
-  await scheduleAt("endo-flare-pre", "Reduce triggers 🚫", `Pre-flare window day ${flareDay}. Cut stress/alcohol/inflammatory foods, prioritize sleep 💜`, d(flareDay), 10);
+  await scheduleAt("endo-flare-pre", "flare-risk window 💜", `You're near day ${flareDay}, when flares have shown up before. Extra sleep & low stress if you can 🫶`, d(flareDay), 10);
 };
 
 export const schedulePcosNotifications = async (prediction: PredictionResult, enabled: boolean) => {
@@ -285,21 +285,21 @@ export const schedulePcosNotifications = async (prediction: PredictionResult, en
   const base = new Date();
   const d = (n: number) => addDays(base, n);
   const cycleLength = prediction.mean;
-  if (prediction.pcosCyclePattern !== "regular") await scheduleAt("pcos-d35", "PCOS: 35 days no period 💚", "35 days since last period. Log symptoms daily to spot your pattern 📊", d(35));
-  await scheduleAt("pcos-d60", "60 days — checking in 💚", "Still no period after 60 days. Worth mentioning to your doctor if unusual 🫶", d(60), 10);
-  await scheduleAt("pcos-d90", "90 days — check in with your doctor 💬", "We recommend speaking with your healthcare provider 💜", d(90), 9);
-  if (prediction.widePredictionWindow) await scheduleAt("pcos-pred-wide", "Wide prediction window 📅", `Next period in ~${Math.round(prediction.stdDev * 2)}d window. Keep pads handy 💕`, addDays(base, prediction.lateArrivalP90 ?? 35));
-  await scheduleAt("pcos-insulin-d3", "Blood sugar & PCOS 🥑", "Eat protein + healthy fat with every meal — eggs, avocado, nuts & seeds 🌿", d(3), 9);
-  await scheduleAt("pcos-insulin-d7", "Low-GI eating 🍎", "Oats, lentils, berries, sweet potato help reduce insulin spikes ✨", d(7), 12);
-  await scheduleAt("pcos-supplement-am", "PCOS supplement check 💚", "Inositol, vitamin D & magnesium are most evidence-backed for PCOS 🌿", d(2), 8);
-  await scheduleAt("pcos-supplement-d14", "Spearmint tea 🌿", "2 cups of spearmint tea daily can reduce androgens in PCOS ✨", d(14), 19);
-  const ovWatchDay = prediction.predictedOvulationDay ?? Math.max(10, cycleLength - 18);
-  await scheduleAt("pcos-ovulation-watch", "Ovulation signs watch 🌸", `Day ${ovWatchDay}: watch egg-white mucus, temp rise, energy boost 📊`, d(ovWatchDay));
-  await scheduleAt("pcos-stress-pre", "Stress affects your cycle 🧘‍♀️", "High cortisol can delay ovulation. Try 10 mins of deep breathing today 💚", d(Math.max(7, cycleLength - 14)), 18);
-  await scheduleAt("pcos-skin-d5", "PCOS skin care 🧖‍♀️", "Post-period oestrogen is rising — great time for skincare! Log your skin today 📊", d(5), 9);
-  await scheduleAt("pcos-hair-d10", "Hair & androgen tip 💇‍♀️", "Androgens are lower now — good time for a scalp massage with rosemary oil 🌿", d(10), 19);
-  await scheduleAt("pcos-post-reset", "Hormone reset window ✨", "Period just ended — oestrogen rising. Best window for exercise & big tasks 🌊", d(6), 9);
-  await scheduleAt("pcos-log-nudge", "Log every day this week 📝", "Consistent logging is how we learn YOUR pattern. Even 30 seconds counts 💪", d(4), 20);
+  if (prediction.pcosCyclePattern !== "regular") await scheduleAt("pcos-d35", "day 35 check-in 💚", "35 days since your last period. Daily logs help us learn your pattern 📊", d(35));
+  await scheduleAt("pcos-d60", "60 days — checking in 💚", "Still no period after 60 days. Worth bringing up with your doctor if that's unusual for you 🫶", d(60), 10);
+  await scheduleAt("pcos-d90", "time for a doctor chat 💬", "It's been 90 days without a period — please check in with a healthcare provider. Your report in the app can help 💜", d(90), 9);
+  if (prediction.widePredictionWindow) await scheduleAt("pcos-pred-wide", "your cycle's keeping us guessing 🔮", `Next period could land anywhere in a ~${Math.round(prediction.stdDev * 2)}-day window. Keep supplies handy 💕`, addDays(base, prediction.lateArrivalP90 ?? 35));
+  await scheduleAt("pcos-insulin-d3", "blood sugar tip 🥑", "Protein + healthy fat with meals can help keep blood sugar steadier — eggs, avocado, nuts 🌿", d(3), 9);
+  await scheduleAt("pcos-insulin-d7", "low-GI snack ideas 🍎", "Oats, lentils, berries & sweet potato release energy slowly — fewer crashes ✨", d(7), 12);
+  await scheduleAt("pcos-supplement-am", "supplement check 💚", "Inositol has the most research for PCOS; vitamin D & magnesium may help too. Ask your doctor first 🌿", d(2), 8);
+  await scheduleAt("pcos-supplement-d14", "spearmint tea moment 🌿", "Small studies suggest spearmint tea may lower androgens a bit. Cozy + maybe helpful ✨", d(14), 19);
+  const ovWatchDay = prediction.predictedOvulationDay ?? Math.max(10, cycleLength - LUTEAL_PHASE_DAYS);
+  await scheduleAt("pcos-ovulation-watch", "ovulation signs watch 🌸", `Around day ${ovWatchDay}: look out for stretchy clear discharge, a temp bump or an energy boost 📊`, d(ovWatchDay));
+  await scheduleAt("pcos-stress-pre", "stress check 🧘", "Stress hormones can mess with ovulation. 10 mins of deep breathing today? 💚", d(Math.max(7, cycleLength - LUTEAL_PHASE_DAYS)), 18);
+  await scheduleAt("pcos-skin-d5", "skin check 🧖", "Post-period is a nice window for skincare. Log your skin today 📊", d(5), 9);
+  await scheduleAt("pcos-hair-d10", "scalp care tip 💇", "Some people like a scalp massage with rosemary oil for hair health. Optional self-care 🌿", d(10), 19);
+  await scheduleAt("pcos-post-reset", "main character window ✨", "Period just ended — energy often picks up now. Good time for workouts & big tasks 🌊", d(6), 9);
+  await scheduleAt("pcos-log-nudge", "log streak this week? 📝", "Daily logs are how we learn YOUR pattern. Even 30 seconds counts 💪", d(4), 20);
 };
 
 export const scheduleRedFlagNotification = async (prediction: PredictionResult, enabled: boolean) => {
@@ -309,19 +309,19 @@ export const scheduleRedFlagNotification = async (prediction: PredictionResult, 
   const daysSinceLast = prediction.daysSinceLastPeriod ?? 0;
   let title = "", body = "", daysFromNow = 0;
   if (prediction.amenorrheaFlag && daysSinceLast > 60) {
-    title = "🚨 Medical Check Recommended";
-    body = `No period for ${daysSinceLast} days. Please consult your healthcare provider 💜`;
+    title = "please check in with a doctor 💛";
+    body = `It's been ${daysSinceLast} days without a period. That's worth a proper check-up — you can share your CycleIQ report 💜`;
   } else if (prediction.widePredictionWindow && prediction.stdDev > 10) {
-    title = "⚠️ Very High Cycle Variability";
-    body = `Your prediction window is ${Math.round(prediction.stdDev * 2)}+ days wide. Consider discussing with your doctor.`;
+    title = "your cycles are all over the place 🌀";
+    body = `Your cycle length is varying a lot (${Math.round(prediction.stdDev * 2)}+ day window). Worth mentioning at your next doctor visit.`;
     daysFromNow = 1;
   } else if (prediction.regimeChangeDetected) {
-    title = "⚠️ Sudden Pattern Shift";
-    body = "Your cycle pattern has shifted significantly. Consider tracking triggers closely.";
+    title = "plot twist in your cycle 📈";
+    body = "Your recent cycles look different from before. Stress, sleep, meds & travel can all do this — keep logging 🫶";
     daysFromNow = 2;
   } else if (prediction.confidence < 0.4) {
-    title = "⚠️ Low Prediction Confidence";
-    body = `Confidence is only ${Math.round(prediction.confidence * 100)}%. Keep logging symptoms.`;
+    title = "still learning your cycle 🔮";
+    body = "Predictions get sharper with every period you log. Keep it up 💪";
     daysFromNow = 3;
   } else return;
   await scheduleAt("red-flag", title, body, new Date(Date.now() + daysFromNow * 86400000), 10);

@@ -1,10 +1,15 @@
-import { CyclePhase, getPhaseForDay } from "../database";
+import { isHeavyFlow } from "./safetyRules";
+import { getPhaseForDay, readExtendedSymptoms, type CyclePhase, type CycleRow, type RedFlagPromptLogRow, type SymptomEntryRow } from "../database";
+
+/** Escapes text for interpolation into the report HTML. */
+const esc = (value: unknown): string =>
+  String(value ?? "").replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[ch] as string);
 
 export const generateSpecialistReportHtml = (
-  cycles: any[],
-  entries: any[],
+  cycles: CycleRow[],
+  entries: SymptomEntryRow[],
   currentMode: string,
-  redFlagPromptLogs: any[] = []
+  redFlagPromptLogs: RedFlagPromptLogRow[] = []
 ): string => {
   let html = `
     <html>
@@ -25,7 +30,7 @@ export const generateSpecialistReportHtml = (
       <body>
         <h1>CycleIQ Specialist Report</h1>
         <p><strong>Generated on:</strong> ${new Date().toLocaleDateString()}</p>
-        <p><strong>Clinical Focus Mode:</strong> ${currentMode.toUpperCase()}</p>
+        <p><strong>Clinical Focus Mode:</strong> ${esc(currentMode.toUpperCase())}</p>
   `;
 
   // Basic Stats
@@ -39,7 +44,7 @@ export const generateSpecialistReportHtml = (
   // Condition Specific Analysis
   if (currentMode === "pcos") {
     html += `<h2>PCOS Irregularity & Metabolic Proxies</h2>`;
-    const cycleLengths = cycles.filter(c => c.cycle_length).map(c => c.cycle_length);
+    const cycleLengths = cycles.map(c => c.cycle_length).filter((l): l is number => typeof l === "number" && l > 0);
     const avgLength = cycleLengths.length ? Math.round(cycleLengths.reduce((a,b)=>a+b,0)/cycleLengths.length) : 0;
     const variance = cycleLengths.length > 1 ? cycleLengths.reduce((a,b)=>a+Math.pow(b-avgLength,2),0)/(cycleLengths.length-1) : 0;
     
@@ -65,19 +70,15 @@ export const generateSpecialistReportHtml = (
         
         let hasAcne = false;
         let hasCrav = false;
-        if (e.extended_symptoms) {
-            try {
-                const ext = typeof e.extended_symptoms === 'string' ? JSON.parse(e.extended_symptoms) : e.extended_symptoms;
-                if (ext.acne || ext.pcos?.acne?.severity > 0) { hasAcne = true; acneCount++; }
-                if (ext.cravings || ext.pcos?.cravings?.int > 0) { hasCrav = true; cravingCount++; }
-            } catch(err) {}
-        }
-        if (e.fatigue_score > 5) fatigueCount++;
+        const pcos = readExtendedSymptoms(e).pcos;
+        if ((pcos?.acne.severity ?? 0) > 0) { hasAcne = true; acneCount++; }
+        if ((pcos?.cravings.int ?? 0) > 0) { hasCrav = true; cravingCount++; }
+        if ((e.fatigue_score ?? 0) > 5) fatigueCount++;
         
         if (phases[phase]) {
            if (hasAcne) phases[phase].acne++;
            if (hasCrav) phases[phase].crav++;
-           if (e.fatigue_score > 5) phases[phase].fat++;
+           if ((e.fatigue_score ?? 0) > 5) phases[phase].fat++;
         }
     });
 
@@ -101,13 +102,13 @@ export const generateSpecialistReportHtml = (
     html += `<h2>Endometriosis Flare Calendar & Impairment</h2>`;
     
     let flareDays = 0, bedBound = 0, limited = 0;
-    const flareEvents: any[] = [];
+    const flareEvents: { date: string; pain: number | string; flow: string }[] = [];
     
     entries.forEach(e => {
       if (e.flare_start) {
         flareDays++;
-        if (e.pain_score >= 8) bedBound++;
-        else if (e.pain_score >= 5) limited++;
+        if ((e.pain_score ?? 0) >= 8) bedBound++;
+        else if ((e.pain_score ?? 0) >= 5) limited++;
         
         flareEvents.push({
            date: e.logged_date,
@@ -124,23 +125,24 @@ export const generateSpecialistReportHtml = (
 
     html += `<h3>Flare Detail Log</h3><table><tr><th>Date</th><th>Peak Pain (0-10)</th><th>Flow Intensity</th></tr>`;
     flareEvents.slice(0, 15).forEach(f => {
-       html += `<tr><td>${f.date.split("T")[0]}</td><td>${f.pain}</td><td>${f.flow}</td></tr>`;
+       html += `<tr><td>${f.date.split("T")[0]}</td><td>${f.pain}</td><td>${esc(f.flow)}</td></tr>`;
     });
     if (flareEvents.length === 0) html += `<tr><td colspan="3">No flares recorded.</td></tr>`;
     html += `</table>`;
 
     html += `<h3>Bowel, Bladder & Heavy Flow</h3><table><tr><th>Date</th><th>Bowel</th><th>Bladder</th><th>Flow & Clots</th></tr>`;
+    // Endo bowel/bladder symptoms are stored under extended_symptoms.endo.
     const complexSymptoms = entries.filter(e => {
-       const ext = e.extended_symptoms ? (typeof e.extended_symptoms === 'string' ? JSON.parse(e.extended_symptoms) : e.extended_symptoms) : {};
-       return ext.bowel || ext.bladder || e.flow_intensity === 'Heavy' || e.clots_size;
+       const endo = readExtendedSymptoms(e).endo;
+       return (endo?.bowel.length ?? 0) > 0 || (endo?.bladder.length ?? 0) > 0 || isHeavyFlow(e.flow_intensity) || e.clots_size;
     });
     complexSymptoms.slice(0, 15).forEach(e => {
-       const ext = e.extended_symptoms ? (typeof e.extended_symptoms === 'string' ? JSON.parse(e.extended_symptoms) : e.extended_symptoms) : {};
+       const endo = readExtendedSymptoms(e).endo;
        html += `<tr>
          <td>${e.logged_date.split("T")[0]}</td>
-         <td>${ext.bowel ? 'Yes' : '-'}</td>
-         <td>${ext.bladder ? 'Yes' : '-'}</td>
-         <td>${e.flow_intensity || '-'}${e.clots_size ? ` (Clots: ${e.clots_size})` : ''}</td>
+         <td>${endo?.bowel.length ? esc(endo.bowel.join(", ")) : '-'}</td>
+         <td>${endo?.bladder.length ? esc(endo.bladder.join(", ")) : '-'}</td>
+         <td>${esc(e.flow_intensity || '-')}${e.clots_size ? ` (Clots: ${esc(e.clots_size)})` : ''}</td>
        </tr>`;
     });
     if (complexSymptoms.length === 0) html += `<tr><td colspan="4">No complex symptoms recorded.</td></tr>`;
@@ -151,8 +153,8 @@ export const generateSpecialistReportHtml = (
        const trigger = String(log.trigger_type || "").replace(/_/g, " ");
        html += `<tr>
          <td>${String(log.logged_date || log.triggered_at).split("T")[0]}</td>
-         <td style="text-transform:capitalize">${trigger}</td>
-         <td><span class="highlight">${log.message}</span></td>
+         <td style="text-transform:capitalize">${esc(trigger)}</td>
+         <td><span class="highlight">${esc(log.message)}</span></td>
        </tr>`;
     });
     if (redFlagPromptLogs.length === 0) html += `<tr><td colspan="3">No red-flag prompts were shown during this report period.</td></tr>`;
@@ -160,7 +162,8 @@ export const generateSpecialistReportHtml = (
 
     html += `<h3>Pain Score Trajectory</h3><table><tr><th>Month</th><th>Avg Pain (0-10)</th></tr>`;
     const monthlyPain: Record<string, { sum: number, count: number }> = {};
-    entries.filter(e => e.pain_score !== null && e.pain_score !== undefined).forEach(e => {
+    entries.forEach(e => {
+       if (e.pain_score === null) return;
        const month = e.logged_date.substring(0, 7);
        if (!monthlyPain[month]) monthlyPain[month] = { sum: 0, count: 0 };
        monthlyPain[month].sum += e.pain_score;
@@ -182,7 +185,7 @@ export const generateSpecialistReportHtml = (
   for (let d = 1; d <= 35; d++) cdBuckets[d] = { pain: 0, mood: 0, energy: 0, count: 0 };
   entries.forEach(e => {
     if (!e.cycle_id) return;
-    const thisCycle = cycles.find((c: any) => c.id === e.cycle_id);
+    const thisCycle = cycles.find((c) => c.id === e.cycle_id);
     if (!thisCycle?.start_date) return;
     const cd = Math.floor((new Date(e.logged_date).getTime() - new Date(thisCycle.start_date).getTime()) / 86400000) + 1;
     if (cd >= 1 && cd <= 35) {
@@ -220,7 +223,7 @@ export const generateSpecialistReportHtml = (
   entries.slice(0, 30).forEach(e => {
     let phase = '—';
     if (e.cycle_id) {
-      const thisCycle = cycles.find((c: any) => c.id === e.cycle_id);
+      const thisCycle = cycles.find((c) => c.id === e.cycle_id);
       if (thisCycle?.start_date) {
         const cd = Math.floor((new Date(e.logged_date).getTime() - new Date(thisCycle.start_date).getTime()) / 86400000) + 1;
         phase = getPhaseForDay(cd, thisCycle.cycle_length || 28);

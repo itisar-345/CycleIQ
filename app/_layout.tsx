@@ -59,7 +59,7 @@ export default function RootLayout() {
     if (!mounted || !dbReady || !storeReady) return;
     const inOnboardingGroup = segments[0] === "onboarding";
     if (!isOnboarded && !inOnboardingGroup) {
-      router.replace("/onboarding/goal" as any);
+      router.replace("/onboarding/goal");
     } else if (isOnboarded && inOnboardingGroup) {
       router.replace("/(tabs)");
     }

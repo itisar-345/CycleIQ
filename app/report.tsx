@@ -6,11 +6,21 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { getAllCycles, getAllEntries, getRedFlagPromptLogs } from '@/database';
+import { getAllCycles, getAllEntries, getRedFlagPromptLogs, readExtendedSymptoms, type CycleRow, type RedFlagPromptLogRow, type SymptomEntryRow } from '@/database';
 import { generateSpecialistReportHtml } from '@/utils/reportGenerator';
 import * as Print from 'expo-print';
 import { format } from 'date-fns';
 import { savePdfToReports, shareReport } from '@/utils/localReports';
+
+interface ReportData {
+  cyclesCount: number;
+  avgLength: number;
+  entriesCount: number;
+  flares: number;
+  rawCycles: CycleRow[];
+  rawEntries: SymptomEntryRow[];
+  redFlagPromptLogs: RedFlagPromptLogRow[];
+}
 
 export default function ReportScreen() {
   const colorScheme = useColorScheme() ?? 'light';
@@ -18,7 +28,7 @@ export default function ReportScreen() {
   const { currentMode } = useAppStore();
   
   const [loading, setLoading] = useState(true);
-  const [data, setData] = useState<any>({
+  const [data, setData] = useState<ReportData>({
     cyclesCount: 0,
     avgLength: 0,
     entriesCount: 0,
@@ -43,16 +53,8 @@ export default function ReportScreen() {
         }
       });
       
-      let flares = 0;
-      entries.forEach(e => {
-        if (e.flare_start) flares++;
-        if (e.extended_symptoms) {
-          try {
-            const ext = JSON.parse(e.extended_symptoms);
-            if (ext.flare && ext.flare.start) flares++;
-          } catch {}
-        }
-      });
+      // A flare-day entry carries both flare_start and extended.flare — count it once.
+      const flares = entries.filter((e) => e.flare_start || readExtendedSymptoms(e).flare?.start).length;
       
       setData({
         cyclesCount: validCycles,
@@ -76,10 +78,10 @@ export default function ReportScreen() {
       const fileName = `CycleIQ_Report_${format(new Date(), 'yyyy-MM-dd_HHmm')}.pdf`;
       const permanentUri = await savePdfToReports(tempUri, fileName);
       const shared = await shareReport(permanentUri);
-      if (!shared) Alert.alert('Report saved', `PDF saved to: ${permanentUri}`);
+      if (!shared) Alert.alert('report saved 📄', `It's in Saved Reports.\n\n${permanentUri}`);
     } catch (e) {
       console.error('PDF generation failed', e);
-      Alert.alert('Error', 'Could not generate or share the report.');
+      Alert.alert('report didn\'t work 😕', 'Couldn\'t make or share the PDF — try again?');
     }
   };
 
@@ -89,33 +91,33 @@ export default function ReportScreen() {
         <TouchableOpacity onPress={() => router.back()} style={{ padding: 8 }}>
           <IconSymbol name="chevron.left" size={24} color={theme.tint} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: theme.text }]}>Specialist Report</Text>
+        <Text style={[styles.headerTitle, { color: theme.text }]}>doctor report 🩺</Text>
         <View style={{ width: 40 }} />
       </View>
       
       <ScrollView contentContainerStyle={styles.content}>
         {loading ? (
-          <Text style={{ color: theme.textSecondary, textAlign: 'center', marginTop: 40 }}>Generating report...</Text>
+          <Text style={{ color: theme.textSecondary, textAlign: 'center', marginTop: 40 }}>putting your report together…</Text>
         ) : (
           <View>
             <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-               <Text style={[styles.cardTitle, { color: theme.text }]}>Patient Summary</Text>
-               <Text style={[styles.text, { color: theme.textSecondary }]}>Mode: {currentMode.toUpperCase()} Focus</Text>
-               <Text style={[styles.text, { color: theme.textSecondary }]}>Total Cycles Logged: {data.cyclesCount}</Text>
-               <Text style={[styles.text, { color: theme.textSecondary }]}>Average Cycle Length: {data.avgLength} days</Text>
-               <Text style={[styles.text, { color: theme.textSecondary }]}>Total Daily Logs: {data.entriesCount}</Text>
+               <Text style={[styles.cardTitle, { color: theme.text }]}>the summary</Text>
+               <Text style={[styles.text, { color: theme.textSecondary }]}>mode: {currentMode === 'standard' ? 'cycle tracking' : currentMode.toUpperCase()}</Text>
+               <Text style={[styles.text, { color: theme.textSecondary }]}>cycles logged: {data.cyclesCount}</Text>
+               <Text style={[styles.text, { color: theme.textSecondary }]}>average cycle: {data.avgLength} days</Text>
+               <Text style={[styles.text, { color: theme.textSecondary }]}>daily logs: {data.entriesCount}</Text>
             </View>
             
             {(currentMode === 'endo' || currentMode === 'pcos') && (
               <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-                 <Text style={[styles.cardTitle, { color: theme.text }]}>Condition Tracking</Text>
-                 <Text style={[styles.text, { color: theme.textSecondary }]}>Documented Flares: {data.flares}</Text>
-                 <Text style={[styles.text, { color: theme.textSecondary, marginTop: 8 }]}>*This data is ready to be exported for physician review.*</Text>
+                 <Text style={[styles.cardTitle, { color: theme.text }]}>condition tracking</Text>
+                 <Text style={[styles.text, { color: theme.textSecondary }]}>flare days documented: {data.flares}</Text>
+                 <Text style={[styles.text, { color: theme.textSecondary, marginTop: 8 }]}>The PDF is written in proper doctor-speak so your appointment goes smoother 💪</Text>
               </View>
             )}
             
             <TouchableOpacity style={[styles.exportBtn, { backgroundColor: theme.tint }]} onPress={handleExport}>
-              <Text style={styles.exportText}>Export as PDF</Text>
+              <Text style={[styles.exportText, { color: theme.onTint }]}>export PDF for my doctor</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -133,5 +135,5 @@ const styles = StyleSheet.create({
   cardTitle: { fontSize: 16, fontWeight: 'bold', marginBottom: 12 },
   text: { fontSize: 14, marginBottom: 4 },
   exportBtn: { padding: 16, borderRadius: 12, alignItems: 'center', marginTop: 24 },
-  exportText: { color: '#fff', fontWeight: 'bold', fontSize: 16 }
+  exportText: { fontWeight: 'bold', fontSize: 16 }
 });

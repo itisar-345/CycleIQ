@@ -3,6 +3,8 @@
  */
 import { benjaminiHochberg, computeSpearman } from "../utils/statistics";
 
+import type { Tone } from "../store";
+import { txFor } from "../utils/tone";
 import { createLocalId, execSql, queryAll } from "./connection";
 import { parseJsonColumn, type CycleRow, type SymptomEntryRow } from "./types";
 
@@ -24,11 +26,34 @@ export interface CycleInsight {
   description: string;
   correlation?: number;
   n?: number;
+  /** Flare Onset Pattern only: average cycle day flares begin (used to schedule warnings). */
+  onsetDay?: number;
   /** True for mood/stress insights — triggers mental health disclaimer on card */
   isMentalHealth?: boolean;
 }
 
-export const generateInsights = async (mode: string = "standard"): Promise<CycleInsight[]> => {
+/** Classic-tone descriptions by insight title: [positive correlation, negative correlation]. */
+const CLASSIC_DESCRIPTIONS: Record<string, [string, string]> = {
+  "Sleep & Pain": ["More sleep tends to coincide with higher pain scores.", "Less sleep tends to coincide with higher pain scores."],
+  "Stress & Mood": ["Higher stress tends to coincide with higher mood scores.", "Higher stress tends to coincide with lower mood scores."],
+  "Sleep & Mood": ["More sleep tends to coincide with better mood.", "More sleep tends to coincide with lower mood."],
+  "Movement & Mood": ["More active days tend to be better-mood days.", "More active days tend to coincide with lower mood."],
+  "Movement & Energy": ["More exercise tends to coincide with higher energy.", "More exercise tends to coincide with lower energy."],
+  "Stress & Pain": ["Higher-stress days tend to have higher pain scores.", "Higher-stress days tend to have lower pain scores."],
+  "Stress & Bloating": ["Higher stress tends to coincide with more bloating.", "Higher stress tends to coincide with less bloating."],
+  "Stress & Cycle Length": ["Higher stress during a cycle tends to coincide with longer cycles.", "Higher stress during a cycle tends to coincide with shorter cycles."],
+  "Cycle Phase & Brain Fog": ["Brain fog tends to be higher later in your cycle.", "Brain fog tends to be higher earlier in your cycle."],
+  "Cycle Phase & Energy": ["Energy tends to be higher later in your cycle.", "Energy tends to be higher earlier in your cycle."],
+  "Sleep & Skin": ["More sleep tends to coincide with more acne.", "Less sleep tends to coincide with more acne."],
+  "Stress & Skin": ["Higher stress tends to coincide with more breakouts.", "Higher stress tends to coincide with fewer breakouts."],
+  "Cycle Phase & Cravings": ["Cravings tend to be stronger later in your cycle.", "Cravings tend to be stronger earlier in your cycle."],
+  "Sleep & Anxiety": ["More sleep tends to coincide with more anxiety spikes.", "Less sleep tends to coincide with more anxiety spikes."],
+  "Sleep & Flare Severity": ["More sleep tends to coincide with more severe flare pain.", "Less sleep tends to coincide with more severe flare pain."],
+  "Stress & Flare Severity": ["Higher stress tends to coincide with more severe flare pain.", "Higher stress tends to coincide with less severe flare pain."],
+};
+
+export const generateInsights = async (mode: string = "standard", tone: Tone = "chill"): Promise<CycleInsight[]> => {
+  const tx = txFor(tone);
   const entries = await queryAll<SymptomEntryRow>(
     `SELECT * FROM symptom_entries ORDER BY logged_date DESC LIMIT 90;`
   );
@@ -37,8 +62,11 @@ export const generateInsights = async (mode: string = "standard"): Promise<Cycle
   if (entries.length < 20) {
     return [
       {
-        title: "patterns loading\u2026 \ud83d\udd0d",
-        description: `Log ${20 - entries.length} more day${20 - entries.length === 1 ? "" : "s"} and we'll start spotting what affects what \u2014 like whether bad sleep means worse pain for you. You're doing great.`
+        title: tx("patterns loading\u2026 \ud83d\udd0d", "Insights are on their way"),
+        description: tx(
+          `Log ${20 - entries.length} more day${20 - entries.length === 1 ? "" : "s"} and we'll start spotting what affects what \u2014 like whether bad sleep means worse pain for you. You're doing great.`,
+          `Log ${20 - entries.length} more day${20 - entries.length === 1 ? "" : "s"} to unlock personal insights, such as how sleep relates to pain.`,
+        )
       }
     ];
   }
@@ -158,7 +186,8 @@ export const generateInsights = async (mode: string = "standard"): Promise<Cycle
             const avgOnset = Math.round(onsetDays.reduce((a,b)=>a+b,0) / onsetDays.length);
             insights.push({
                title: "Flare Onset Pattern",
-               description: `Your flares usually kick off around cycle day ${avgOnset}. Plan a softer few days around then if you can 💜`
+               onsetDay: avgOnset,
+               description: tx(`Your flares usually kick off around cycle day ${avgOnset}. Plan a softer few days around then if you can 💜`, `Your flares most often begin around cycle day ${avgOnset}. Consider planning lighter days around then.`)
             });
         }
      }
@@ -172,7 +201,10 @@ export const generateInsights = async (mode: string = "standard"): Promise<Cycle
      if (!significant[i] || Math.abs(c.correlation) <= 0.3) return;
      insights.push({
         title: c.title,
-        description: c.correlation > 0 ? c.descPos : c.descNeg,
+        description: tx(
+          c.correlation > 0 ? c.descPos : c.descNeg,
+          (CLASSIC_DESCRIPTIONS[c.title] ?? [c.descPos, c.descNeg])[c.correlation > 0 ? 0 : 1],
+        ),
         correlation: Math.round(c.correlation * 100) / 100,
         n: c.n,
         isMentalHealth: c.isMentalHealth,

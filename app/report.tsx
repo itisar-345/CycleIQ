@@ -8,6 +8,7 @@ import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { getAllCycles, getAllEntries, getRedFlagPromptLogs, readExtendedSymptoms, type CycleRow, type RedFlagPromptLogRow, type SymptomEntryRow } from '@/database';
 import { generateSpecialistReportHtml } from '@/utils/reportGenerator';
+import { useTx } from '@/utils/tone';
 import * as Print from 'expo-print';
 import { format } from 'date-fns';
 import { savePdfToReports, shareReport } from '@/utils/localReports';
@@ -23,6 +24,7 @@ interface ReportData {
 }
 
 export default function ReportScreen() {
+  const tx = useTx();
   const colorScheme = useColorScheme() ?? 'light';
   const theme = Colors[colorScheme];
   const { currentMode } = useAppStore();
@@ -78,46 +80,46 @@ export default function ReportScreen() {
       const fileName = `CycleIQ_Report_${format(new Date(), 'yyyy-MM-dd_HHmm')}.pdf`;
       const permanentUri = await savePdfToReports(tempUri, fileName);
       const shared = await shareReport(permanentUri);
-      if (!shared) Alert.alert('report saved 📄', `It's in Saved Reports.\n\n${permanentUri}`);
+      if (!shared) Alert.alert(tx('report saved 📄', 'Report saved'), tx(`It's in Saved Reports.\n\n${permanentUri}`, `Saved to Saved Reports.\n\n${permanentUri}`));
     } catch (e) {
       console.error('PDF generation failed', e);
-      Alert.alert('report didn\'t work 😕', 'Couldn\'t make or share the PDF — try again?');
+      Alert.alert(tx("report didn't work 😕", 'Report failed'), tx("Couldn't make or share the PDF — try again?", 'The PDF could not be created or shared. Please try again.'));
     }
   };
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
       <View style={[styles.header, { borderBottomColor: theme.border }]}>
-        <TouchableOpacity onPress={() => router.back()} style={{ padding: 8 }}>
+        <TouchableOpacity onPress={() => router.back()} style={{ padding: 8, minWidth: 44, minHeight: 44, justifyContent: 'center' }} accessibilityRole="button" accessibilityLabel={tx("Back", "Back")}>
           <IconSymbol name="chevron.left" size={24} color={theme.tint} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: theme.text }]}>doctor report 🩺</Text>
+        <Text style={[styles.headerTitle, { color: theme.text }]} accessibilityRole="header">{tx("doctor report 🩺", "Doctor report")}</Text>
         <View style={{ width: 40 }} />
       </View>
       
       <ScrollView contentContainerStyle={styles.content}>
         {loading ? (
-          <Text style={{ color: theme.textSecondary, textAlign: 'center', marginTop: 40 }}>putting your report together…</Text>
+          <Text style={{ color: theme.textSecondary, textAlign: 'center', marginTop: 40 }}>{tx("putting your report together…", "Preparing report…")}</Text>
         ) : (
           <View>
             <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-               <Text style={[styles.cardTitle, { color: theme.text }]}>the summary</Text>
-               <Text style={[styles.text, { color: theme.textSecondary }]}>mode: {currentMode === 'standard' ? 'cycle tracking' : currentMode.toUpperCase()}</Text>
-               <Text style={[styles.text, { color: theme.textSecondary }]}>cycles logged: {data.cyclesCount}</Text>
-               <Text style={[styles.text, { color: theme.textSecondary }]}>average cycle: {data.avgLength} days</Text>
-               <Text style={[styles.text, { color: theme.textSecondary }]}>daily logs: {data.entriesCount}</Text>
+               <Text style={[styles.cardTitle, { color: theme.text }]} accessibilityRole="header">{tx("the summary", "Summary")}</Text>
+               <Text style={[styles.text, { color: theme.textSecondary }]}>{tx("mode:", "Mode:")} {currentMode === 'standard' ? tx('cycle tracking', 'Cycle tracking') : currentMode.toUpperCase()}</Text>
+               <Text style={[styles.text, { color: theme.textSecondary }]}>{tx("cycles logged:", "Cycles logged:")} {data.cyclesCount}</Text>
+               <Text style={[styles.text, { color: theme.textSecondary }]}>{tx("average cycle:", "Average cycle length:")} {data.avgLength} days</Text>
+               <Text style={[styles.text, { color: theme.textSecondary }]}>{tx("daily logs:", "Daily logs:")} {data.entriesCount}</Text>
             </View>
             
             {(currentMode === 'endo' || currentMode === 'pcos') && (
               <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-                 <Text style={[styles.cardTitle, { color: theme.text }]}>condition tracking</Text>
-                 <Text style={[styles.text, { color: theme.textSecondary }]}>flare days documented: {data.flares}</Text>
-                 <Text style={[styles.text, { color: theme.textSecondary, marginTop: 8 }]}>The PDF is written in proper doctor-speak so your appointment goes smoother 💪</Text>
+                 <Text style={[styles.cardTitle, { color: theme.text }]} accessibilityRole="header">{tx("condition tracking", "Condition tracking")}</Text>
+                 <Text style={[styles.text, { color: theme.textSecondary }]}>{tx("flare days documented:", "Flare days documented:")} {data.flares}</Text>
+                 <Text style={[styles.text, { color: theme.textSecondary, marginTop: 8 }]}>{tx("The PDF is written in proper doctor-speak so your appointment goes smoother 💪", "The PDF is written in clinical language for your healthcare provider.")}</Text>
               </View>
             )}
             
-            <TouchableOpacity style={[styles.exportBtn, { backgroundColor: theme.tint }]} onPress={handleExport}>
-              <Text style={[styles.exportText, { color: theme.onTint }]}>export PDF for my doctor</Text>
+            <TouchableOpacity style={[styles.exportBtn, { backgroundColor: theme.tint }]} onPress={handleExport} accessibilityRole="button">
+              <Text style={[styles.exportText, { color: theme.onTint }]}>{tx("export PDF for my doctor", "Export PDF")}</Text>
             </TouchableOpacity>
           </View>
         )}

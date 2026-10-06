@@ -2,9 +2,11 @@ import { Colors, Radius, Shadow, Spacing } from "@/constants/theme";
 import { OnboardingProgress } from "@/components/onboarding-progress";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useAppStore } from "@/store";
+import { DateField } from "@/components/date-field";
+import { useTx, type Tx } from "@/utils/tone";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useState } from "react";
-import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 const MIN_LENGTH = 18;
@@ -21,26 +23,27 @@ const daysAgo = (n: number) => {
 };
 
 const QUICK_DATES = [
-  { label: "today", days: 0 },
-  { label: "yesterday", days: 1 },
-  { label: "~1 week ago", days: 7 },
-  { label: "~2 weeks ago", days: 14 },
-  { label: "~3 weeks ago", days: 21 },
-];
+  { label: ["today", "Today"], days: 0 },
+  { label: ["yesterday", "Yesterday"], days: 1 },
+  { label: ["~1 week ago", "About 1 week ago"], days: 7 },
+  { label: ["~2 weeks ago", "About 2 weeks ago"], days: 14 },
+  { label: ["~3 weeks ago", "About 3 weeks ago"], days: 21 },
+] as const;
 
 /** Returns an error message, or null when the date is usable. */
-const validateDate = (value: string): string | null => {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return "use the format YYYY-MM-DD";
+const validateDate = (value: string, tx: Tx): string | null => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return tx("pick a date", "Please choose a date.");
   const [y, m, d] = value.split("-").map(Number);
   const date = new Date(y, m - 1, d);
-  if (date.getFullYear() !== y || date.getMonth() !== m - 1 || date.getDate() !== d) return "that date doesn't exist";
-  if (value > toDateKey(new Date())) return "that's in the future 👀";
-  if (value < daysAgo(180)) return "that's over 6 months ago — pick your most recent period";
+  if (date.getFullYear() !== y || date.getMonth() !== m - 1 || date.getDate() !== d) return tx("that date doesn't exist", "That date doesn't exist.");
+  if (value > toDateKey(new Date())) return tx("that's in the future 👀", "That date is in the future.");
+  if (value < daysAgo(180)) return tx("that's over 6 months ago — pick your most recent period", "That's more than 6 months ago. Please choose your most recent period.");
   return null;
 };
 
 export default function CycleHistoryInputScreen() {
   const theme = Colors[useColorScheme() ?? "light"];
+  const tx = useTx();
   const { setCycleHistory, currentMode } = useAppStore();
   const { next } = useLocalSearchParams<{ next?: string }>();
 
@@ -48,7 +51,7 @@ export default function CycleHistoryInputScreen() {
   const [lastPeriodDate, setLastPeriodDate] = useState(daysAgo(0));
   const [customDate, setCustomDate] = useState<string | null>(null);
 
-  const dateError = validateDate(lastPeriodDate);
+  const dateError = validateDate(lastPeriodDate, tx);
 
   const onContinue = () => {
     if (dateError) return;
@@ -86,81 +89,80 @@ export default function CycleHistoryInputScreen() {
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
       <View style={styles.backRow}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn} accessibilityRole="button">
-          <Text style={[styles.backText, { color: theme.tint }]}>← Back</Text>
+          <Text style={[styles.backText, { color: theme.tint }]}>{tx("← back", "← Back")}</Text>
         </TouchableOpacity>
         <OnboardingProgress
           step={2}
           total={next === "condition" ? 5 : 3}
-          label="step 2 · cycle basics"
+          label={tx("step 2 · cycle basics", "Step 2: cycle basics")}
         />
       </View>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <Text style={[styles.title, { color: theme.text }]}>Quick setup ⚡</Text>
+        <Text style={[styles.title, { color: theme.text }]} accessibilityRole="header">{tx("Quick setup ⚡", "Your cycle")}</Text>
         <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
-          Two questions, then you get your first prediction. Best guesses are totally fine.
+          {tx("Two questions, then you get your first prediction. Best guesses are totally fine.", "Two quick questions, then you'll see your first prediction. Estimates are fine.")}
         </Text>
 
         <View style={[styles.card, { backgroundColor: theme.surface }, Shadow]}>
-          <Text style={[styles.question, { color: theme.text }]}>When did your last period start? 🩸</Text>
-          <View style={styles.chips}>
+          <Text style={[styles.question, { color: theme.text }]} accessibilityRole="header">{tx("When did your last period start? 🩸", "When did your last period start?")}</Text>
+          <View style={styles.chips} accessibilityRole="radiogroup">
             {QUICK_DATES.map((q) =>
-              chip(q.label, customDate === null && lastPeriodDate === daysAgo(q.days), () => {
+              chip(tx<string>(q.label[0], q.label[1]), customDate === null && lastPeriodDate === daysAgo(q.days), () => {
                 setCustomDate(null);
                 setLastPeriodDate(daysAgo(q.days));
               }),
             )}
-            {chip("pick a date", customDate !== null, () => {
+            {chip(tx("pick a date 📅", "Choose a date"), customDate !== null, () => {
               setCustomDate(lastPeriodDate);
             })}
           </View>
           {customDate !== null && (
             <>
-              <TextInput
-                style={[styles.input, { borderColor: dateError ? theme.error : theme.border, color: theme.text, backgroundColor: theme.surfaceAlt }]}
-                value={customDate}
-                onChangeText={(t) => {
-                  setCustomDate(t);
-                  setLastPeriodDate(t.trim());
+              <DateField
+                value={lastPeriodDate}
+                onChange={(key) => {
+                  setCustomDate(key);
+                  setLastPeriodDate(key);
                 }}
-                placeholder="YYYY-MM-DD"
-                placeholderTextColor={theme.textSecondary}
-                autoCorrect={false}
-                maxLength={10}
-                accessibilityLabel="Last period start date, year month day"
+                label={tx("Last period start date", "Last period start date")}
+                minimumDate={new Date(Date.now() - 180 * 86400000)}
+                maximumDate={new Date()}
               />
-              {dateError && <Text style={[styles.error, { color: theme.error }]}>{dateError}</Text>}
+              {dateError && <Text style={[styles.error, { color: theme.error }]} accessibilityLiveRegion="polite">{dateError}</Text>}
             </>
           )}
         </View>
 
         <View style={[styles.card, { backgroundColor: theme.surface }, Shadow]}>
-          <Text style={[styles.question, { color: theme.text }]}>How long is your cycle, usually?</Text>
+          <Text style={[styles.question, { color: theme.text }]} accessibilityRole="header">{tx("How long is your cycle, usually?", "Typical cycle length")}</Text>
           <Text style={[styles.hint, { color: theme.textSecondary }]}>
-            day 1 of one period → day 1 of the next
+            {tx("day 1 of one period → day 1 of the next", "From the first day of one period to the first day of the next.")}
           </Text>
           <View style={styles.stepper}>
             <TouchableOpacity
               style={[styles.stepBtn, { borderColor: theme.tint }]}
               onPress={() => setAverageLength((v) => Math.max(MIN_LENGTH, v - 1))}
-              accessibilityLabel="One day shorter"
+              accessibilityRole="button"
+              accessibilityLabel={tx("One day shorter", "One day shorter")}
             >
               <Text style={[styles.stepBtnText, { color: theme.tint }]}>−</Text>
             </TouchableOpacity>
-            <View style={{ alignItems: "center" }}>
+            <View style={{ alignItems: "center" }} accessible accessibilityLabel={`${averageLength} days`} accessibilityLiveRegion="polite">
               <Text style={[styles.stepValue, { color: theme.text }]}>{averageLength}</Text>
-              <Text style={[styles.stepUnit, { color: theme.textSecondary }]}>days</Text>
+              <Text style={[styles.stepUnit, { color: theme.textSecondary }]}>{tx("days", "days")}</Text>
             </View>
             <TouchableOpacity
               style={[styles.stepBtn, { borderColor: theme.tint }]}
               onPress={() => setAverageLength((v) => Math.min(MAX_LENGTH, v + 1))}
-              accessibilityLabel="One day longer"
+              accessibilityRole="button"
+              accessibilityLabel={tx("One day longer", "One day longer")}
             >
               <Text style={[styles.stepBtnText, { color: theme.tint }]}>+</Text>
             </TouchableOpacity>
           </View>
-          <TouchableOpacity onPress={() => setAverageLength(28)} style={styles.unsure}>
+          <TouchableOpacity onPress={() => setAverageLength(28)} style={styles.unsure} accessibilityRole="button">
             <Text style={[styles.unsureText, { color: theme.tint }]}>
-              no idea? use 28 — we&apos;ll learn your real number as you log
+              {tx("no idea? use 28 — we'll learn your real number as you log", "Not sure? Use 28 days — this will adjust as you log.")}
             </Text>
           </TouchableOpacity>
         </View>
@@ -172,7 +174,7 @@ export default function CycleHistoryInputScreen() {
           accessibilityRole="button"
         >
           <Text style={[styles.nextText, { color: theme.onTint }]}>
-            {next === "condition" ? "Next →" : "Show my prediction ✨"}
+            {next === "condition" ? tx("Next →", "Continue") : tx("Show my prediction ✨", "See my prediction")}
           </Text>
         </TouchableOpacity>
       </ScrollView>
@@ -183,7 +185,7 @@ export default function CycleHistoryInputScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   backRow: { paddingHorizontal: Spacing.lg, paddingTop: Spacing.sm, gap: Spacing.md },
-  backBtn: { alignSelf: "flex-start", paddingVertical: 6 },
+  backBtn: { alignSelf: "flex-start", paddingVertical: 6, minHeight: 44, justifyContent: "center" },
   backText: { fontSize: 16, fontWeight: "700" },
   content: { padding: Spacing.xl, paddingBottom: 40, gap: Spacing.lg },
   title: { fontSize: 30, fontWeight: "800", letterSpacing: -0.5 },
@@ -200,7 +202,7 @@ const styles = StyleSheet.create({
   stepBtnText: { fontSize: 26, fontWeight: "700" },
   stepValue: { fontSize: 40, fontWeight: "800", letterSpacing: -1 },
   stepUnit: { fontSize: 13, fontWeight: "600" },
-  unsure: { alignSelf: "center", paddingVertical: 4 },
+  unsure: { alignSelf: "center", paddingVertical: 10, minHeight: 44, justifyContent: "center" },
   unsureText: { fontSize: 13, fontWeight: "700", textAlign: "center" },
   nextButton: { paddingVertical: 18, borderRadius: Radius.pill, alignItems: "center", ...Shadow },
   nextText: { fontSize: 17, fontWeight: "800" },

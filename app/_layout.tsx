@@ -1,5 +1,6 @@
 import { initDb, getCyclePredictions } from "@/database";
 import { AppLoading } from "@/components/app-loading";
+import { AppLockGate } from "@/components/app-lock";
 import { useAppStore, waitForStoreHydration } from "@/store";
 import { Stack, router, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
@@ -17,7 +18,7 @@ export const unstable_settings = {
 };
 
 export default function RootLayout() {
-  const { isOnboarded, notificationsEnabled, notificationPrefs, postPillMode, postPillStartDate, currentMode } = useAppStore();
+  const { isOnboarded, notificationsEnabled, notificationPrefs, postPillMode, postPillStartDate, currentMode, tone, discreetNotifications } = useAppStore();
   const segments = useSegments();
   const [mounted, setMounted] = useState(false);
   const [dbReady, setDbReady] = useState(false);
@@ -53,14 +54,18 @@ export default function RootLayout() {
       if (state === "active") syncNotifications();
     });
     return () => sub.remove();
-  }, [isOnboarded, dbReady, notificationsEnabled, notificationPrefs, currentMode, postPillMode, postPillStartDate]);
+    // tone / discreetNotifications: rescheduling rewrites already-scheduled wording.
+  }, [isOnboarded, dbReady, notificationsEnabled, notificationPrefs, currentMode, postPillMode, postPillStartDate, tone, discreetNotifications]);
 
   useEffect(() => {
     if (!mounted || !dbReady || !storeReady) return;
     const inOnboardingGroup = segments[0] === "onboarding";
+    // Condition setup screens are also opened from Profile after onboarding (switching mode).
+    const segs = segments as string[];
+    const inConditionSetup = inOnboardingGroup && ["pcos", "pcod", "endo"].includes(segs[1] ?? "");
     if (!isOnboarded && !inOnboardingGroup) {
       router.replace("/onboarding/goal");
-    } else if (isOnboarded && inOnboardingGroup) {
+    } else if (isOnboarded && inOnboardingGroup && !inConditionSetup) {
       router.replace("/(tabs)");
     }
   }, [isOnboarded, mounted, dbReady, storeReady, segments]);
@@ -76,6 +81,7 @@ export default function RootLayout() {
         <Stack.Screen name="reports" options={{ headerShown: false }} />
         <Stack.Screen name="appointment-prep" options={{ headerShown: false }} />
       </Stack>
+      <AppLockGate ready={mounted && dbReady && storeReady} />
       {(!mounted || !dbReady || !storeReady) && (
         <View style={StyleSheet.absoluteFill} pointerEvents="auto">
           <AppLoading />

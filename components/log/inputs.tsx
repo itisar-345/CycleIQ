@@ -7,6 +7,7 @@
  */
 import { Colors, Radius, Spacing } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import { useTx } from "@/utils/tone";
 import * as Haptics from "expo-haptics";
 import React from "react";
 import { Platform, StyleSheet, Switch, Text, TouchableOpacity, View } from "react-native";
@@ -123,8 +124,8 @@ export function Scale({
                 onChange(num);
               }}
               style={styles.scaleHit}
-              accessibilityRole="adjustable"
-              accessibilityLabel={`${num} out of ${max}`}
+              accessibilityRole="button"
+              accessibilityLabel={`${num} out of ${max}${lowLabel && num === min ? `, ${lowLabel}` : ""}${highLabel && num === max ? `, ${highLabel}` : ""}`}
               accessibilityState={{ selected: isValue }}
             >
               <View
@@ -148,7 +149,7 @@ export function Scale({
         <Text style={[styles.scaleEndText, { color: theme.textSecondary }]}>{highLabel ?? max}</Text>
       </View>
       {value !== null && caption && (
-        <Text style={[styles.caption, { color: theme.tint }]}>{caption(value)}</Text>
+        <Text style={[styles.caption, { color: theme.tint }]} accessibilityLiveRegion="polite">{caption(value)}</Text>
       )}
     </View>
   );
@@ -174,21 +175,23 @@ export function Slider4({
 }
 
 const FACES = [
-  { emoji: "😭", label: "rough" },
-  { emoji: "🙁", label: "meh" },
-  { emoji: "😐", label: "mid" },
-  { emoji: "🙂", label: "decent" },
-  { emoji: "🤩", label: "thriving" },
+  { emoji: "😭", chill: "rough", classic: "Very low" },
+  { emoji: "🙁", chill: "meh", classic: "Low" },
+  { emoji: "😐", chill: "mid", classic: "Okay" },
+  { emoji: "🙂", chill: "decent", classic: "Good" },
+  { emoji: "🤩", chill: "thriving", classic: "Great" },
 ];
 
 /** 1–5 mood picker; null = not answered yet. */
 export function MoodFaces({ value, onChange }: { value: number | null; onChange: (val: number) => void }) {
   const theme = useTheme();
+  const tx = useTx();
   return (
     <View style={styles.facesContainer}>
       {FACES.map((face, i) => {
         const val = i + 1;
         const isSelected = value === val;
+        const label = tx(face.chill, face.classic);
         return (
           <TouchableOpacity
             key={val}
@@ -201,7 +204,7 @@ export function MoodFaces({ value, onChange }: { value: number | null; onChange:
               isSelected && { backgroundColor: theme.tintSoft, borderColor: theme.tint },
             ]}
             accessibilityRole="button"
-            accessibilityLabel={`Mood: ${face.label}`}
+            accessibilityLabel={`Mood ${val} of 5: ${label}`}
             accessibilityState={{ selected: isSelected }}
           >
             <Text style={{ fontSize: isSelected ? 34 : 28, opacity: isSelected || value === null ? 1 : 0.45 }}>
@@ -213,7 +216,7 @@ export function MoodFaces({ value, onChange }: { value: number | null; onChange:
                 { color: isSelected ? theme.onTintSoft : theme.textSecondary, fontWeight: isSelected ? "800" : "500" },
               ]}
             >
-              {face.label}
+              {label}
             </Text>
           </TouchableOpacity>
         );
@@ -258,6 +261,8 @@ const styles = StyleSheet.create({
   chip: {
     paddingHorizontal: 14,
     paddingVertical: 9,
+    minHeight: 40,
+    justifyContent: "center",
     borderRadius: Radius.pill,
     borderWidth: 1.5,
   },

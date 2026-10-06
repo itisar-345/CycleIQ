@@ -46,6 +46,9 @@ export type BooleanNotificationPref = {
   [K in keyof NotificationPrefs]: NotificationPrefs[K] extends boolean ? K : never;
 }[keyof NotificationPrefs];
 
+/** How the app talks: "chill" (casual, emoji) or "classic" (plain and calm). */
+export type Tone = "chill" | "classic";
+
 interface AppState {
   isOnboarded: boolean;
   currentMode: AppMode;
@@ -74,6 +77,11 @@ interface AppState {
   notificationPrefs: NotificationPrefs;
   healthImportPrefs: HealthImportPrefs;
   dismissedInsights: string[];
+  tone: Tone;
+  /** Lock-screen-safe notifications: generic title/body, no health details. */
+  discreetNotifications: boolean;
+  /** Require Face ID / fingerprint / device passcode to open the app. */
+  appLockEnabled: boolean;
 
   lastSafeguardPrompt: string | null; // ISO date for Sec 4.7 cooldown;
   lastRedFlagPrompt: string | null;
@@ -101,6 +109,7 @@ interface AppState {
     postPillMode: boolean,
     isTeen: boolean
   ) => void;
+  setPostPillMode: (enabled: boolean) => void;
   setLastPCOSPrompt: (date: string | null) => void;
   setLastSafeguardPrompt: (date: string | null) => void;
   setLastRedFlagPrompt: (date: string | null) => void;
@@ -115,6 +124,9 @@ interface AppState {
   setNotificationsEnabled: (enabled: boolean) => void;
   setHealthImportPrefs: (prefs: Partial<HealthImportPrefs>) => void;
   dismissInsight: (title: string) => void;
+  setTone: (tone: Tone) => void;
+  setDiscreetNotifications: (enabled: boolean) => void;
+  setAppLockEnabled: (enabled: boolean) => void;
 }
 
 const persistSettingsToSqlite = (state: AppState) => {
@@ -203,6 +215,9 @@ export const useAppStore = create<AppState>()(
         healthConnectActivity: false,
       } as HealthImportPrefs,
       dismissedInsights: [] as string[],
+      tone: "chill" as Tone,
+      discreetNotifications: false as boolean,
+      appLockEnabled: false as boolean,
 
       setOnboarded: (status) => {
         set({ isOnboarded: status });
@@ -240,6 +255,14 @@ export const useAppStore = create<AppState>()(
         set({ age, gender, language, notificationsEnabled, postPillMode, isTeen,
           postPillStartDate: postPillMode ? new Date().toISOString() : null
         });
+        persistSettingsToSqlite(get());
+      },
+
+      setPostPillMode: (enabled) => {
+        set((state) => ({
+          postPillMode: enabled,
+          postPillStartDate: enabled ? (state.postPillStartDate ?? new Date().toISOString()) : null,
+        }));
         persistSettingsToSqlite(get());
       },
 
@@ -299,6 +322,9 @@ export const useAppStore = create<AppState>()(
           }
           return state;
         }),
+      setTone: (tone) => set({ tone }),
+      setDiscreetNotifications: (enabled) => set({ discreetNotifications: enabled }),
+      setAppLockEnabled: (enabled) => set({ appLockEnabled: enabled }),
       checkSafeguardCooldown: () => {
         const state = get();
         if (!state.lastSafeguardPrompt) return true;

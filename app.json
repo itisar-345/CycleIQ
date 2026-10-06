@@ -69,6 +69,13 @@
             "minSdkVersion": 26
           }
         }
+      ],
+      "@react-native-community/datetimepicker",
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "CycleIQ uses Face ID so only you can open your health data."
+        }
       ]
     ],
     "experiments": {

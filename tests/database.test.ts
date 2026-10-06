@@ -10,6 +10,7 @@ import {
   deleteCycle,
   exportLocalDataSnapshot,
   generateInsights,
+  persistAndRetireInsights,
   getAllCycles,
   getCycleEntries,
   getCyclePredictions,
@@ -21,12 +22,17 @@ import {
   updateCycle,
   wipeLocalDatabase,
 } from "../database";
-import { execSql, queryAll, queryFirst } from "../database/connection";
+import { ensureDb, execSql, queryAll, queryFirst } from "../database/connection";
+import { recomputeCycleLengths } from "../database/cycles";
 import { webcrypto } from "node:crypto";
 import { encryptedPersistStorage } from "../utils/encryptedPersistStorage";
 import { decryptField, encryptField, FieldDecryptionError } from "../utils/fieldEncryption";
 import { getOrCreateDbKey } from "../utils/secureKey";
 import { __asyncStorage } from "./support/fake-async-storage";
+import { useAppStore } from "../store";
+import { currentTx } from "../utils/tone";
+import { getCopy } from "../constants/copy";
+import { resolveNotificationContent } from "../utils/notifications";
 
 const DAY_MS = 86400000;
 const day = (iso: string) => `${iso}T12:00:00.000Z`;
@@ -227,6 +233,129 @@ test("persisted app state migrates legacy blobs and is stored encrypted", async 
   assert.ok(stored.startsWith("cycleiq:v2:enc:v1:"));
   assert.ok(!stored.includes("userName"));
   assert.equal(await encryptedPersistStorage.getItem("app"), '{"state":{"userName":"B"}}');
+});
+
+test("tone: chill and classic wording, shared copy", async () => {
+  useAppStore.setState({ tone: "chill" });
+  assert.equal(currentTx()("hey 👋", "Hello"), "hey 👋");
+  assert.equal(getCopy("chill").options.flow.find((o) => typeof o !== "string" && o.value === "Very Heavy") !== undefined, true);
+  useAppStore.setState({ tone: "classic" });
+  assert.equal(currentTx()("hey 👋", "Hello"), "Hello");
+  // Stored values never change with tone — only labels do.
+  const classicFlow = getCopy("classic").options.flow.map((o) => (typeof o === "string" ? o : o.value));
+  const chillFlow = getCopy("chill").options.flow.map((o) => (typeof o === "string" ? o : o.value));
+  assert.deepEqual(classicFlow, chillFlow);
+  useAppStore.setState({ tone: "chill" });
+});
+
+test("notifications: classic wording by id, discreet hides health details", async () => {
+  useAppStore.setState({ tone: "classic", discreetNotifications: false });
+  assert.deepEqual(
+    resolveNotificationContent("period-reminder", ["period incoming 🩸", "chill body"]),
+    ["Period expected soon", "Your next period is predicted in about 2 days."],
+  );
+  useAppStore.setState({ tone: "chill" });
+  assert.deepEqual(resolveNotificationContent("period-reminder", ["period incoming 🩸", "chill body"]), ["period incoming 🩸", "chill body"]);
+  useAppStore.setState({ discreetNotifications: true });
+  for (const tone of ["chill", "classic"] as const) {
+    useAppStore.setState({ tone });
+    const [title, body] = resolveNotificationContent("pcos-d90", ["time for a doctor chat 💬", "90 days without a period"]);
+    assert.equal(title, "CycleIQ");
+    assert.ok(!/period|PCOS|pain|flare|ovulat|blood/i.test(`${title} ${body}`), `discreet text leaked details: ${body}`);
+  }
+  useAppStore.setState({ tone: "chill", discreetNotifications: false });
+});
+
+test("insights: classic descriptions and numeric flare onset day", async () => {
+  await seedInitialCycleFromOnboarding("2026-01-01", 28);
+  const cycle = (await getAllCycles())[0];
+  for (let i = 0; i < 30; i++) {
+    const stress = (i % 5) + 1;
+    await createSymptomEntry({
+      cycle_id: cycle.id,
+      logged_date: addDaysISO(day("2026-01-01"), i),
+      stress_score: stress,
+      pain_score: stress * 2,
+      flare_start: i % 6 === 0 ? addDaysISO(day("2026-01-01"), i) : undefined,
+    });
+  }
+  const classic = await generateInsights("endo", "classic");
+  const stressFlare = classic.find((i) => i.title === "Stress & Flare Severity");
+  assert.equal(stressFlare?.description, "Higher stress tends to coincide with more severe flare pain.");
+  const onset = classic.find((i) => i.title === "Flare Onset Pattern");
+  assert.equal(typeof onset?.onsetDay, "number", "flare warnings rely on a numeric onset day, not parsing text");
+});
+
+test("prediction saves are de-duplicated when nothing changed", async () => {
+  await seedInitialCycleFromOnboarding("2026-01-01", 28);
+  const count = async () => (await queryFirst<{ n: number }>(`SELECT count(*) AS n FROM cycle_predictions;`))?.n ?? 0;
+  await getCyclePredictions("standard");
+  const before = await count();
+  await getCyclePredictions("standard");
+  await getCyclePredictions("standard");
+  assert.equal(await count(), before, "re-reading an unchanged prediction must not add audit rows");
+  await createCycle(day("2026-01-29"));
+  assert.ok((await count()) > before, "a real change is recorded");
+});
+
+test("period start → prediction re-anchors on the new period", async () => {
+  await seedInitialCycleFromOnboarding("2026-01-01", 28);
+  const beforeStart = (await getCyclePredictions("standard")).predictedStartISO!;
+  await createCycle(day("2026-02-02"));
+  const after = await getCyclePredictions("standard");
+  assert.notEqual(after.predictedStartISO, beforeStart);
+  // Two completed cycles now (28 and 32 days) → next period ~4–5 weeks after Feb 2.
+  const gap = Math.round((new Date(after.predictedStartISO!).getTime() - new Date(day("2026-02-02")).getTime()) / DAY_MS);
+  assert.ok(gap >= 28 && gap <= 32, `predicted ${gap} days after the new start`);
+});
+
+test("symptom logs → correlations → stored insights (no duplicates on re-run)", async () => {
+  await seedInitialCycleFromOnboarding("2026-01-01", 28);
+  const cycle = (await getAllCycles())[0];
+  for (let i = 0; i < 30; i++) {
+    const stress = (i % 5) + 1;
+    await createSymptomEntry({ cycle_id: cycle.id, logged_date: addDaysISO(day("2026-01-01"), i), stress_score: stress, pain_score: stress * 2 });
+  }
+  const first = await generateInsights("standard");
+  await persistAndRetireInsights(first);
+  await persistAndRetireInsights(await generateInsights("standard"));
+  const rows = await queryAll<{ title: string; n: number }>(`SELECT title, n FROM user_correlations;`);
+  assert.ok(rows.some((r) => r.title === "Stress & Pain" && r.n === 30));
+  assert.equal(new Set(rows.map((r) => r.title)).size, rows.length, "insights are upserted, not duplicated");
+});
+
+test("performance: retraining on 5 years of cycles stays under 2 s", async () => {
+  await seedInitialCycleFromOnboarding("2021-01-01", 28);
+  let start = new Date(day("2021-01-01")).getTime();
+  for (let i = 0; i < 60; i++) {
+    start += (26 + (i % 6)) * DAY_MS;
+    await execSql(`INSERT INTO cycles (id, start_date, is_confirmed) VALUES (?, ?, 1);`, [`perf-${i}`, new Date(start).toISOString()]);
+  }
+  await recomputeCycleLengths(await ensureDb());
+  const t0 = performance.now();
+  await getCyclePredictions("pcos");
+  const elapsed = performance.now() - t0;
+  console.log(`      retrain (60 cycles): ${elapsed.toFixed(0)} ms (budget 2000)`);
+  assert.ok(elapsed < 2000, `retrain took ${elapsed.toFixed(0)} ms`);
+});
+
+test("performance: correlations over 90 days of logs stay under 3 s", async () => {
+  await seedInitialCycleFromOnboarding("2026-01-01", 28);
+  const cycle = (await getAllCycles())[0];
+  for (let i = 0; i < 90; i++) {
+    await createSymptomEntry({
+      cycle_id: cycle.id,
+      logged_date: addDaysISO(day("2026-01-01"), i),
+      stress_score: (i % 5) + 1, pain_score: i % 11, mood_score: (i % 5) + 1, energy_score: (i * 3) % 11,
+      brain_fog_score: (i * 7) % 11, sleep_hours: 5 + (i % 4), exercise_duration: (i % 3) * 15, bloating: ["None", "Mild", "Moderate", "Severe"][i % 4],
+      extended_symptoms: { pcos: { acne: { severity: i % 4, locations: [] }, hair_thinning: "", hirsutism: false, weight: { dir: null, note: "" }, cravings: { int: i % 4, types: [] }, pelvic_pressure: null, sleep_disruption: [], anxiety_spike: i % 7 === 0 } },
+    });
+  }
+  const t0 = performance.now();
+  await generateInsights("pcos");
+  const elapsed = performance.now() - t0;
+  console.log(`      insights (90 days): ${elapsed.toFixed(0)} ms (budget 3000)`);
+  assert.ok(elapsed < 3000, `insights took ${elapsed.toFixed(0)} ms`);
 });
 
 (async () => {

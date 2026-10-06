@@ -1,6 +1,7 @@
 import { Colors, Radius, Shadow, Spacing } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useAppStore } from "@/store";
+import { useTx } from "@/utils/tone";
 import { router } from "expo-router";
 import React from "react";
 import {
@@ -73,6 +74,7 @@ const getUserRegion = (): Region | null => {
 
 export default function ResourcesScreen() {
   const theme = Colors[useColorScheme() ?? "light"];
+  const tx = useTx();
   const currentMode = useAppStore((state) => state.currentMode);
   const region = getUserRegion();
 
@@ -82,22 +84,24 @@ export default function ResourcesScreen() {
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
       <View style={[styles.header, { borderBottomColor: theme.border }]}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton} accessibilityRole="button">
-          <Text style={[styles.backText, { color: theme.tint }]}>‹ Back</Text>
+          <Text style={[styles.backText, { color: theme.tint }]}>{tx("‹ back", "‹ Back")}</Text>
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: theme.text }]}>Support</Text>
+        <Text style={[styles.headerTitle, { color: theme.text }]} accessibilityRole="header">{tx("support", "Support")}</Text>
         <View style={{ width: 64 }} />
       </View>
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={[styles.title, { color: theme.text }]}>You don&apos;t have to do this alone 🫶</Text>
+        <Text style={[styles.title, { color: theme.text }]} accessibilityRole="header">{tx("You don't have to do this alone 🫶", "You don't have to manage this alone")}</Text>
         <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
-          Reaching out is a strong move, not a weak one. These are support options — not a
-          replacement for professional care.
+          {tx(
+            "Reaching out is a strong move, not a weak one. These are support options — not a replacement for professional care.",
+            "Reaching out takes strength. These support options don't replace professional care.",
+          )}
         </Text>
 
         <View style={[styles.emergency, { backgroundColor: theme.tintSoft }]}>
           <Text style={[styles.emergencyText, { color: theme.onTintSoft }]}>
             If you&apos;re in danger right now, call your local emergency number
-            {region === "IN" ? " (112)" : region === "UK" ? " (999)" : region === "AU" ? " (000)" : " (911)"}.
+            {region === "IN" ? " (112)" : region === "UK" ? " (999)" : region === "AU" ? " (000)" : region ? " (911)" : ", such as 112 or 911"}.
           </Text>
         </View>
 
@@ -108,7 +112,7 @@ export default function ResourcesScreen() {
           return (
             <View key={section.title} style={[styles.section, { backgroundColor: theme.surface }, Shadow]}>
               <Text style={[styles.sectionTitle, { color: theme.text }]}>
-                {section.emoji}  {section.title}
+                {tx(`${section.emoji}  ${section.title}`, section.title)}
               </Text>
               {shown.map((item, j) => {
                 const callable = !!item.phone;
@@ -125,7 +129,7 @@ export default function ResourcesScreen() {
                     <Text style={[styles.resourceText, { color: theme.text }]}>{item.label}</Text>
                     {callable && (
                       <View style={[styles.callPill, { backgroundColor: theme.tint }]}>
-                        <Text style={[styles.callText, { color: theme.onTint }]}>Call {item.phone}</Text>
+                        <Text style={[styles.callText, { color: theme.onTint }]}>{tx("Call", "Call")} {item.phone}</Text>
                       </View>
                     )}
                   </TouchableOpacity>
@@ -138,7 +142,7 @@ export default function ResourcesScreen() {
         {currentMode === "endo" && (
           <View style={[styles.note, { backgroundColor: theme.surfaceAlt }]}>
             <Text style={[styles.noteText, { color: theme.text }]}>
-              💜 Endo-specific: EndoFound.org has peer support for the pain and the mental load.
+              {tx("💜 Endo-specific: EndoFound.org has peer support for the pain and the mental load.", "For endometriosis: EndoFound.org offers peer support and resources.")}
             </Text>
           </View>
         )}
@@ -146,7 +150,7 @@ export default function ResourcesScreen() {
         {currentMode === "pcos" && (
           <View style={[styles.note, { backgroundColor: theme.surfaceAlt }]}>
             <Text style={[styles.noteText, { color: theme.text }]}>
-              💚 PCOS-specific: the PCOS Awareness Association has mental health resources made for PCOS life.
+              {tx("💚 PCOS-specific: the PCOS Awareness Association has mental health resources made for PCOS life.", "For PCOS: the PCOS Awareness Association provides mental health resources.")}
             </Text>
           </View>
         )}

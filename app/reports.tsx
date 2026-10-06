@@ -5,19 +5,21 @@ import { router, useFocusEffect } from "expo-router";
 import React, { useCallback, useState } from "react";
 import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useTx } from "@/utils/tone";
 
 const formatSize = (size: number | null) => {
-  if (!size) return "size unknown";
+  if (!size) return "—";
   if (size < 1024 * 1024) return `${Math.round(size / 1024)} KB`;
   return `${(size / (1024 * 1024)).toFixed(1)} MB`;
 };
 
 const formatDate = (timestamp: number | null) => {
-  if (!timestamp) return "date unknown";
+  if (!timestamp) return "—";
   return new Date(timestamp * 1000).toLocaleString();
 };
 
 export default function ReportsScreen() {
+  const tx = useTx();
   const colorScheme = useColorScheme() ?? "light";
   const theme = Colors[colorScheme];
   const [reports, setReports] = useState<LocalReportFile[]>([]);
@@ -38,26 +40,26 @@ export default function ReportsScreen() {
 
   const handleShare = async (report: LocalReportFile) => {
     const shared = await shareReport(report.uri);
-    if (!shared) Alert.alert("saved on your phone 📄", report.uri);
+    if (!shared) Alert.alert(tx("saved on your phone 📄", "Saved on this device"), report.uri);
   };
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
       <View style={[styles.header, { borderBottomColor: theme.border }]}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Text style={[styles.backText, { color: theme.tint }]}>‹ back</Text>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backButton} accessibilityRole="button">
+          <Text style={[styles.backText, { color: theme.tint }]}>{tx("‹ back", "‹ Back")}</Text>
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: theme.text }]}>saved reports</Text>
+        <Text style={[styles.headerTitle, { color: theme.text }]} accessibilityRole="header">{tx("saved reports", "Saved reports")}</Text>
         <View style={{ width: 56 }} />
       </View>
       <ScrollView contentContainerStyle={styles.content}>
         {loading ? (
-          <Text style={{ color: theme.textSecondary }}>finding your reports…</Text>
+          <Text style={{ color: theme.textSecondary }}>{tx("finding your reports…", "Loading reports…")}</Text>
         ) : reports.length === 0 ? (
           <View style={[styles.empty, { borderColor: theme.border, backgroundColor: theme.surface }]}>
-            <Text style={[styles.emptyTitle, { color: theme.text }]}>no reports yet 📭</Text>
+            <Text style={[styles.emptyTitle, { color: theme.text }]}>{tx("no reports yet 📭", "No saved reports")}</Text>
             <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
-              Make a doctor report or appointment prep PDF and it&apos;ll show up here.
+              {tx("Make a doctor report or appointment prep PDF and it'll show up here.", "Reports and appointment summaries you export will appear here.")}
             </Text>
           </View>
         ) : (
@@ -66,11 +68,16 @@ export default function ReportsScreen() {
               <View style={{ flex: 1 }}>
                 <Text style={[styles.reportName, { color: theme.text }]}>{report.name}</Text>
                 <Text style={[styles.meta, { color: theme.textSecondary }]}>
-                  {report.type === "appointment" ? "appointment prep" : report.type === "specialist" ? "doctor report" : "PDF"} · {formatDate(report.modifiedAt)} · {formatSize(report.size)}
+                  {report.type === "appointment" ? tx("appointment prep", "Appointment prep") : report.type === "specialist" ? tx("doctor report", "Doctor report") : "PDF"} · {formatDate(report.modifiedAt)} · {formatSize(report.size)}
                 </Text>
               </View>
-              <TouchableOpacity style={[styles.shareButton, { backgroundColor: theme.tint }]} onPress={() => handleShare(report)}>
-                <Text style={[styles.shareText, { color: theme.onTint }]}>share</Text>
+              <TouchableOpacity
+                style={[styles.shareButton, { backgroundColor: theme.tint }]}
+                onPress={() => handleShare(report)}
+                accessibilityRole="button"
+                accessibilityLabel={`${tx("Share", "Share")} ${report.name}`}
+              >
+                <Text style={[styles.shareText, { color: theme.onTint }]}>{tx("share", "Share")}</Text>
               </TouchableOpacity>
             </View>
           ))

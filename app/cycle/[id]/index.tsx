@@ -1,14 +1,17 @@
-import { PHASE_COPY } from '@/constants/copy';
+import { useCopy } from '@/constants/copy';
+import { useTx } from '@/utils/tone';
 import { Colors } from '@/constants/theme';
 import { format } from 'date-fns';
 import { getCycle, getCycleEntries, getCyclePhases, getDayOfCycle, getPhaseForDay, type CyclePhase, type CycleRow, type SymptomEntryRow } from '@/database';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function CycleDetail() {
+  const tx = useTx();
+  const copy = useCopy();
   const { id } = useLocalSearchParams<{ id: string }>();
   const colorScheme = useColorScheme() ?? 'light';
   const theme = Colors[colorScheme];
@@ -30,50 +33,57 @@ export default function CycleDetail() {
     load();
   }, [id]);
 
-  if (!cycle) return <Text style={{ color: theme.textSecondary, padding: 20 }}>loading…</Text>;
+  if (!cycle) return <Text style={{ color: theme.textSecondary, padding: 20 }}>{tx("loading…", "Loading…")}</Text>;
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={[styles.title, { color: theme.text }]}>
-          cycle from {format(new Date(cycle.start_date), "MMM d, yyyy")}
+        <TouchableOpacity onPress={() => router.back()} style={styles.backHit} accessibilityRole="button">
+          <Text style={{ color: theme.tint, fontWeight: '700', fontSize: 16 }}>{tx("‹ back", "‹ Back")}</Text>
+        </TouchableOpacity>
+        <Text style={[styles.title, { color: theme.text }]} accessibilityRole="header">
+          {tx("cycle from", "Cycle starting")} {format(new Date(cycle.start_date), "MMM d, yyyy")}
         </Text>
         <View style={[styles.infoCard, { backgroundColor: theme.surface }]}>
-          <Text style={[styles.label, { color: theme.textSecondary }]}>period length</Text>
-          <Text style={[styles.value, { color: theme.text }]}>{cycle.period_length ? `${cycle.period_length} days` : 'not logged'}</Text>
-          <Text style={[styles.label, { color: theme.textSecondary }]}>cycle length</Text>
-          <Text style={[styles.value, { color: theme.text }]}>{cycle.cycle_length ? `${cycle.cycle_length} days` : 'still going 🔄'}</Text>
+          <Text style={[styles.label, { color: theme.textSecondary }]}>{tx("period length", "Period length")}</Text>
+          <Text style={[styles.value, { color: theme.text }]}>{cycle.period_length ? `${cycle.period_length} days` : tx('not logged', 'Not logged')}</Text>
+          <Text style={[styles.label, { color: theme.textSecondary }]}>{tx("cycle length", "Cycle length")}</Text>
+          <Text style={[styles.value, { color: theme.text }]}>{cycle.cycle_length ? `${cycle.cycle_length} days` : tx('still going 🔄', 'In progress')}</Text>
         </View>
 
-        <Text style={[styles.section, { color: theme.text }]}>phases, roughly</Text>
+        <Text style={[styles.section, { color: theme.text }]} accessibilityRole="header">{tx("phases, roughly", "Estimated phases")}</Text>
         <View style={styles.phasesRow}>
           {phases.map(phase => (
-            <View key={phase.name} style={[styles.phaseBadge, { backgroundColor: phase.color + '20' }]}>
-              <Text style={[styles.phaseName, { color: phase.color }]}>{PHASE_COPY[phase.name]?.name ?? phase.name}</Text>
-              <Text style={[styles.phaseRange, { color: theme.textSecondary }]}>days {phase.dayRange.join('–')}</Text>
+            <View key={phase.name} style={[styles.phaseBadge, { backgroundColor: phase.color + '20' }]} accessible accessibilityLabel={`${copy.phases[phase.name]?.name ?? phase.name}: days ${phase.dayRange[0]} to ${phase.dayRange[1]}`}>
+              <Text style={[styles.phaseName, { color: theme.text }]}>{copy.phases[phase.name]?.name ?? phase.name}</Text>
+              <Text style={[styles.phaseRange, { color: theme.textSecondary }]}>{tx("days", "Days")} {phase.dayRange.join('–')}</Text>
             </View>
           ))}
         </View>
 
-        <Text style={[styles.section, { color: theme.text }]}>daily logs ({entries.length})</Text>
+        <Text style={[styles.section, { color: theme.text }]} accessibilityRole="header">{tx("daily logs", "Daily logs")} ({entries.length})</Text>
         {entries.length === 0 ? (
-          <Text style={{ color: theme.textSecondary }}>nothing logged this cycle — that&apos;s okay.</Text>
+          <Text style={{ color: theme.textSecondary }}>{tx("nothing logged this cycle — that's okay.", "No logs for this cycle.")}</Text>
         ) : (
           entries.map(entry => {
             const day = getDayOfCycle(entry.logged_date, cycle.start_date);
             const phase = getPhaseForDay(day, cycle.cycle_length ?? 28);
             return (
               <View key={entry.id} style={[styles.dayCard, { backgroundColor: theme.surface }]}>
-                <Text style={[styles.dayHeader, { color: theme.text }]}>day {day} · {PHASE_COPY[phase]?.vibe ?? phase}</Text>
-                <View style={styles.symptomRow}>
-                  <Text style={{ color: theme.text }}>🔥 {entry.pain_score ?? '—'}</Text>
-                  <Text style={{ color: theme.text }}>✨ {entry.mood_score ?? '—'}</Text>
-                  <Text style={{ color: theme.text }}>🔋 {entry.energy_score ?? '—'}</Text>
+                <Text style={[styles.dayHeader, { color: theme.text }]} accessibilityRole="header">{tx("day", "Day")} {day} · {copy.phases[phase]?.vibe ?? phase}</Text>
+                <View
+                  style={styles.symptomRow}
+                  accessible
+                  accessibilityLabel={`Pain ${entry.pain_score ?? 'not logged'}, mood ${entry.mood_score ?? 'not logged'}, energy ${entry.energy_score ?? 'not logged'}`}
+                >
+                  <Text style={{ color: theme.text }}>{tx("🔥", "Pain")} {entry.pain_score ?? '—'}</Text>
+                  <Text style={{ color: theme.text }}>{tx("✨", "Mood")} {entry.mood_score ?? '—'}</Text>
+                  <Text style={{ color: theme.text }}>{tx("🔋", "Energy")} {entry.energy_score ?? '—'}</Text>
                 </View>
-                {entry.flow_intensity && <Text style={[styles.periodNote, { color: theme.error }]}>flow: {entry.flow_intensity.toLowerCase()}</Text>}
+                {entry.flow_intensity && <Text style={[styles.periodNote, { color: theme.error }]}>{tx("flow:", "Flow:")} {tx(entry.flow_intensity.toLowerCase(), entry.flow_intensity)}</Text>}
                 {(entry.health_sleep_source || entry.health_activity_source) && (
                   <Text style={[styles.sourceNote, { color: theme.textSecondary }]}>
-                    ⌚ synced from {Array.from(new Set([entry.health_sleep_source, entry.health_activity_source].filter(Boolean))).join(" + ")}
+                    {tx("⌚ synced from", "From")} {Array.from(new Set([entry.health_sleep_source, entry.health_activity_source].filter(Boolean))).join(" + ")}
                   </Text>
                 )}
               </View>
@@ -88,6 +98,7 @@ export default function CycleDetail() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   content: { padding: 20, paddingBottom: 40 },
+  backHit: { alignSelf: 'flex-start', minHeight: 44, justifyContent: 'center' },
   title: { fontSize: 28, fontWeight: 'bold', marginBottom: 16 },
   infoCard: { padding: 20, borderRadius: 16, marginBottom: 24, gap: 8 },
   label: { fontSize: 14 },

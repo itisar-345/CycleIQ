@@ -92,7 +92,7 @@ export const evaluateEndoRedFlag = (input: RedFlagInput): RedFlagResult => {
       shouldPrompt: true,
       triggerType: "bowel_shoulder_heavy_flow",
       message:
-        "You've logged bowel symptoms, shoulder pain and heavy flow on the same day. That combo is worth getting checked by a doctor — please don't brush it off 💛",
+        "You've logged bowel symptoms, shoulder pain and heavy flow on the same day. This combination is worth getting checked by a doctor — please don't brush it off.",
     };
   }
 
@@ -102,7 +102,7 @@ export const evaluateEndoRedFlag = (input: RedFlagInput): RedFlagResult => {
       shouldPrompt: true,
       triggerType: "severe_pain_3_days",
       message:
-        "You've had severe pain (8+) three days in a row. That's not something you should have to push through — please reach out to a healthcare provider 💛",
+        "You've had severe pain (8 or higher) three days in a row. That's not something you should have to push through — please contact a healthcare provider.",
     };
   }
 

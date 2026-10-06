@@ -2,7 +2,7 @@
 
 **Product:** CycleIQ — Period & Symptom Tracker  
 **Version:** 2.0  
-**Last Updated:** June 2026  
+**Last Updated:** October 2026  
 **Storage:** All data stored locally on device (no account, no server, no sync)  
 **Status Key:** `[ ]` Not started · `[~]` In progress · `[x]` Complete
 
@@ -19,8 +19,8 @@
 - [x] Set active period automatically if last period was within 7 days of onboarding
 - [x] PCOS / PCOD / Endo condition setup forms (diagnosis, pattern, management)
 - [x] Notification permission request (contextual, post first period log)
-- [x] Post-pill mode option ("I recently came off hormonal contraception")
-- [x] Age declaration (teen mode trigger for under 18)
+- [x] Post-pill mode option ("I recently came off hormonal contraception") — switch under Profile → your mode
+- [ ] Age declaration (teen mode trigger for under 18) — not in the current onboarding; waiting on the COPPA / GDPR-K review (§17) to decide whether an age gate or parental consent is needed
 - [x] Gender / language preference selection (deferred to Profile after setup)
 
 ---
@@ -94,7 +94,7 @@
 - [x] Resources list localised by user region
 - [x] Safeguarding threshold constants centralized in `constants/safeguarding.ts`
 - [x] Clinical review checklist documented in `docs/CLINICAL_REVIEW.md`
-- [ ] **Clinical sign-off required** before public release (`SAFEGUARDING_CLINICAL_REVIEW_REQUIRED = true`)
+- [ ] **Clinical sign-off required** before public release (`SAFEGUARDING_CLINICAL_REVIEW_REQUIRED = true`) — review pack ready: `docs/CLINICAL_REVIEW.md`
 
 ---
 
@@ -303,9 +303,9 @@
 - [x] Post-pill mode: predictions suppressed for 90 days
 - [x] Post-pill mode: baseline-building progress bar
 - [x] Post-pill education content (hormonal rebalancing timelines)
-- [x] Teen mode: simplified UI and reduced field set
-- [x] Teen mode: age-appropriate education content only
-- [x] Teen mode: no fertility-related features or content shown
+- [~] Teen mode: simplified UI and reduced field set — built in the Log screen, but can't be turned on until the age declaration exists
+- [~] Teen mode: age-appropriate education content only — same blocker as above
+- [~] Teen mode: no fertility-related features or content shown — same blocker as above
 
 ---
 
@@ -324,12 +324,12 @@
 - [x] Home screen — contextual pain management card (during active period with cramping)
 - [x] Home screen — flare active banner with timer (endo users in flare)
 - [x] Home screen — post-pill baseline progress bar
-- [x] Bottom navigation: Home / Log Hub / Calendar / Education / History / Insights / Profile (7 tabs)
-- [x] Tab bar icons — correct per tab (home, edit, calendar, books, history, chart, person)
+- [x] Bottom navigation: Home / Log / Calendar / Insights / You (5 tabs); History and Learn open from Home and Profile
+- [x] Tab bar icons — correct per tab (home, pencil, calendar, chart, person)
 - [x] Haptic feedback on tab press (iOS)
 - [x] Calendar tab — month view with cycle shading, phase labels, pain heat-map, day detail panel
 - [x] Insights tab — coaching cards, trend charts, cycle-phase overlays
-- [x] History tab — cycle list and entry log
+- [x] History screen — cycle list and entry log
 - [x] Profile tab — condition, language, notifications, data & privacy, exports
 
 ---
@@ -369,8 +369,8 @@
 - [x] Zustand persist encrypted at rest (AES-256-GCM via `utils/encryptedPersistStorage.ts`)
 - [x] Legacy plaintext AsyncStorage blobs migrated to encrypted on next save
 - [x] Sensitive prefs mirrored to encrypted SQLite (`pcos_data`, `endo_data`, age, gender, onboarding flag)
-- [ ] FDA regulatory counsel review — SaMD classification risk assessment
-- [ ] Teen mode parental consent — US COPPA and EU GDPR-K compliance review
+- [ ] FDA regulatory counsel review — SaMD classification risk assessment — brief ready: `docs/REGULATORY_BRIEF.md`
+- [ ] Teen mode parental consent — US COPPA and EU GDPR-K compliance review — brief ready: `docs/REGULATORY_BRIEF.md` §3
 
 ---
 
@@ -384,7 +384,7 @@
 - [x] prediction_feedback table — actual vs predicted for bias correction
 - [x] red_flag_prompt_logs table — red-flag alert history for reports
 - [x] app_settings table — condition, language, notification prefs, dismissed insights (partial Zustand mirror)
-- [x] schema_migrations table — versioned migration framework (dbSchemaVersion = 3)
+- [x] schema_migrations table — versioned migration framework (dbSchemaVersion = 4)
 - [x] All health data read/written from local SQLite only — no network calls for core features
 - [x] Database migration framework for app update schema changes
 - [x] Local backup: export full encrypted database to file on demand (via share sheet)
@@ -406,13 +406,15 @@
 - [x] On-device correlation engine (Spearman, runs after sufficient entries)
 - [x] Local push notifications via Expo Notifications (no server required)
 - [x] OS notification permission re-sync on AppState foreground
-- [ ] Native biometric auth module (FaceID / TouchID / Fingerprint) for app lock
+- [x] App lock via expo-local-authentication (Face ID / Touch ID / fingerprint, passcode fallback)
+- [x] Discreet notifications (no health details on the lock screen)
+- [x] Tone setting: chill / classic wording across the app and notifications
 - [x] HealthKit bridge via @kingstinct/react-native-healthkit (sleep, steps, exercise minutes; dev/store builds)
 - [x] Health Connect bridge via react-native-health-connect (sleep, steps, exercise; dev/store builds, minSdk 26)
-- [ ] iOS 16+ compatibility verified on device
-- [ ] Android 10+ compatibility verified on device
-- [ ] iOS App Store submission and listing
-- [ ] Android Play Store submission and listing
+- [ ] iOS 16+ compatibility verified on device — test plan: `docs/QA_DEVICE_TEST_PLAN.md`
+- [ ] Android 10+ compatibility verified on device — test plan: `docs/QA_DEVICE_TEST_PLAN.md`
+- [ ] iOS App Store submission and listing — submission pack: `docs/STORE_SUBMISSION.md` (needs bundle ID + developer account)
+- [ ] Android Play Store submission and listing — submission pack: `docs/STORE_SUBMISSION.md` (needs package name + Play Console account)
 
 ---
 
@@ -424,21 +426,29 @@
 - [x] Unit tests: safeguarding threshold detection (3 consecutive mood = 1)
 - [x] Unit tests: red-flag prompt trigger logic
 - [x] Unit tests: cycle-length recompute on create / edit / delete
-- [ ] Unit tests: prediction save deduplication
+- [x] Unit tests: prediction save deduplication
 - [x] Unit tests: migration ledger and v4 cycle-length repair
-- [ ] Integration tests: full symptom log → correlation computation → insight display flow
+- [x] Integration tests: full symptom log → correlation computation → insight display flow (DB layer + Insights screen)
 - [x] Integration tests: onboarding seed → period start → prediction feedback (database layer)
-- [ ] Integration tests: period start → prediction update flow
+- [x] Integration tests: period start → prediction update flow (DB layer + Home screen)
 - [x] Integration tests: flare start → flare end with encrypted reflection (database layer)
 - [x] Integration tests: local backup export → restore
-- [ ] Performance test: calendar render with 12 months of dense symptom data
-- [ ] Performance test: on-device prediction retraining time (<2 seconds target)
-- [ ] Performance test: correlation computation on 90 days of entries (<3 seconds target)
-- [ ] Accessibility audit (WCAG 2.1 AA) before launch
-- [ ] User research sessions with PCOS community members
-- [ ] User research sessions with endometriosis community members
-- [ ] Clinical review: safeguarding thresholds and resource destinations
+- [x] Performance test: calendar render with 12 months of dense symptom data (< 3 s budget, Jest)
+- [x] Performance test: on-device prediction retraining time (<2 seconds target; 60 cycles)
+- [x] Performance test: correlation computation on 90 days of entries (<3 seconds target)
+- [x] Screen tests (Jest + React Native Testing Library): Log, Home, Calendar, Insights, Profile — `npm run test:ui`
+- [x] Automated accessibility check: tests fail if any tappable element lacks a role or label
+- [x] Tone tests: chill / classic wording, discreet notifications never mention health details
+- [x] CI workflow (`.github/workflows/ci.yml`): typecheck, lint, unit + UI tests, expo-doctor, iOS/Android bundle export
+- [x] End-to-end flows for real devices (Maestro, `.maestro/`): onboarding, daily log, period start/end, settings — `npm run e2e`
+- [x] EAS build profiles (`eas.json`): development, internal QA, production
+- [x] One-command local gate: `npm run check`
+- [x] Accessibility pass: AA contrast, screen-reader labels/roles/states, 44pt targets, Reduce Motion
+- [ ] Accessibility audit with VoiceOver / TalkBack on real devices before launch — script: `docs/ACCESSIBILITY_AUDIT.md`
+- [ ] User research sessions with PCOS community members — guide: `docs/USER_RESEARCH_GUIDE.md`
+- [ ] User research sessions with endometriosis community members — guide: `docs/USER_RESEARCH_GUIDE.md`
+- [ ] Clinical review: safeguarding thresholds and resource destinations — `docs/CLINICAL_REVIEW.md`
 
 ---
 
-\_Last updated: June 2026
+\_Last updated: October 2026

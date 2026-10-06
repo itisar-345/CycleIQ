@@ -14,7 +14,13 @@ export function OnboardingProgress({ step, total, label }: Props) {
   const theme = Colors[colorScheme];
 
   return (
-    <View style={styles.wrap}>
+    <View
+      style={styles.wrap}
+      accessible
+      accessibilityRole="progressbar"
+      accessibilityLabel={label ?? `Step ${step} of ${total}`}
+      accessibilityValue={{ min: 0, max: total, now: step, text: `Step ${step} of ${total}` }}
+    >
       <View style={styles.row}>
         {Array.from({ length: total }, (_, i) => (
             <View

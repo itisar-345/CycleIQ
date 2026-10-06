@@ -1,0 +1,7 @@
+# Maestro end-to-end flows. Run against a development/QA build:
+#   APP_ID=<your bundle id / package> maestro test .maestro
+# (npm run e2e passes through to `maestro test .maestro`.)
+flows:
+  - "*.yaml"
+excludeFlows:
+  - config.yaml

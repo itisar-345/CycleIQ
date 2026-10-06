@@ -1,5 +1,7 @@
 import { IconSymbol } from "@/components/ui/icon-symbol";
-import { PHASE_COPY } from "@/constants/copy";
+import { useCopy } from "@/constants/copy";
+import { router } from "expo-router";
+import { useTx } from "@/utils/tone";
 import { Colors } from "@/constants/theme";
 import { getAllCycles, getPhaseAverages, generateInsights, persistAndRetireInsights, CycleInsight, PhaseAverage, getCyclePredictions, type CycleRow } from "@/database";
 import { useColorScheme } from "@/hooks/use-color-scheme";
@@ -21,7 +23,9 @@ import { SafeAreaView } from "react-native-safe-area-context";
 export default function AnalyticsScreen() {
   const colorScheme = useColorScheme() ?? "light";
   const theme = Colors[colorScheme];
-  const { currentMode, postPillMode, postPillStartDate, dismissedInsights, dismissInsight: storeDismissInsight, notificationPrefs } = useAppStore();
+  const tx = useTx();
+  const copy = useCopy();
+  const { currentMode, postPillMode, postPillStartDate, dismissedInsights, dismissInsight: storeDismissInsight, notificationPrefs, tone } = useAppStore();
 
   const [cycles, setCycles] = useState<CycleRow[]>([]);
   const [phaseAverages, setPhaseAverages] = useState<PhaseAverage[]>([]);
@@ -38,7 +42,7 @@ export default function AnalyticsScreen() {
         const avgs = await getPhaseAverages(allCycles[0].id, pred.model !== "none" ? pred.mean : 28);
         setPhaseAverages(avgs);
       }
-      const fetchedInsights = await generateInsights(currentMode);
+      const fetchedInsights = await generateInsights(currentMode, tone);
       fetchedInsights.sort((a, b) => Math.abs(b.correlation || 0) - Math.abs(a.correlation || 0));
       setInsights(fetchedInsights);
       // Persist correlations and retire stale ones (90-day re-evaluation)
@@ -53,10 +57,9 @@ export default function AnalyticsScreen() {
       // Schedule flare warning for endo users if a flare onset pattern exists
       if (currentMode === "endo" && notificationPrefs.flares && allCycles.length > 0) {
         const flareInsight = fetchedInsights.find((i) => i.title === "Flare Onset Pattern");
-        if (flareInsight?.description) {
-          const match = flareInsight.description.match(/Cycle Day (\d+)/);
-          if (match) {
-            const avgOnsetDay = parseInt(match[1], 10);
+        if (flareInsight?.onsetDay) {
+          {
+            const avgOnsetDay = flareInsight.onsetDay;
             const latestStart = new Date(allCycles[0].start_date);
             const avgCycleLen = allCycles[0].cycle_length || 28;
             // Predict flare date in the current cycle
@@ -78,7 +81,7 @@ export default function AnalyticsScreen() {
       }
     };
     loadData();
-  }, [currentMode, postPillMode, postPillStartDate, notificationPrefs.flares, notificationPrefs.insights]);
+  }, [currentMode, postPillMode, postPillStartDate, notificationPrefs.flares, notificationPrefs.insights, tone]);
   const visibleInsights = insights.filter((i) => !dismissedInsights.includes(i.title));
 
   const dismissInsight = (title: string) => {
@@ -90,19 +93,24 @@ export default function AnalyticsScreen() {
       style={[styles.container, { backgroundColor: theme.background }]}
     >
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={[styles.title, { color: theme.text }]}>
-          your patterns 👀
-        </Text>
+        <View style={styles.titleRow}>
+          <Text style={[styles.title, { color: theme.text }]} accessibilityRole="header">
+            {tx("your patterns 👀", "Insights")}
+          </Text>
+          <TouchableOpacity onPress={() => router.push("/education")} style={styles.learnLink} accessibilityRole="link">
+            <Text style={{ color: theme.tint, fontWeight: "800" }}>{tx("learn 📚", "Learn")}</Text>
+          </TouchableOpacity>
+        </View>
         <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
-          the tea from your own logs ☕ — stuff that tends to happen together for you.
+          {tx("the tea from your own logs ☕ — stuff that tends to happen together for you.", "Patterns found in your own logs.")}
         </Text>
 
         {/* Prediction Summary Card */}
         {prediction && prediction.model !== "none" && (
           <View style={[styles.predCard, { backgroundColor: theme.surface, borderColor: theme.tint }]}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-              <Text style={{ fontSize: 20 }}>🔮</Text>
-              <Text style={{ fontSize: 18, fontWeight: 'bold', color: theme.text }}>next period, probably</Text>
+              <Text style={{ fontSize: 20 }} importantForAccessibility="no" accessibilityElementsHidden>🔮</Text>
+              <Text style={{ fontSize: 18, fontWeight: 'bold', color: theme.text }} accessibilityRole="header">{tx("next period, probably", "Next period prediction")}</Text>
             </View>
             {prediction.predictedStartISO && (
               <Text style={{ fontSize: 26, fontWeight: 'bold', color: theme.tint, marginBottom: 2 }}>
@@ -111,26 +119,30 @@ export default function AnalyticsScreen() {
             )}
             {prediction.windowStartISO && prediction.windowEndISO && (
               <Text style={{ color: theme.textSecondary, marginBottom: 10 }}>
-                Likely window: {format(parseISO(prediction.windowStartISO), 'MMM d')} – {format(parseISO(prediction.windowEndISO), 'MMM d')}
+                {tx("likely between", "Likely window:")} {format(parseISO(prediction.windowStartISO), 'MMM d')} – {format(parseISO(prediction.windowEndISO), 'MMM d')}
               </Text>
             )}
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
-              <Text style={{ color: theme.textSecondary, fontSize: 13 }}>how sure we are</Text>
+            <View
+              style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}
+              accessible
+              accessibilityLabel={`${tx("How sure we are", "Confidence")}: ${Math.round(prediction.confidence * 100)}%`}
+            >
+              <Text style={{ color: theme.textSecondary, fontSize: 13 }}>{tx("how sure we are", "Confidence")}</Text>
               <Text style={{ color: theme.tint, fontWeight: 'bold', fontSize: 13 }}>{Math.round(prediction.confidence * 100)}%</Text>
             </View>
             <View style={{ width: '100%', height: 8, borderRadius: 4, backgroundColor: theme.border, overflow: 'hidden', marginBottom: 8 }}>
               <View style={{ width: `${Math.round(prediction.confidence * 100)}%`, height: 8, borderRadius: 4, backgroundColor: theme.tint }} />
             </View>
             {prediction.mae !== null && (
-              <Text style={{ color: theme.textSecondary, fontSize: 13 }}>past guesses were off by ~{prediction.mae} days on average</Text>
+              <Text style={{ color: theme.textSecondary, fontSize: 13 }}>{tx(`past guesses were off by ~${prediction.mae} days on average`, `Past predictions were off by ${prediction.mae} days on average`)}</Text>
             )}
             {prediction.outlierFlagged && (
-              <Text style={{ color: theme.error ?? '#E53E3E', fontSize: 13, marginTop: 4 }}>
-                ⚠️ Last cycle was unusually long — window is wider.
+              <Text style={{ color: theme.error, fontSize: 13, marginTop: 4 }}>
+                {tx("heads up: your last cycle ran long, so the window's wider.", "Your last cycle was unusually long, so the window is wider.")}
               </Text>
             )}
             <Text style={{ color: theme.textSecondary, fontSize: 11, marginTop: 8 }}>
-              {prediction.label} · Not medical advice
+              {prediction.label} · {tx("not medical advice", "Not medical advice")}
             </Text>
           </View>
         )}
@@ -143,13 +155,15 @@ export default function AnalyticsScreen() {
             ]}
           >
             <Text style={[styles.placeholderTitle, { color: theme.text }]}>
-              patterns loading… 🔍
+              {tx("patterns loading… 🔍", "Insights are on their way")}
             </Text>
             <Text
               style={[styles.placeholderText, { color: theme.textSecondary }]}
             >
-              Keep logging daily — after about 20 days we start spotting what affects what for you.
-              we&apos;re learning what makes your body, well, yours 💫
+              {tx(
+                "Keep logging daily — after about 20 days we start spotting what affects what for you. we're learning what makes your body, well, yours 💫",
+                "Keep logging daily. After about 20 days of logs, personal patterns will start to appear.",
+              )}
             </Text>
           </View>
         )}
@@ -159,17 +173,17 @@ export default function AnalyticsScreen() {
           <View
             style={[styles.sectionCard, { backgroundColor: theme.surface }]}
           >
-            <Text style={[styles.sectionTitle, { color: theme.text }]}>
-              how you feel by phase 📊
+            <Text style={[styles.sectionTitle, { color: theme.text }]} accessibilityRole="header">
+              {tx("how you feel by phase 📊", "Phase trends")}
             </Text>
             {phaseAverages.map((avg, i) => (
               <View key={i} style={styles.avgRow}>
                 <Text style={{ fontWeight: "600", color: theme.text }}>
-                  {PHASE_COPY[avg.phase]?.vibe ?? avg.phase}
+                  {copy.phases[avg.phase]?.vibe ?? avg.phase}
                 </Text>
                 <Text style={{ color: theme.textSecondary }}>
-                  mood {avg.mood_avg ?? "—"} · energy {avg.energy_avg ?? "—"} · fog{" "}
-                  {avg.brain_fog_avg} (n={avg.count})
+                  {tx("mood", "Mood")} {avg.mood_avg ?? "—"} · {tx("energy", "Energy")} {avg.energy_avg ?? "—"} · {tx("fog", "Brain fog")}{" "}
+                  {avg.brain_fog_avg ?? "—"} ({avg.count} {tx("logs", "logs")})
                 </Text>
               </View>
             ))}
@@ -177,7 +191,7 @@ export default function AnalyticsScreen() {
         )}
         {phaseAverages.length === 0 && cycles.length >= 3 && (
           <Text style={{ color: theme.textSecondary, textAlign: "center" }}>
-            log across different phases and your trends show up here ✨
+            {tx("log across different phases and your trends show up here ✨", "Log across different phases to see trends.")}
           </Text>
         )}
 
@@ -193,43 +207,60 @@ export default function AnalyticsScreen() {
               <View style={styles.correlationBadge}>
                 <Text style={{ color: theme.tint, fontWeight: "bold", fontSize: 12 }}>
                   {insight.correlation !== undefined
-                    ? `|r| = ${Math.abs(insight.correlation)} (n=${insight.n || "?"})`
-                    : "Pattern"}
+                    ? tx(
+                        `${Math.abs(insight.correlation) >= 0.5 ? "strong" : "moderate"} link · ${insight.n ?? "?"} days`,
+                        `Correlation ${Math.abs(insight.correlation)} (${insight.n ?? "?"} days)`,
+                      )
+                    : tx("pattern", "Pattern")}
                 </Text>
               </View>
-              <TouchableOpacity onPress={() => dismissInsight(insight.title)}>
-                <Text style={{ color: theme.textSecondary, fontSize: 12 }}>not for me ×</Text>
+              <TouchableOpacity
+                onPress={() => dismissInsight(insight.title)}
+                style={styles.dismissHit}
+                accessibilityRole="button"
+                accessibilityLabel={`${tx("Hide insight", "Hide insight")}: ${insight.title}`}
+              >
+                <Text style={{ color: theme.textSecondary, fontSize: 12 }}>{tx("not for me ×", "Hide ×")}</Text>
               </TouchableOpacity>
             </View>
 
             {/* Sec 9: "Patterns we've noticed" label on every card */}
             <Text style={[styles.patternLabel, { color: theme.textSecondary }]}>
-              pattern spotted 👀
+              {tx("pattern spotted 👀", "Pattern we've noticed")}
             </Text>
 
-            <Text style={[styles.insightTitle, { color: theme.text }]}>{insight.title}</Text>
+            <Text style={[styles.insightTitle, { color: theme.text }]} accessibilityRole="header">{insight.title}</Text>
             <Text style={[styles.insightText, { color: theme.text }]}>{insight.description}</Text>
 
             {/* Sec 9: Mental health disclaimer on relevant cards */}
             {insight.isMentalHealth && (
               <View style={[styles.mhDisclaimer, { backgroundColor: theme.border + "60" }]}>
                 <Text style={{ color: theme.textSecondary, fontSize: 12, lineHeight: 18 }}>
-                  💛 Mood and stress have lots of moving parts — this isn&apos;t a diagnosis. If you&apos;re struggling, talking to a professional is a power move, not a weakness.
+                  {tx(
+                    "💛 Mood and stress have lots of moving parts — this isn't a diagnosis. If you're struggling, talking to a professional is a power move, not a weakness.",
+                    "Mood and stress have many contributing factors. This is not a clinical assessment — if you're struggling, please reach out to a healthcare professional.",
+                  )}
                 </Text>
               </View>
             )}
 
             <View style={[styles.cardFooter, { borderTopColor: theme.border }]}>
               <Text style={{ color: theme.textSecondary, fontSize: 11 }}>
-                not medical advice · based on your last 90 days
+                {tx("not medical advice · based on your last 90 days", "Not medical advice · Based on the last 90 days")}
               </Text>
               <TouchableOpacity
                 onPress={() =>
                   Alert.alert(
-                    "how we figured this out 🧪",
-                    "We compare your last 90 days of logs. A pattern only shows up if it's based on 20+ days AND still holds after correcting for all the comparisons we check at once — so it's unlikely to be a fluke. It shows things that tend to happen together, not proof that one causes the other."
+                    tx("how we figured this out 🧪", "How this was calculated"),
+                    tx(
+                      "We compare your last 90 days of logs. A pattern only shows up if it's based on 20+ days AND still holds after correcting for all the comparisons we check at once — so it's unlikely to be a fluke. It shows things that tend to happen together, not proof that one causes the other.",
+                      "We compare your last 90 days of logs. A pattern is shown only if it's based on at least 20 days and remains statistically significant after correcting for the number of comparisons. It shows association, not causation.",
+                    ),
                   )
                 }
+                style={styles.dismissHit}
+                accessibilityRole="button"
+                accessibilityLabel={tx("How this was calculated", "How this was calculated")}
               >
                 <IconSymbol name="info.circle" size={16} color={theme.textSecondary} />
               </TouchableOpacity>
@@ -240,7 +271,7 @@ export default function AnalyticsScreen() {
         {visibleInsights.length === 0 && cycles.length >= 3 && (
           <View style={{ alignItems: "center", marginTop: 40 }}>
             <Text style={{ color: theme.textSecondary }}>
-              no new patterns rn — keep logging and we&apos;ll keep looking 🔍
+              {tx("no new patterns rn — keep logging and we'll keep looking 🔍", "No new insights right now. Keep logging.")}
             </Text>
           </View>
         )}
@@ -253,6 +284,9 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   content: { padding: 20, paddingBottom: 40 },
   title: { fontSize: 30, fontWeight: "800", letterSpacing: -0.5 },
+  titleRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  learnLink: { paddingVertical: 10, paddingHorizontal: 4, minHeight: 44, justifyContent: "center" },
+  dismissHit: { minHeight: 44, minWidth: 44, alignItems: "flex-end", justifyContent: "center" },
   subtitle: { fontSize: 15, lineHeight: 21, marginTop: 4, marginBottom: 24 },
   insightCard: {
     padding: 20,

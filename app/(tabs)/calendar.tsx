@@ -1,4 +1,5 @@
-import { PHASE_COPY } from '@/constants/copy';
+import { useCopy } from '@/constants/copy';
+import { useTx } from '@/utils/tone';
 import { Colors } from '@/constants/theme';
 import { getAllCycles, getAllEntries, getCyclePredictions, getPhaseAverages, getDayOfCycle, getPhaseForDay, type CycleRow, type PhaseAverage, type SymptomEntryRow } from '@/database';
 import { differenceInDays, format, parseISO } from "date-fns";
@@ -22,6 +23,8 @@ type DayData = {
 };
 
 export default function CalendarScreen() {
+  const tx = useTx();
+  const copy = useCopy();
   const colorScheme = useColorScheme() ?? 'light';
   const theme = Colors[colorScheme];
   const { currentMode, postPillMode, postPillStartDate } = useAppStore();
@@ -162,25 +165,30 @@ export default function CalendarScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.tint} />
         }
       >
-        <Text style={[styles.title, { color: theme.text }]}>your calendar 📅</Text>
+        <View style={styles.titleRow}>
+          <Text style={[styles.title, { color: theme.text }]} accessibilityRole="header">{tx("your calendar 📅", "Calendar")}</Text>
+          <TouchableOpacity onPress={() => router.push('/history')} style={styles.historyLink} accessibilityRole="link">
+            <Text style={{ color: theme.tint, fontWeight: '800' }}>{tx("history →", "History")}</Text>
+          </TouchableOpacity>
+        </View>
 
         <View style={styles.monthNav}>
-          <TouchableOpacity onPress={() => shiftMonth(-1)} style={[styles.navBtn, { borderColor: theme.border }]}>
+          <TouchableOpacity onPress={() => shiftMonth(-1)} style={[styles.navBtn, { borderColor: theme.border }]} accessibilityRole="button" accessibilityLabel={tx("Previous month", "Previous month")}>
             <Text style={{ color: theme.tint, fontWeight: '700' }}>‹</Text>
           </TouchableOpacity>
-          <Text style={[styles.subtitle, { color: theme.text, marginBottom: 0 }]}>
+          <Text style={[styles.subtitle, { color: theme.text, marginBottom: 0 }]} accessibilityRole="header" accessibilityLiveRegion="polite">
             {viewDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long' })}
           </Text>
-          <TouchableOpacity onPress={() => shiftMonth(1)} style={[styles.navBtn, { borderColor: theme.border }]}>
+          <TouchableOpacity onPress={() => shiftMonth(1)} style={[styles.navBtn, { borderColor: theme.border }]} accessibilityRole="button" accessibilityLabel={tx("Next month", "Next month")}>
             <Text style={{ color: theme.tint, fontWeight: '700' }}>›</Text>
           </TouchableOpacity>
         </View>
 
-        <TouchableOpacity onPress={() => { setViewDate(new Date(today.getFullYear(), today.getMonth(), 1)); setSelectedDay(null); }}>
-          <Text style={[styles.todayLink, { color: theme.tint }]}>back to today ↩︎</Text>
+        <TouchableOpacity onPress={() => { setViewDate(new Date(today.getFullYear(), today.getMonth(), 1)); setSelectedDay(null); }} accessibilityRole="button" style={styles.todayHit}>
+          <Text style={[styles.todayLink, { color: theme.tint }]}>{tx("back to today ↩︎", "Go to today")}</Text>
         </TouchableOpacity>
 
-        <View style={styles.weekdays}>
+        <View style={styles.weekdays} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
           {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
             <Text key={day} style={[styles.weekday, { color: theme.textSecondary }]}>{day}</Text>
           ))}
@@ -196,6 +204,19 @@ export default function CalendarScreen() {
                 style={styles.dayCell}
                 onPress={() => day && setSelectedDay(day)}
                 activeOpacity={day ? 0.7 : 1}
+                disabled={!day}
+                accessible={!!day}
+                accessibilityRole="button"
+                accessibilityState={{ selected: isSelected }}
+                accessibilityLabel={day ? [
+                  format(parseISO(day.date), 'EEEE, MMMM d'),
+                  isToday ? 'today' : null,
+                  day.periodScore > 0 ? 'period' : null,
+                  day.predictionConfidence > 0 ? 'predicted period' : null,
+                  day.painScore > 5 ? 'high pain' : null,
+                  day.flare ? 'flare' : null,
+                  day.phase ? `${copy.phases[day.phase]?.name ?? day.phase} phase` : null,
+                ].filter(Boolean).join(', ') : undefined}
               >
                 {day ? (
                   <View style={[
@@ -226,28 +247,29 @@ export default function CalendarScreen() {
 
         {selectedDay && (
           <View style={[styles.dayDetail, { backgroundColor: theme.surface, borderColor: theme.tint }]}>
-            <Text style={[styles.dayDetailTitle, { color: theme.text }]}>
+            <Text style={[styles.dayDetailTitle, { color: theme.text }]} accessibilityRole="header">
               {format(parseISO(selectedDay.date), 'EEEE, MMM d')}
             </Text>
             {selectedDay.phase && (
               <Text style={{ color: theme.textSecondary }}>
-                <Text style={{ color: getPhaseColor(selectedDay.phase), fontWeight: '700' }}>{PHASE_COPY[selectedDay.phase]?.name ?? selectedDay.phase}</Text> · {PHASE_COPY[selectedDay.phase]?.vibe ?? ''}
+                <Text style={{ color: getPhaseColor(selectedDay.phase), fontWeight: '700' }}>{copy.phases[selectedDay.phase]?.name ?? selectedDay.phase}</Text>{tx(` · ${copy.phases[selectedDay.phase]?.vibe ?? ''}`, ' phase')}
               </Text>
             )}
             {selectedEntry ? (
               <View style={styles.detailStats}>
-                <Text style={{ color: theme.text }}>🔥 pain {selectedEntry.pain_score ?? '—'}/10</Text>
-                <Text style={{ color: theme.text }}>✨ mood {selectedEntry.mood_score ?? '—'}/5</Text>
-                <Text style={{ color: theme.text }}>🔋 energy {selectedEntry.energy_score ?? '—'}/10</Text>
+                <Text style={{ color: theme.text }}>{tx("🔥 pain", "Pain")} {selectedEntry.pain_score ?? '—'}/10</Text>
+                <Text style={{ color: theme.text }}>{tx("✨ mood", "Mood")} {selectedEntry.mood_score ?? '—'}/5</Text>
+                <Text style={{ color: theme.text }}>{tx("🔋 energy", "Energy")} {selectedEntry.energy_score ?? '—'}/10</Text>
               </View>
             ) : (
-              <Text style={{ color: theme.textSecondary, marginTop: 8 }}>nothing logged this day — no stress.</Text>
+              <Text style={{ color: theme.textSecondary, marginTop: 8 }}>{tx("nothing logged this day — no stress.", "Nothing logged for this day.")}</Text>
             )}
             <TouchableOpacity
               style={[styles.logDayBtn, { backgroundColor: theme.tint }]}
               onPress={() => router.push('/log')}
+              accessibilityRole="button"
             >
-              <Text style={[styles.logDayBtnText, { color: theme.onTint }]}>{selectedEntry ? 'update this log' : 'log this day'}</Text>
+              <Text style={[styles.logDayBtnText, { color: theme.onTint }]}>{selectedEntry ? tx('update this log', 'Update log') : tx('log this day', 'Log this day')}</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -255,26 +277,26 @@ export default function CalendarScreen() {
         <View style={styles.legend}>
           <View style={styles.legendItem}>
             <View style={[styles.legendDot, { backgroundColor: '#FF6B9D' }]} />
-            <Text style={{ color: theme.textSecondary }}>period</Text>
+            <Text style={{ color: theme.textSecondary }}>{tx("period", "Period")}</Text>
           </View>
           <View style={styles.legendItem}>
             <View style={[styles.legendDot, { backgroundColor: theme.tint, opacity: 0.5 }]} />
-            <Text style={{ color: theme.textSecondary }}>predicted</Text>
+            <Text style={{ color: theme.textSecondary }}>{tx("predicted", "Predicted")}</Text>
           </View>
           <View style={styles.legendItem}>
             <View style={[styles.legendDot, { backgroundColor: '#FF4757' }]} />
-            <Text style={{ color: theme.textSecondary }}>rough pain day</Text>
+            <Text style={{ color: theme.textSecondary }}>{tx("rough pain day", "High pain")}</Text>
           </View>
         </View>
 
         {phaseAverages.length > 0 && (
           <View style={styles.overlaysSection}>
-            <Text style={[styles.sectionTitle, { color: theme.text }]}>how you feel by phase 📊</Text>
+            <Text style={[styles.sectionTitle, { color: theme.text }]} accessibilityRole="header">{tx("how you feel by phase 📊", "Phase trends")}</Text>
             {phaseAverages.map(avg => (
               <View key={avg.phase} style={[styles.avgRow, { backgroundColor: theme.surface }]}>
-                <Text style={{ color: theme.text, fontWeight: '700' }}>{PHASE_COPY[avg.phase]?.vibe ?? avg.phase}</Text>
+                <Text style={{ color: theme.text, fontWeight: '700' }}>{copy.phases[avg.phase]?.vibe ?? avg.phase}</Text>
                 <Text style={{ color: theme.textSecondary }}>
-                  mood {avg.mood_avg ?? '—'} · energy {avg.energy_avg ?? '—'}
+                  {tx("mood", "Mood")} {avg.mood_avg ?? '—'} · {tx("energy", "Energy")} {avg.energy_avg ?? '—'}
                 </Text>
               </View>
             ))}
@@ -298,10 +320,13 @@ const getPhaseColor = (phase: string) => {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   content: { padding: 20, paddingBottom: 40 },
-  title: { fontSize: 32, fontWeight: 'bold' },
+  title: { fontSize: 30, fontWeight: '800', letterSpacing: -0.5 },
+  titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  historyLink: { paddingVertical: 10, paddingHorizontal: 4, minHeight: 44, justifyContent: 'center' },
+  todayHit: { minHeight: 44, justifyContent: 'center' },
   subtitle: { fontSize: 18, fontWeight: '600', marginBottom: 24, textAlign: 'center', flex: 1 },
   monthNav: { flexDirection: 'row', alignItems: 'center', marginBottom: 8, gap: 12 },
-  navBtn: { width: 40, height: 40, borderRadius: 20, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  navBtn: { width: 44, height: 44, borderRadius: 22, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   todayLink: { fontSize: 14, fontWeight: '600', textAlign: 'center', marginBottom: 16 },
   weekdays: { flexDirection: 'row', marginBottom: 12 },
   weekday: { flex: 1, textAlign: 'center', fontWeight: '600' },

@@ -14,8 +14,10 @@ import * as Print from "expo-print";
 import React, { useEffect, useState } from "react";
 import { Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useTx } from "@/utils/tone";
 
 export default function AppointmentPrepScreen() {
+  const tx = useTx();
   const colorScheme = useColorScheme() ?? "light";
   const theme = Colors[colorScheme];
   const { currentMode } = useAppStore();
@@ -44,10 +46,10 @@ export default function AppointmentPrepScreen() {
       const fileName = `CycleIQ_Appointment_Prep_${format(new Date(), "yyyy-MM-dd_HHmm")}.pdf`;
       const permanentUri = await savePdfToReports(tempUri, fileName);
       const shared = await shareReport(permanentUri);
-      if (!shared) Alert.alert("prep saved 📄", `It's in Saved Reports.\n\n${permanentUri}`);
+      if (!shared) Alert.alert(tx("prep saved 📄", "Saved"), tx(`It's in Saved Reports.\n\n${permanentUri}`, `Saved to Saved Reports.\n\n${permanentUri}`));
     } catch (error) {
       console.error("Appointment prep export failed", error);
-      Alert.alert("export didn't work 😕", "Couldn't make the PDF — try again?");
+      Alert.alert(tx("export didn't work 😕", "Export failed"), tx("Couldn't make the PDF — try again?", "The PDF couldn't be created. Please try again."));
     } finally {
       setSaving(false);
     }
@@ -56,52 +58,52 @@ export default function AppointmentPrepScreen() {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
       <View style={[styles.header, { borderBottomColor: theme.border }]}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Text style={[styles.backText, { color: theme.tint }]}>‹ back</Text>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backButton} accessibilityRole="button">
+          <Text style={[styles.backText, { color: theme.tint }]}>{tx("‹ back", "‹ Back")}</Text>
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: theme.text }]}>appointment prep 📝</Text>
+        <Text style={[styles.headerTitle, { color: theme.text }]} accessibilityRole="header">{tx("appointment prep 📝", "Appointment preparation")}</Text>
         <View style={{ width: 56 }} />
       </View>
       <ScrollView contentContainerStyle={styles.content}>
         {!summary ? (
-          <Text style={{ color: theme.textSecondary }}>pulling your notes together…</Text>
+          <Text style={{ color: theme.textSecondary }}>{tx("pulling your notes together…", "Preparing…")}</Text>
         ) : (
           <>
             <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-              <Text style={[styles.cardTitle, { color: theme.text }]}>what your logs say (auto-filled) ✨</Text>
-              <Text style={[styles.label, { color: theme.textSecondary }]}>dates covered</Text>
+              <Text style={[styles.cardTitle, { color: theme.text }]} accessibilityRole="header">{tx("what your logs say (auto-filled) ✨", "Summary from your logs")}</Text>
+              <Text style={[styles.label, { color: theme.textSecondary }]}>{tx("dates covered", "Date range")}</Text>
               <Text style={[styles.value, { color: theme.text }]}>{summary.dateRange}</Text>
-              <Text style={[styles.label, { color: theme.textSecondary }]}>cycles</Text>
+              <Text style={[styles.label, { color: theme.textSecondary }]}>{tx("cycles", "Cycles")}</Text>
               <Text style={[styles.value, { color: theme.text }]}>{summary.cycleSummary}</Text>
-              <Text style={[styles.label, { color: theme.textSecondary }]}>pain</Text>
+              <Text style={[styles.label, { color: theme.textSecondary }]}>{tx("pain", "Pain")}</Text>
               <Text style={[styles.value, { color: theme.text }]}>{summary.painSummary}</Text>
-              <Text style={[styles.label, { color: theme.textSecondary }]}>symptoms</Text>
+              <Text style={[styles.label, { color: theme.textSecondary }]}>{tx("symptoms", "Symptoms")}</Text>
               <Text style={[styles.value, { color: theme.text }]}>{summary.symptomSummary}</Text>
-              <Text style={[styles.label, { color: theme.textSecondary }]}>flares & meds</Text>
+              <Text style={[styles.label, { color: theme.textSecondary }]}>{tx("flares & meds", "Flares and medication")}</Text>
               <Text style={[styles.value, { color: theme.text }]}>{summary.flareSummary} {summary.medicationSummary}</Text>
             </View>
 
             <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-              <Text style={[styles.cardTitle, { color: theme.text }]}>what I want from this visit 🎯</Text>
+              <Text style={[styles.cardTitle, { color: theme.text }]} accessibilityRole="header">{tx("what I want from this visit 🎯", "Visit goals")}</Text>
               <TextInput
                 style={[styles.textArea, { color: theme.text, borderColor: theme.border }]}
                 value={summary.goals}
                 onChangeText={(value) => updateField("goals", value)}
                 multiline
               />
-              <Text style={[styles.cardTitle, { color: theme.text, marginTop: 16 }]}>questions to ask (don&apos;t leave without asking!)</Text>
+              <Text style={[styles.cardTitle, { color: theme.text, marginTop: 16 }]} accessibilityRole="header">{tx("questions to ask (don't leave without asking!)", "Questions to ask")}</Text>
               <TextInput
                 style={[styles.textArea, { color: theme.text, borderColor: theme.border }]}
                 value={summary.questions}
                 onChangeText={(value) => updateField("questions", value)}
                 multiline
               />
-              <Text style={[styles.cardTitle, { color: theme.text, marginTop: 16 }]}>my notes</Text>
+              <Text style={[styles.cardTitle, { color: theme.text, marginTop: 16 }]} accessibilityRole="header">{tx("my notes", "Personal notes")}</Text>
               <TextInput
                 style={[styles.textArea, { color: theme.text, borderColor: theme.border }]}
                 value={summary.notes}
                 onChangeText={(value) => updateField("notes", value)}
-                placeholder="anything you don't want to forget in the moment…"
+                placeholder={tx("anything you don't want to forget in the moment…", "Anything you want to remember during the appointment")}
                 placeholderTextColor={theme.textSecondary}
                 multiline
               />
@@ -112,7 +114,7 @@ export default function AppointmentPrepScreen() {
               onPress={exportPdf}
               disabled={saving}
             >
-              <Text style={[styles.exportText, { color: theme.onTint }]}>{saving ? "saving…" : "export my one-pager"}</Text>
+              <Text style={[styles.exportText, { color: theme.onTint }]}>{saving ? tx("saving…", "Saving…") : tx("export my one-pager", "Export one-page PDF")}</Text>
             </TouchableOpacity>
           </>
         )}

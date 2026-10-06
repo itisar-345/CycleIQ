@@ -1,5 +1,7 @@
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import { useReducedMotion } from "@/hooks/use-reduced-motion";
+import { useTx } from "@/utils/tone";
 import React, { useEffect, useRef } from "react";
 import { ActivityIndicator, Animated, StyleSheet, Text, View } from "react-native";
 
@@ -7,12 +9,15 @@ type Props = {
   message?: string;
 };
 
-export function AppLoading({ message = "locking in your private vault 🔒…" }: Props) {
+export function AppLoading({ message }: Props) {
   const colorScheme = useColorScheme() ?? "light";
   const theme = Colors[colorScheme];
+  const tx = useTx();
+  const reduceMotion = useReducedMotion();
   const pulse = useRef(new Animated.Value(0.85)).current;
 
   useEffect(() => {
+    if (reduceMotion) return;
     const loop = Animated.loop(
       Animated.sequence([
         Animated.timing(pulse, { toValue: 1, duration: 900, useNativeDriver: true }),
@@ -21,15 +26,20 @@ export function AppLoading({ message = "locking in your private vault 🔒…" }
     );
     loop.start();
     return () => loop.stop();
-  }, [pulse]);
+  }, [pulse, reduceMotion]);
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.background }]}>
+    <View
+      style={[styles.container, { backgroundColor: theme.background }]}
+      accessible
+      accessibilityRole="progressbar"
+      accessibilityLabel={message ?? tx("Loading CycleIQ", "Loading CycleIQ")}
+    >
       <Animated.Text style={[styles.logo, { color: theme.tint, transform: [{ scale: pulse }] }]}>
         CycleIQ
       </Animated.Text>
       <ActivityIndicator size="large" color={theme.tint} style={styles.spinner} />
-      <Text style={[styles.message, { color: theme.textSecondary }]}>{message}</Text>
+      <Text style={[styles.message, { color: theme.textSecondary }]}>{message ?? tx("locking in your private vault 🔒…", "Loading your data securely…")}</Text>
     </View>
   );
 }

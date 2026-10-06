@@ -1,6 +1,7 @@
 import React, { useRef } from "react";
 import { Animated, GestureResponderEvent, Platform, Pressable, StyleProp, ViewStyle } from "react-native";
 import * as Haptics from "expo-haptics";
+import { useReducedMotion } from "@/hooks/use-reduced-motion";
 
 type HapticType = "light" | "medium" | "heavy" | "selection" | "success" | "warning" | "error";
 
@@ -11,6 +12,8 @@ interface InteractivePressableProps {
   scaleTo?: number;
   haptic?: HapticType | null;
   disabled?: boolean;
+  accessibilityLabel?: string;
+  accessibilityHint?: string;
 }
 
 export function InteractivePressable({
@@ -20,7 +23,10 @@ export function InteractivePressable({
   scaleTo = 0.95,
   haptic = "light",
   disabled = false,
+  accessibilityLabel,
+  accessibilityHint,
 }: InteractivePressableProps) {
+  const reduceMotion = useReducedMotion();
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
   const triggerHaptic = async () => {
@@ -57,6 +63,7 @@ export function InteractivePressable({
   const handlePressIn = (event: GestureResponderEvent) => {
     if (disabled) return;
     triggerHaptic();
+    if (reduceMotion) return;
     Animated.spring(scaleAnim, {
       toValue: scaleTo,
       useNativeDriver: true,
@@ -82,6 +89,10 @@ export function InteractivePressable({
       onPressOut={handlePressOut}
       disabled={disabled}
       style={{ opacity: disabled ? 0.5 : 1 }}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      accessibilityHint={accessibilityHint}
+      accessibilityState={{ disabled }}
     >
       <Animated.View style={[style, { transform: [{ scale: scaleAnim }] }]}>
         {children}

@@ -1,0 +1,16 @@
+appId: ${APP_ID}
+name: Log a day (mood, pain, exercise) and save
+---
+- launchApp
+- tapOn: "Log"
+- assertVisible: "How we doing today?"
+- tapOn: "Mood 2 of 5: meh"
+- tapOn: "6 out of 10"
+- scrollUntilVisible:
+    element: "yoga 🧘"
+- tapOn: "yoga 🧘"
+- scrollUntilVisible:
+    element: "Save today's log ✨"
+- tapOn: "Save today's log ✨"
+- assertVisible: "Logged ✨"
+- tapOn: "OK"

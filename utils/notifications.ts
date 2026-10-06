@@ -2,6 +2,7 @@ import { NotificationPrefs, useAppStore } from "@/store";
 import { addDays, format } from "date-fns";
 import Constants from "expo-constants";
 import { LUTEAL_PHASE_DAYS, type PredictionResult } from "./predictions";
+import { currentTx, type Tx } from "./tone";
 
 const isExpoGo = Constants.executionEnvironment === "storeClient";
 
@@ -91,15 +92,77 @@ const safeHour = (preferredHour: number): number => {
   return inQuiet ? qEnd : preferredHour;
 };
 
-const scheduleAt = async (id: string, title: string, body: string, date: Date, hour = 9) => {
+/**
+ * Classic-tone wording, keyed by notification id. Chill wording is written inline at
+ * each call site; entries with dynamic values pass their classic text as an argument.
+ */
+const CLASSIC_COPY: Record<string, [title: string, body: string]> = {
+  "period-reminder": ["Period expected soon", "Your next period is predicted in about 2 days."],
+  "pad-reminder": ["Time to restock", "Your period is about 5 days away. You may want to check your supplies."],
+  "hydration-nudge": ["Hydration reminder", "Your period is about 3 days away. Staying hydrated may help with bloating and cramps."],
+  "anti-inflam-food": ["Nutrition tip", "Your period is about 2 days away. Oily fish, walnuts, leafy greens and berries may help with inflammation."],
+  "heat-pad": ["Heat pad reminder", "Your period may start today. Twenty minutes of heat can ease cramps."],
+  "mood-checkin": ["Mood check-in", "You're in your luteal phase, when mood changes are common. Would you like to log how you feel?"],
+  "pd1-am": ["Day 1", "Heat, pain relief if needed and a warm drink can help today. Take it easy."],
+  "pd1-pm": ["Evening comfort", "A warm bath with Epsom salts may help your muscles relax."],
+  "pd2-am": ["Iron and vitamin C", "Day 2: pairing iron-rich food with vitamin C (such as orange juice) helps absorption."],
+  "pd2-pm": ["Magnesium", "Dark chocolate, almonds or avocado provide magnesium, which may help with cramps."],
+  "pd3-am": ["Hydration", "Day 3: drinking enough water can help reduce bloating."],
+  "pd3-pm": ["Iron top-up", "Pumpkin seeds or fortified cereal can help replace iron."],
+  "pd4-am": ["Gentle movement", "A short walk or light yoga may lift your mood and ease remaining cramps."],
+  "pd4-pm": ["Rest and comfort", "Make time for something relaxing this evening."],
+  "pd5-am": ["Day 5", "Keep up iron-rich foods and fluids."],
+  "pd5-pm": ["Nearly done", "Your period is likely ending. Well done getting through it."],
+  "endo-pre3": ["Endometriosis: 3 days to go", "Anti-inflammatory foods such as turmeric, ginger, oily fish and leafy greens may help."],
+  "endo-pre1": ["Prepare your comfort kit", "Your period is likely tomorrow. Heat pad, TENS, medication and comfortable clothes ready?"],
+  "endo-d1-am": ["Endometriosis day 1: pain plan", "Pain relief tends to work better taken before cramps peak. Apply heat to your abdomen and lower back."],
+  "endo-d1-pm": ["Digestive care", "Warm peppermint tea may ease bloating. Avoid foods you know trigger symptoms."],
+  "endo-d2-am": ["Pace yourself", "Day 2 is often the hardest. Rest is part of treatment. Log your pain when you can."],
+  "endo-d2-pm": ["Anti-inflammatory dinner", "Oily fish, sweet potato and greens are good choices. Consider avoiding alcohol and added sugar."],
+  "endo-d3-am": ["Bladder care", "Drink plenty of water, limit caffeine and try a warm compress."],
+  "endo-d3-pm": ["Gentle stretching", "Child's pose or a supine twist can relieve pelvic tension."],
+  "endo-d4-am": ["Energy and iron", "Lentils, spinach, tofu and pumpkin seeds help replace iron."],
+  "endo-d4-pm": ["Emotional check-in", "Endometriosis is physically and emotionally demanding. How are you feeling?"],
+  "endo-d5-am": ["Almost through", "Keep hydrating and eating well. Note anything new to mention to your doctor."],
+  "endo-d5-pm": ["Well done", "You've made it through another period. Rest tonight."],
+  "endo-post1": ["Recovery day", "Fatigue can linger after your period. Ease back in and prioritise sleep."],
+  "endo-post3": ["Gentle return to activity", "A short walk or restorative yoga may help, if you feel up to it."],
+  "pcos-d35": ["Day 35 check-in", "It's been 35 days since your last period. Daily logs help identify your pattern."],
+  "pcos-d60": ["60 days without a period", "If this is unusual for you, it's worth mentioning to your doctor."],
+  "pcos-d90": ["Please see your doctor", "It has been 90 days without a period. Please contact a healthcare provider. Your CycleIQ report can help."],
+  "pcos-insulin-d3": ["Blood sugar tip", "Including protein and healthy fat with meals can help keep blood sugar steady."],
+  "pcos-insulin-d7": ["Low-GI foods", "Oats, lentils, berries and sweet potato release energy slowly."],
+  "pcos-supplement-am": ["Supplements", "Inositol has the most research for PCOS; vitamin D and magnesium may also help. Check with your doctor first."],
+  "pcos-supplement-d14": ["Spearmint tea", "Small studies suggest spearmint tea may modestly lower androgens."],
+  "pcos-stress-pre": ["Stress and your cycle", "Stress hormones can affect ovulation. A few minutes of deep breathing may help."],
+  "pcos-skin-d5": ["Skin check", "After your period is a good time to focus on skincare. Consider logging your skin today."],
+  "pcos-hair-d10": ["Scalp care", "Some people find a scalp massage with rosemary oil helpful."],
+  "pcos-post-reset": ["Post-period energy", "Energy often improves after your period — a good time for exercise and demanding tasks."],
+  "pcos-log-nudge": ["Daily logging", "Logging each day helps CycleIQ learn your pattern. Even 30 seconds helps."],
+};
+
+/** Lock-screen-safe content: no health details. */
+const discreetContent = (tx: Tx): [string, string] =>
+  tx(["CycleIQ", "psst — you've got a reminder 👀"], ["CycleIQ", "You have a new reminder."]);
+
+/** Resolves the title/body actually shown, applying tone and discreet mode. */
+export const resolveNotificationContent = (id: string, chill: [string, string], classic?: [string, string]): [string, string] => {
+  const { discreetNotifications } = useAppStore.getState();
+  const tx = currentTx();
+  if (discreetNotifications) return discreetContent(tx);
+  return tx(chill, classic ?? CLASSIC_COPY[id] ?? chill);
+};
+
+const scheduleAt = async (id: string, title: string, body: string, date: Date, hour = 9, classic?: [string, string]) => {
   if (isExpoGo || Number.isNaN(date.getTime())) return;
   const scheduledDate = new Date(date.getFullYear(), date.getMonth(), date.getDate(), safeHour(hour), 0);
   if (scheduledDate <= new Date()) return;
   try {
     const N = await getNotifications();
+    const [shownTitle, shownBody] = resolveNotificationContent(id, [title, body], classic);
     await N.scheduleNotificationAsync({
       identifier: id,
-      content: { title, body },
+      content: { title: shownTitle, body: shownBody },
       trigger: {
         type: N.SchedulableTriggerInputTypes.DATE,
         date: scheduledDate,
@@ -131,7 +194,9 @@ export const scheduleDailyLogReminder = async (enabled: boolean, hourOfDay = 20)
     const N = await getNotifications();
     await N.scheduleNotificationAsync({
       identifier: "daily-log",
-      content: { title: "daily check-in ✨", body: "30 secs to log how today went — future-you will thank you 💕" },
+      content: (([title, body]) => ({ title, body }))(
+        resolveNotificationContent("daily-log", ["daily check-in ✨", "30 secs to log how today went — future-you will thank you 💕"], ["Daily check-in", "Take 30 seconds to log how today went."]),
+      ),
       trigger: { type: N.SchedulableTriggerInputTypes.DAILY, hour: safeHour(hourOfDay), minute: 0 },
     });
   } catch { /* non-fatal */ }
@@ -178,7 +243,13 @@ export const scheduleInsightNotification = async (insightTitle: string, enabled:
     const N = await getNotifications();
     await N.scheduleNotificationAsync({
       identifier: `insight-${Date.now()}`,
-      content: { title: "ooh, new pattern spotted 👀", body: `We noticed something: "${insightTitle}". Tap to see the tea ☕` },
+      content: (([title, body]) => ({ title, body }))(
+        resolveNotificationContent(
+          "insight",
+          ["ooh, new pattern spotted 👀", `We noticed something: "${insightTitle}". Tap to see the tea ☕`],
+          ["New insight", `We noticed a pattern: "${insightTitle}". Tap to view.`],
+        ),
+      ),
       trigger: { type: N.SchedulableTriggerInputTypes.DATE, date: new Date(Date.now() + 5000) },
     });
   } catch { /* non-fatal */ }
@@ -189,14 +260,14 @@ export const scheduleOvulationReminder = async (cycleStartDate: Date, cycleLengt
   await cancelId("ovulation-window");
   if (!enabled) return;
   const ovulationDate = addDays(cycleStartDate, cycleLength - LUTEAL_PHASE_DAYS - 1);
-  await scheduleAt("ovulation-window", "ovulation szn approaching 🌸", `Predicted ovulation around ${format(ovulationDate, "MMM d")}. Energy might be about to peak ✨`, addDays(ovulationDate, -1));
+  await scheduleAt("ovulation-window", "ovulation szn approaching 🌸", `Predicted ovulation around ${format(ovulationDate, "MMM d")}. Energy might be about to peak ✨`, addDays(ovulationDate, -1), 9, ["Ovulation window approaching", `Ovulation is predicted around ${format(ovulationDate, "MMM d")}. This is an estimate and not suitable for contraception.`]);
 };
 
 export const scheduleFlareWarning = async (predictedFlareDate: Date, confidence: number, enabled: boolean) => {
   if (isExpoGo) return;
   await cancelId("flare-warning");
   if (!enabled || confidence < 0.7) return;
-  await scheduleAt("flare-warning", "flare might be coming 💜", `Possible flare around ${format(predictedFlareDate, "MMM d")}. Plan a soft day if you can 🫶`, addDays(predictedFlareDate, -1));
+  await scheduleAt("flare-warning", "flare might be coming 💜", `Possible flare around ${format(predictedFlareDate, "MMM d")}. Plan a soft day if you can 🫶`, addDays(predictedFlareDate, -1), 9, ["Possible flare ahead", `A flare may occur around ${format(predictedFlareDate, "MMM d")}. Consider planning a lighter day.`]);
 };
 
 export const schedulePadReminder = async (predictedStartDate: Date, enabled: boolean) => {
@@ -273,9 +344,9 @@ export const scheduleEndoNotifications = async (prediction: PredictionResult, en
   await scheduleAt("endo-post1", "recovery day 🌿", "Endo fatigue can hang around. Ease back in & protect your sleep 💤", d(6), 9);
   await scheduleAt("endo-post3", "ease back in 🧘", "Gentle walk or restorative yoga today? Only if your body's into it 🌸", d(8), 9);
   const ovDay = prediction.ovulationPainDay ?? cycleLength - LUTEAL_PHASE_DAYS;
-  await scheduleAt("endo-mid", "ovulation pain heads-up 💜", `Around cycle day ${ovDay} some people get mid-cycle pain. Keep the heat pad close 🌸`, d(ovDay - 2), 9);
+  await scheduleAt("endo-mid", "ovulation pain heads-up 💜", `Around cycle day ${ovDay} some people get mid-cycle pain. Keep the heat pad close 🌸`, d(ovDay - 2), 9, ["Mid-cycle pain", `Around cycle day ${ovDay} some people experience ovulation pain. Keep a heat pad nearby.`]);
   const flareDay = prediction.flareRiskWindowStart ?? cycleLength - 7;
-  await scheduleAt("endo-flare-pre", "flare-risk window 💜", `You're near day ${flareDay}, when flares have shown up before. Extra sleep & low stress if you can 🫶`, d(flareDay), 10);
+  await scheduleAt("endo-flare-pre", "flare-risk window 💜", `You're near day ${flareDay}, when flares have shown up before. Extra sleep & low stress if you can 🫶`, d(flareDay), 10, ["Flare-risk window", `You're near cycle day ${flareDay}, when flares have occurred before. Extra rest may help.`]);
 };
 
 export const schedulePcosNotifications = async (prediction: PredictionResult, enabled: boolean) => {
@@ -288,13 +359,13 @@ export const schedulePcosNotifications = async (prediction: PredictionResult, en
   if (prediction.pcosCyclePattern !== "regular") await scheduleAt("pcos-d35", "day 35 check-in 💚", "35 days since your last period. Daily logs help us learn your pattern 📊", d(35));
   await scheduleAt("pcos-d60", "60 days — checking in 💚", "Still no period after 60 days. Worth bringing up with your doctor if that's unusual for you 🫶", d(60), 10);
   await scheduleAt("pcos-d90", "time for a doctor chat 💬", "It's been 90 days without a period — please check in with a healthcare provider. Your report in the app can help 💜", d(90), 9);
-  if (prediction.widePredictionWindow) await scheduleAt("pcos-pred-wide", "your cycle's keeping us guessing 🔮", `Next period could land anywhere in a ~${Math.round(prediction.stdDev * 2)}-day window. Keep supplies handy 💕`, addDays(base, prediction.lateArrivalP90 ?? 35));
+  if (prediction.widePredictionWindow) await scheduleAt("pcos-pred-wide", "your cycle's keeping us guessing 🔮", `Next period could land anywhere in a ~${Math.round(prediction.stdDev * 2)}-day window. Keep supplies handy 💕`, addDays(base, prediction.lateArrivalP90 ?? 35), 9, ["Wide prediction window", `Your next period could fall anywhere in a ${Math.round(prediction.stdDev * 2)}-day window. Keep supplies handy.`]);
   await scheduleAt("pcos-insulin-d3", "blood sugar tip 🥑", "Protein + healthy fat with meals can help keep blood sugar steadier — eggs, avocado, nuts 🌿", d(3), 9);
   await scheduleAt("pcos-insulin-d7", "low-GI snack ideas 🍎", "Oats, lentils, berries & sweet potato release energy slowly — fewer crashes ✨", d(7), 12);
   await scheduleAt("pcos-supplement-am", "supplement check 💚", "Inositol has the most research for PCOS; vitamin D & magnesium may help too. Ask your doctor first 🌿", d(2), 8);
   await scheduleAt("pcos-supplement-d14", "spearmint tea moment 🌿", "Small studies suggest spearmint tea may lower androgens a bit. Cozy + maybe helpful ✨", d(14), 19);
   const ovWatchDay = prediction.predictedOvulationDay ?? Math.max(10, cycleLength - LUTEAL_PHASE_DAYS);
-  await scheduleAt("pcos-ovulation-watch", "ovulation signs watch 🌸", `Around day ${ovWatchDay}: look out for stretchy clear discharge, a temp bump or an energy boost 📊`, d(ovWatchDay));
+  await scheduleAt("pcos-ovulation-watch", "ovulation signs watch 🌸", `Around day ${ovWatchDay}: look out for stretchy clear discharge, a temp bump or an energy boost 📊`, d(ovWatchDay), 9, ["Signs of ovulation", `Around day ${ovWatchDay}, look for clear stretchy discharge, a temperature rise or more energy.`]);
   await scheduleAt("pcos-stress-pre", "stress check 🧘", "Stress hormones can mess with ovulation. 10 mins of deep breathing today? 💚", d(Math.max(7, cycleLength - LUTEAL_PHASE_DAYS)), 18);
   await scheduleAt("pcos-skin-d5", "skin check 🧖", "Post-period is a nice window for skincare. Log your skin today 📊", d(5), 9);
   await scheduleAt("pcos-hair-d10", "scalp care tip 💇", "Some people like a scalp massage with rosemary oil for hair health. Optional self-care 🌿", d(10), 19);
@@ -307,24 +378,33 @@ export const scheduleRedFlagNotification = async (prediction: PredictionResult, 
   await cancelId("red-flag");
   if (!enabled) return;
   const daysSinceLast = prediction.daysSinceLastPeriod ?? 0;
+  const tx = currentTx();
   let title = "", body = "", daysFromNow = 0;
   if (prediction.amenorrheaFlag && daysSinceLast > 60) {
-    title = "please check in with a doctor 💛";
-    body = `It's been ${daysSinceLast} days without a period. That's worth a proper check-up — you can share your CycleIQ report 💜`;
+    [title, body] = tx(
+      ["please check in with a doctor 💛", `It's been ${daysSinceLast} days without a period. That's worth a proper check-up — you can share your CycleIQ report 💜`],
+      ["Medical check recommended", `You haven't had a period for ${daysSinceLast} days. Please see a healthcare provider; your CycleIQ report can help.`],
+    );
   } else if (prediction.widePredictionWindow && prediction.stdDev > 10) {
-    title = "your cycles are all over the place 🌀";
-    body = `Your cycle length is varying a lot (${Math.round(prediction.stdDev * 2)}+ day window). Worth mentioning at your next doctor visit.`;
+    [title, body] = tx(
+      ["your cycles are all over the place 🌀", `Your cycle length is varying a lot (${Math.round(prediction.stdDev * 2)}+ day window). Worth mentioning at your next doctor visit.`],
+      ["High cycle variability", `Your cycle length varies a lot (a ${Math.round(prediction.stdDev * 2)}+ day window). Consider mentioning this to your doctor.`],
+    );
     daysFromNow = 1;
   } else if (prediction.regimeChangeDetected) {
-    title = "plot twist in your cycle 📈";
-    body = "Your recent cycles look different from before. Stress, sleep, meds & travel can all do this — keep logging 🫶";
+    [title, body] = tx(
+      ["plot twist in your cycle 📈", "Your recent cycles look different from before. Stress, sleep, meds & travel can all do this — keep logging 🫶"],
+      ["Change in cycle pattern", "Your recent cycles differ from before. Stress, sleep, medication and travel can all contribute."],
+    );
     daysFromNow = 2;
   } else if (prediction.confidence < 0.4) {
-    title = "still learning your cycle 🔮";
-    body = "Predictions get sharper with every period you log. Keep it up 💪";
+    [title, body] = tx(
+      ["still learning your cycle 🔮", "Predictions get sharper with every period you log. Keep it up 💪"],
+      ["Predictions are still learning", "Predictions become more accurate with each period you log."],
+    );
     daysFromNow = 3;
   } else return;
-  await scheduleAt("red-flag", title, body, new Date(Date.now() + daysFromNow * 86400000), 10);
+  await scheduleAt("red-flag", title, body, new Date(Date.now() + daysFromNow * 86400000), 10, [title, body]);
 };
 
 export const scheduleAllCycleNotifications = async (

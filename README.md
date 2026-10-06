@@ -12,7 +12,9 @@
 - **Insights** — Spearman correlations, cycle-phase overlays, dismissible coaching cards
 - **Flare management** — Endo flare timer, reflection prompts, pattern analysis
 - **Safeguards** — In-app mood alerts (3+ low days), red-flag prompts (pain 8+ × 3 days)
-- **Privacy** — SQLCipher database, AES-256-GCM for sensitive notes, no analytics SDKs
+- **Privacy** — SQLCipher database, AES-256-GCM for sensitive notes, app lock (Face ID / fingerprint / passcode), discreet lock-screen notifications, no analytics SDKs
+- **Two voices** — "chill" (casual, emoji) or "classic" (plain, calm); chosen at onboarding, switchable in Profile. Strings are written `tx(chill, classic)` (see `utils/tone.ts`, `constants/copy.ts`)
+- **Accessibility** — WCAG AA contrast in light & dark, screen-reader labels/roles throughout, 44pt touch targets, respects Reduce Motion
 - **Exports** — Doctor-ready PDF reports, appointment prep, JSON/CSV backup
 
 See [CycleIQ-Feature-Checklist.md](CycleIQ-Feature-Checklist.md) for the full spec and open items.
@@ -87,10 +89,13 @@ Press `i` for iOS simulator, `a` for Android, or scan the QR code with Expo Go.
 
 ```bash
 npm test          # unit tests, prediction backtest gate, and database tests on real SQLite
+npm run test:ui   # screen tests (Jest + React Native Testing Library), incl. accessibility labels
+npm run check     # typecheck + lint + all tests — the same gate CI runs
 npm run backtest  # prediction accuracy report vs simple baselines
-npm run lint
-npx tsc --noEmit
+APP_ID=<bundle id> npm run e2e   # Maestro end-to-end flows on a device/simulator build
 ```
+
+CI (`.github/workflows/ci.yml`) also runs `expo-doctor` and exports iOS/Android bundles. Release QA that needs people — device testing, screen-reader audit, clinical and legal review, store submission, user research — is described in `docs/`.
 
 The database tests run the real `database/` modules against SQLite (better-sqlite3) behind the
 expo-sqlite API — see `tests/support/`. The stand-in rejects SQL that device builds of
@@ -131,7 +136,6 @@ data/          Bundled education articles
 
 - [ ] Clinical safeguarding sign-off ([docs/CLINICAL_REVIEW.md](docs/CLINICAL_REVIEW.md))
 - [ ] IAP tiers (Care / Clinical)
-- [ ] Biometric app lock
 - [ ] App Store / Play Store submission
 
 ## 🤝 Contributing

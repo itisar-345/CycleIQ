@@ -11,6 +11,7 @@ const fakes = {
   "expo-secure-store": "fake-expo-secure-store.ts",
   "react-native": "fake-react-native.ts",
   "@react-native-async-storage/async-storage": "fake-async-storage.ts",
+  "expo-constants": "fake-expo-constants.ts",
 };
 
 const originalResolve = Module._resolveFilename;

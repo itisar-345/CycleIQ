@@ -1,0 +1,15 @@
+appId: ${APP_ID}
+name: Period start updates Home and the prediction
+---
+- launchApp
+- tapOn: "Home"
+- tapOn: "🩸 my period started"
+- tapOn: "yep, today"
+- runFlow:
+    when:
+      visible: "want a heads-up next time? 🔔"
+    commands:
+      - tapOn: "Not now"
+- assertVisible: "day 1 of your period 🩸"
+- tapOn: "it's over 🎉"
+- assertVisible: "🩸 my period started"

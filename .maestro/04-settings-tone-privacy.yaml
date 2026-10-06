@@ -1,0 +1,13 @@
+appId: ${APP_ID}
+name: Switch tone and enable discreet notifications
+---
+- launchApp
+- tapOn: "You"
+- tapOn: "classic, calm, plain sentences"
+- assertVisible: "Profile"
+- assertVisible: "App tone"
+- scrollUntilVisible:
+    element: "Discreet notifications"
+- tapOn: "Discreet notifications"
+- tapOn: "Casual, Relaxed with emoji"
+- assertVisible: "you 💅"

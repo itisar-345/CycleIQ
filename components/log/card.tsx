@@ -30,7 +30,7 @@ export function Card({
         Shadow,
       ]}
     >
-      {title && <Text style={[styles.title, { color: accent ?? theme.text }]}>{title}</Text>}
+      {title && <Text style={[styles.title, { color: accent ?? theme.text }]} accessibilityRole="header">{title}</Text>}
       {subtitle && <Text style={[styles.subtitle, { color: theme.textSecondary }]}>{subtitle}</Text>}
       <View style={title || subtitle ? { marginTop: Spacing.md } : undefined}>{children}</View>
     </View>

@@ -5,11 +5,13 @@ import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useTx } from "@/utils/tone";
 import { Tabs } from "expo-router";
 import React from "react";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function TabLayout() {
   const colorScheme = useColorScheme() ?? "light";
   const theme = Colors[colorScheme];
   const tx = useTx();
+  const insets = useSafeAreaInsets();
 
   return (
     <Tabs
@@ -20,10 +22,12 @@ export default function TabLayout() {
         tabBarInactiveTintColor: theme.tabIconDefault,
         headerShown: false,
         tabBarButton: HapticTab,
-        // No fixed height: the navigator adds the home-indicator inset itself.
+        // The default 49pt bar clips the bold labels when there is no bottom inset (web,
+        // Android 3-button navigation). Height must include the inset the navigator pads with.
         tabBarStyle: {
           backgroundColor: theme.surface,
           borderTopColor: theme.border,
+          height: 58 + insets.bottom,
           paddingTop: 4,
         },
         tabBarLabelStyle: { fontSize: 11, fontWeight: "700" },

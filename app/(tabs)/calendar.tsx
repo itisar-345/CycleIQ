@@ -240,9 +240,13 @@ export default function CalendarScreen() {
                       </View>
                     )}
                     <Text style={[styles.dayNum, { color: isToday ? theme.tint : theme.text }]}>{day.dayNum}</Text>
-                    {day.periodScore > 0 && <View style={[styles.periodDot, { backgroundColor: '#FF6B9D' }]} />}
-                    {day.painScore > 5 && <View style={[styles.painDot, { backgroundColor: '#FF4757' }]} />}
-                    {day.flare && <View style={[styles.flareDot, { backgroundColor: '#FF3838' }]} />}
+                    {(day.periodScore > 0 || day.painScore > 5 || day.flare) && (
+                      <View style={styles.dotRow}>
+                        {day.periodScore > 0 && <View style={[styles.periodDot, { backgroundColor: '#FF6B9D' }]} />}
+                        {day.painScore > 5 && <View style={[styles.painDot, { backgroundColor: '#FF4757' }]} />}
+                        {day.flare && <View style={[styles.flareDot, { backgroundColor: '#FF3838' }]} />}
+                      </View>
+                    )}
                     {day.phase && <Text style={[styles.phaseLabel, { color: getPhaseColor(day.phase) }]}>{day.phase[0].toUpperCase()}</Text>}
                   </View>
                 ) : (
@@ -261,6 +265,11 @@ export default function CalendarScreen() {
             {selectedDay.phase && (
               <Text style={{ color: theme.textSecondary }}>
                 <Text style={{ color: getPhaseColor(selectedDay.phase), fontWeight: '700' }}>{copy.phases[selectedDay.phase]?.name ?? selectedDay.phase}</Text>{tx(` · ${copy.phases[selectedDay.phase]?.vibe ?? ''}`, ' phase')}
+              </Text>
+            )}
+            {selectedDay.phase === 'ovulatory' && (
+              <Text style={{ color: theme.textSecondary, fontSize: 12, marginTop: 4 }}>
+                {tx("estimated ovulation — not reliable for birth control", "Estimated ovulation. Not suitable for contraception.")}
               </Text>
             )}
             {selectedEntry ? (
@@ -343,9 +352,11 @@ const styles = StyleSheet.create({
   emptyCell: { width: '100%', height: '100%' },
   dayContent: { width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center', position: 'relative', overflow: 'hidden', borderRadius: 8 },
   dayNum: { fontSize: 16, fontWeight: 'bold', marginBottom: 2, zIndex: 2 },
-  periodDot: { width: 8, height: 8, borderRadius: 4, marginTop: 2, zIndex: 2 },
-  painDot: { width: 6, height: 6, borderRadius: 3, marginLeft: 2, zIndex: 2 },
-  flareDot: { width: 10, height: 10, borderRadius: 5, zIndex: 2 },
+  // Markers sit side by side so the phase letter below always fits in the cell.
+  dotRow: { flexDirection: 'row', alignItems: 'center', gap: 2, height: 10, zIndex: 2 },
+  periodDot: { width: 8, height: 8, borderRadius: 4 },
+  painDot: { width: 6, height: 6, borderRadius: 3 },
+  flareDot: { width: 8, height: 8, borderRadius: 4, borderWidth: 1.5, borderColor: '#FF3838', backgroundColor: 'transparent' },
   phaseLabel: { fontSize: 10, marginTop: 1, zIndex: 2 },
   predictionLayer: { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, borderRadius: 8, overflow: 'hidden', flexDirection: 'row' },
   predictionFade: { flex: 1 },

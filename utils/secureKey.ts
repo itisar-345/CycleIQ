@@ -28,7 +28,7 @@ const generateKey = (): string => {
 };
 
 /**
- * Web is a preview-only target (see database/index.web.ts): there is no keychain,
+ * Web is a preview-only target (see database/connection.web.ts): there is no keychain,
  * so the key lives in localStorage and offers no protection at rest.
  */
 const getOrCreateWebPreviewKey = (): string => {

@@ -1,0 +1,72 @@
+name: Bug report
+description: Something isn't working as expected
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! **Please don't include real health data** (yours or anyone's) in this issue or its screenshots.
+        Security or privacy problem? Report it privately instead. See SECURITY.md.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, and what happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Go to …
+        2. Tap …
+        3. See …
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      options:
+        - iOS
+        - Android
+        - Web preview
+    validations:
+      required: true
+  - type: dropdown
+    id: build
+    attributes:
+      label: How are you running it?
+      options:
+        - Expo Go
+        - Development build
+        - Store / release build
+        - Web preview
+  - type: input
+    id: device
+    attributes:
+      label: Device and OS version
+      placeholder: e.g. Pixel 7, Android 14
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Tracking mode
+      options:
+        - Cycle tracking
+        - PCOS
+        - PCOD
+        - Endometriosis
+        - Perimenopause
+  - type: dropdown
+    id: tone
+    attributes:
+      label: Tone
+      options:
+        - chill
+        - classic
+  - type: textarea
+    id: extra
+    attributes:
+      label: Screenshots or logs
+      description: Use sample data only.

@@ -93,8 +93,10 @@ export const runDatabaseMigrations = async (database: SQLite.SQLiteDatabase) => 
 
 export const initDb = async () => {
   const database = await ensureDb();
+  // Journal mode can't change inside a transaction. expo-sqlite already opens in WAL; the
+  // in-memory web preview has no WAL, so a refusal here is fine.
+  await database.runAsync("PRAGMA journal_mode = WAL;").catch(() => {});
   await database.withTransactionAsync(async () => {
-    await database.runAsync("PRAGMA journal_mode = WAL;");
     await database.runAsync(`CREATE TABLE IF NOT EXISTS cycles (
       id TEXT PRIMARY KEY,
       start_date TEXT NOT NULL,

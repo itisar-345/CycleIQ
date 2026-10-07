@@ -40,7 +40,7 @@ jobs:
         run: npx expo-doctor
 
   bundle:
-    name: Production bundles (iOS + Android)
+    name: Production bundles (iOS, Android, web)
     runs-on: ubuntu-latest
     timeout-minutes: 30
     needs: checks
@@ -56,4 +56,4 @@ jobs:
 
       # Catches module-resolution errors that typechecking can't (e.g. native packages, subpath exports).
       - name: Export JS bundles
-        run: npx expo export --platform ios --platform android --output-dir /tmp/bundle-check
+        run: npx expo export --platform ios --platform android --platform web --output-dir /tmp/bundle-check

@@ -390,7 +390,7 @@
 - [x] Database migration framework for app update schema changes
 - [x] Local backup: export full encrypted database to file on demand (via share sheet)
 - [x] Local restore: import from previously exported backup file (JSON snapshot + DocumentPicker)
-- [x] Web stub guarded: banner comment + one-time `console.warn` in `database/index.web.ts`
+- [x] Web preview runs the real database layer on sql.js in memory (`database/connection.web.ts`); `npm run web:demo` loads sample data
 
 ---
 

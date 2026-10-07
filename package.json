@@ -2,6 +2,25 @@
   "name": "cycleiq",
   "main": "expo-router/entry",
   "version": "1.0.0",
+  "description": "Private, on-device period and symptom tracker for regular cycles, PCOS, PCOD, endometriosis and perimenopause.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/itisar-345/CycleIQ.git"
+  },
+  "homepage": "https://github.com/itisar-345/CycleIQ#readme",
+  "bugs": {
+    "url": "https://github.com/itisar-345/CycleIQ/issues"
+  },
+  "keywords": [
+    "period-tracker",
+    "menstrual-cycle",
+    "pcos",
+    "endometriosis",
+    "privacy",
+    "expo",
+    "react-native"
+  ],
   "scripts": {
     "start": "expo start",
     "android": "expo start --android",
@@ -14,7 +33,9 @@
     "typecheck": "tsc --noEmit",
     "test:all": "npm test && npm run test:ui",
     "check": "npm run typecheck && npm run lint && npm run test:all",
-    "e2e": "maestro test .maestro"
+    "e2e": "maestro test .maestro",
+    "screenshots": "node scripts/screenshots/run.js",
+    "web:demo": "node scripts/web-demo.js"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",
@@ -69,11 +90,15 @@
     "@types/react": "~19.1.0",
     "@types/react-test-renderer": "^19.3.0",
     "@types/uuid": "^10.0.0",
+    "babel-preset-expo": "~54.0.10",
     "better-sqlite3": "^12.11.1",
     "eslint": "^9.25.0",
     "eslint-config-expo": "~10.0.0",
+    "gifenc": "^1.0.3",
     "jest": "~29.7.0",
     "jest-expo": "~54.0.18",
+    "pngjs": "^7.0.0",
+    "puppeteer-core": "^23.11.1",
     "react-test-renderer": "19.1.0",
     "tsx": "^4.20.6",
     "typescript": "~5.9.2"

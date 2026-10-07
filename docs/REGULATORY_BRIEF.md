@@ -15,7 +15,7 @@ CycleIQ is a menstrual-cycle and symptom tracker for general cycle tracking, PCO
 | Function | What it does | Intended-use framing in the app |
 |----------|--------------|---------------------------------|
 | Period prediction | Estimates next period date and a likely window from the user's past cycle lengths (statistical, on-device). Shows a confidence percentage and average past error. | "Not medical advice" shown on the Home and Insights prediction cards |
-| Ovulation / fertile-window estimate | Ovulation estimated as 14 days before the predicted period; shown as a phase on the calendar and in optional notifications | Classic-voice notification states it is "an estimate and not suitable for contraception"; **chill voice does not yet** (see §5) |
+| Ovulation / fertile-window estimate | Ovulation estimated as 14 days before the predicted period; shown as a phase on the calendar and in optional notifications | Both voices state it is an estimate and not suitable for contraception, in the notification and in the calendar day detail |
 | Symptom correlations ("insights") | Spearman correlations across the user's own logs, with multiple-comparison correction | "Shows association, not causation"; mental-health cards add a "not a clinical assessment" note |
 | Endometriosis red-flag prompts | Suggests contacting a provider after severe pain on 3 consecutive days, or a specific symptom combination | Signposting only; see `docs/CLINICAL_REVIEW.md` |
 | Low-mood safeguarding prompt | After 3 consecutive very-low mood days, offers crisis / support resources | Signposting only |
@@ -61,7 +61,6 @@ The app does **not**: diagnose any condition, recommend or adjust medication dos
 
 ## 5. Known gaps the team will fix based on counsel's advice
 
-- Add a "not for contraception" statement wherever ovulation is shown, in both voices.
 - Add an age gate / parental-consent flow if required.
 - Final wording of disclaimers in onboarding and the store listing.
 

@@ -269,7 +269,7 @@ export const scheduleOvulationReminder = async (cycleStartDate: Date, cycleLengt
   await cancelId("ovulation-window");
   if (!enabled) return;
   const ovulationDate = addDays(cycleStartDate, cycleLength - LUTEAL_PHASE_DAYS - 1);
-  await scheduleAt("ovulation-window", "ovulation szn approaching 🌸", `Predicted ovulation around ${format(ovulationDate, "MMM d")}. Energy might be about to peak ✨`, addDays(ovulationDate, -1), 9, ["Ovulation window approaching", `Ovulation is predicted around ${format(ovulationDate, "MMM d")}. This is an estimate and not suitable for contraception.`]);
+  await scheduleAt("ovulation-window", "ovulation szn approaching 🌸", `Predicted ovulation around ${format(ovulationDate, "MMM d")}. Energy might be about to peak ✨ (it's an estimate — not birth control)`, addDays(ovulationDate, -1), 9, ["Ovulation window approaching", `Ovulation is predicted around ${format(ovulationDate, "MMM d")}. This is an estimate and not suitable for contraception.`]);
 };
 
 export const scheduleFlareWarning = async (predictedFlareDate: Date, confidence: number, enabled: boolean) => {

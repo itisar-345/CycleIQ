@@ -124,9 +124,11 @@ describe("Calendar screen", () => {
     mock(db.getAllEntries).mockResolvedValue(entries);
     mock(db.getCyclePredictions).mockResolvedValue(prediction());
 
-    const started = performance.now();
     render(<CalendarScreen />);
     await screen.findAllByLabelText(/today/);
+    // Time only the paging (each month re-renders the grid against all cycles and logs),
+    // not first render and module warm-up.
+    const started = performance.now();
     for (let m = 0; m < 12; m++) {
       await act(async () => {
         fireEvent.press(screen.getByLabelText("Previous month"));
@@ -138,7 +140,9 @@ describe("Calendar screen", () => {
     // Day cells describe their state for screen readers, not just colour dots.
     expect(screen.getAllByLabelText(/high pain/).length).toBeGreaterThan(0);
     expect(findUnlabelledPressables(screen.root)).toEqual([]);
-  });
+    // Generous harness timeout: setup with a year of data is slow on loaded CI machines;
+    // the paging budget above is the real gate.
+  }, 20000);
 
   // Local days this month, at times that differ from UTC midnight in every time zone.
   const thisMonth = (dayOfMonth: number, hour: number) => {

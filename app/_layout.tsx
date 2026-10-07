@@ -1,11 +1,11 @@
-import { initDb, getCyclePredictions } from "@/database";
+import { initDb, getCyclePredictions, getLatestCycle } from "@/database";
 import { AppLoading } from "@/components/app-loading";
 import { AppLockGate } from "@/components/app-lock";
 import { useAppStore, waitForStoreHydration } from "@/store";
 import { Stack, router, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
-import { AppState, View, StyleSheet } from "react-native";
+import { AppState, Platform, View, StyleSheet } from "react-native";
 import { currentTx } from "@/utils/tone";
 import "react-native-reanimated";
 import {
@@ -35,7 +35,14 @@ export default function RootLayout() {
   useEffect(() => {
     setDbFailed(false);
     initDb()
-      .then(() => { setDbReady(true); })
+      .then(async () => {
+        // Web preview / screenshots only: fill the in-memory database with sample data.
+        if (Platform.OS === "web" && process.env.EXPO_PUBLIC_DEMO_DATA === "1" && !(await getLatestCycle())) {
+          const { seedDemoData } = await import("@/database/demoData");
+          await seedDemoData();
+        }
+        setDbReady(true);
+      })
       .catch((error) => {
         console.error("Database initialization error:", error);
         setDbFailed(true);

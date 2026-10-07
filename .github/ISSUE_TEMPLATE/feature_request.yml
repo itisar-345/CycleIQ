@@ -1,0 +1,32 @@
+name: Feature request
+description: Suggest an idea or improvement
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Ideas from people who live with PCOS, endometriosis or irregular cycles are especially welcome.
+        CycleIQ is local-only by design, so features that need a server or send data off the device are unlikely to be accepted.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would this solve?
+      description: Who is it for, and what's hard today?
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would you like to happen?
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you've considered
+  - type: checkboxes
+    id: health
+    attributes:
+      label: Health & safety
+      options:
+        - label: This touches medical advice, safety prompts or predictions (needs extra review)

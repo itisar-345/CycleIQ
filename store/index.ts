@@ -360,6 +360,15 @@ export const useAppStore = create<AppState>()(
   ),
 );
 
+/**
+ * Back to a fresh install: every setting, condition answer and period state is reset and the
+ * encrypted persisted copy is removed. Routing then sends the user to onboarding.
+ */
+export const resetAppStore = async (): Promise<void> => {
+  useAppStore.setState(useAppStore.getInitialState(), true);
+  await useAppStore.persist.clearStorage();
+};
+
 /** Wait until AsyncStorage has rehydrated Zustand — avoids routing on stale isOnboarded. */
 export const waitForStoreHydration = (): Promise<void> =>
   new Promise((resolve) => {

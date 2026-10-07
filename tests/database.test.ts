@@ -14,6 +14,7 @@ import {
   getAllCycles,
   getCycleEntries,
   getCyclePredictions,
+  getPhaseAverages,
   initDb,
   restoreLocalDataSnapshot,
   saveAppSetting,
@@ -23,13 +24,13 @@ import {
   wipeLocalDatabase,
 } from "../database";
 import { ensureDb, execSql, queryAll, queryFirst } from "../database/connection";
-import { recomputeCycleLengths } from "../database/cycles";
+import { reassignEntryCycles, recomputeCycleLengths } from "../database/cycles";
 import { webcrypto } from "node:crypto";
 import { encryptedPersistStorage } from "../utils/encryptedPersistStorage";
 import { decryptField, encryptField, FieldDecryptionError } from "../utils/fieldEncryption";
 import { getOrCreateDbKey } from "../utils/secureKey";
 import { __asyncStorage } from "./support/fake-async-storage";
-import { useAppStore } from "../store";
+import { resetAppStore, useAppStore } from "../store";
 import { currentTx } from "../utils/tone";
 import { getCopy } from "../constants/copy";
 import { resolveNotificationContent } from "../utils/notifications";
@@ -43,7 +44,7 @@ const test = (name: string, fn: () => Promise<void>) => tests.push([name, fn]);
 
 test("schema and migration ledger are created", async () => {
   const migrations = await queryAll<{ id: number }>(`SELECT id FROM schema_migrations ORDER BY id;`);
-  assert.deepEqual(migrations.map((m) => m.id), [1, 2, 3, 4]);
+  assert.deepEqual(migrations.map((m) => m.id), [1, 2, 3, 4, 5]);
 });
 
 test("onboarding seed leaves the current cycle open", async () => {
@@ -128,7 +129,7 @@ test("ending a flare updates the flare entry and encrypts the reflection", async
   const cycle = (await getAllCycles())[0];
   const flareDay = day("2026-01-10");
   await createSymptomEntry({ cycle_id: cycle.id, logged_date: flareDay, flare_start: flareDay, pain_score: 7 });
-  await saveFlareEnd(cycle.id, flareDay, day("2026-01-12"), "heat pad helped", 3);
+  await saveFlareEnd(flareDay, day("2026-01-12"), "heat pad helped", 3);
   const entries = await getCycleEntries(cycle.id);
   const flareEntry = entries.find((e) => e.flare_start === flareDay);
   assert.equal(flareEntry?.flare_end, day("2026-01-12"));
@@ -356,6 +357,64 @@ test("performance: correlations over 90 days of logs stay under 3 s", async () =
   const elapsed = performance.now() - t0;
   console.log(`      insights (90 days): ${elapsed.toFixed(0)} ms (budget 3000)`);
   assert.ok(elapsed < 3000, `insights took ${elapsed.toFixed(0)} ms`);
+});
+
+// ── Full journey: logs belong to whole cycles ─────────────────────────────
+test("onboarding estimate is marked unconfirmed; the real period is confirmed", async () => {
+  await seedInitialCycleFromOnboarding("2026-01-01", 28);
+  const [current, estimate] = await getAllCycles();
+  assert.equal(current.is_confirmed, 1);
+  assert.equal(estimate.is_confirmed, 0);
+});
+
+test("every log joins the cycle its day falls in, and moves when a new period starts", async () => {
+  await seedInitialCycleFromOnboarding("2026-01-01", 28);
+  const [first] = await getAllCycles();
+  // Mid-cycle logs (not period days) — no cycle_id passed, as the Log screen does.
+  await createSymptomEntry({ logged_date: day("2026-01-12"), mood_score: 4 });
+  await createSymptomEntry({ logged_date: day("2026-01-30"), mood_score: 2 });
+  assert.equal((await getCycleEntries(first.id)).length, 2);
+
+  // Period starts on Jan 29: the Jan 30 log now belongs to the new cycle.
+  const second = await createCycle(day("2026-01-29"));
+  assert.deepEqual((await getCycleEntries(first.id)).map((e) => e.mood_score), [4]);
+  assert.deepEqual((await getCycleEntries(second)).map((e) => e.mood_score), [2]);
+
+  // Deleting that period keeps the log; it moves back to the first cycle.
+  await deleteCycle(second);
+  assert.equal((await getCycleEntries(first.id)).length, 2);
+});
+
+test("migration 5 attaches old period-only logs to their cycles", async () => {
+  await seedInitialCycleFromOnboarding("2026-01-01", 28);
+  const [current] = await getAllCycles();
+  await execSql(`INSERT INTO symptom_entries (id, cycle_id, logged_date, mood_score) VALUES ('old', NULL, ?, 3);`, [day("2026-01-15")]);
+  await reassignEntryCycles(await ensureDb());
+  assert.equal((await queryFirst<{ cycle_id: string }>(`SELECT cycle_id FROM symptom_entries WHERE id = 'old';`))?.cycle_id, current.id);
+});
+
+test("phase averages cover the whole cycle, not just period days", async () => {
+  await seedInitialCycleFromOnboarding("2026-01-01", 28);
+  const [current] = await getAllCycles();
+  await createSymptomEntry({ logged_date: day("2026-01-02"), mood_score: 2 }); // day 2: menstrual
+  await createSymptomEntry({ logged_date: day("2026-01-08"), mood_score: 4 }); // day 8: follicular
+  await createSymptomEntry({ logged_date: day("2026-01-14"), energy_score: 9 }); // day 14: ovulatory
+  await createSymptomEntry({ logged_date: day("2026-01-24"), mood_score: 3 }); // day 24: luteal
+  const phases = await getPhaseAverages(current.id, 28);
+  assert.deepEqual(phases.map((p) => p.phase), ["menstrual", "follicular", "ovulatory", "luteal"]);
+  assert.equal(phases.find((p) => p.phase === "ovulatory")?.energy_avg, 9);
+});
+
+test("delete-all resets every stored setting back to a fresh install", async () => {
+  useAppStore.setState({ isOnboarded: true, currentMode: "endo", activePeriodId: "gone", appLockEnabled: true, postPillMode: true });
+  await resetAppStore();
+  const s = useAppStore.getState();
+  assert.equal(s.isOnboarded, false);
+  assert.equal(s.currentMode, "standard");
+  assert.equal(s.activePeriodId, null);
+  assert.equal(s.appLockEnabled, false);
+  assert.equal(s.postPillMode, false);
+  assert.equal(typeof s.setOnboarded, "function", "actions survive the reset");
 });
 
 (async () => {

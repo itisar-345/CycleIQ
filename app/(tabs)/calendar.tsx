@@ -2,7 +2,8 @@ import { useCopy } from '@/constants/copy';
 import { useTx } from '@/utils/tone';
 import { Colors } from '@/constants/theme';
 import { getAllCycles, getAllEntries, getCyclePredictions, getPhaseAverages, getDayOfCycle, getPhaseForDay, type CycleRow, type PhaseAverage, type SymptomEntryRow } from '@/database';
-import { differenceInDays, format, parseISO } from "date-fns";
+import { addDays, differenceInCalendarDays, format, parseISO } from "date-fns";
+import { localDateKey, parseLocalDate } from '@/utils/dates';
 import { useAppStore } from '@/store';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import React, { useCallback, useEffect, useState } from 'react';
@@ -40,14 +41,15 @@ export default function CalendarScreen() {
   const year = viewDate.getFullYear();
   const month = viewDate.getMonth();
 
+  /** Compares local calendar days. The onboarding estimate (is_confirmed = 0) was never a logged period. */
   const isPeriodDay = (dateStr: string, cycle: CycleRow): boolean => {
-    if (!cycle.start_date) return false;
-    const start = new Date(cycle.start_date);
-    const end = cycle.end_date ? new Date(cycle.end_date) : null;
-    const date = new Date(dateStr);
-    if (end) return date >= start && date <= end;
-    const daysSince = differenceInDays(date, start);
-    return daysSince >= 0 && daysSince <= 7;
+    if (!cycle.start_date || cycle.is_confirmed === 0) return false;
+    const startKey = localDateKey(cycle.start_date);
+    if (dateStr < startKey) return false;
+    if (cycle.end_date) return dateStr <= localDateKey(cycle.end_date);
+    // Not ended yet: show the typical period length, but never paint days that haven't happened.
+    const lastKey = localDateKey(addDays(parseLocalDate(startKey), (cycle.period_length ?? 5) - 1));
+    return dateStr <= lastKey && dateStr <= localDateKey(new Date());
   };
 
   const generateMonth = useCallback((
@@ -78,19 +80,25 @@ export default function CalendarScreen() {
 
       loadedCycles.forEach(cycle => {
         if (isPeriodDay(dateStr, cycle)) dayData.periodScore += 1;
-        const cycleDay = getDayOfCycle(dateStr, cycle.start_date);
-        if (cycleDay > 0) dayData.phase = getPhaseForDay(cycleDay, cycle.cycle_length || (prediction && prediction.model !== "none" ? prediction.mean : 28));
       });
+      // Phase comes from the most recent cycle that started on or before this day (cycles are newest first).
+      const owner = loadedCycles.find((cycle) => getDayOfCycle(dateStr, cycle.start_date) > 0);
+      if (owner) {
+        dayData.phase = getPhaseForDay(
+          getDayOfCycle(dateStr, owner.start_date),
+          owner.cycle_length || (prediction && prediction.model !== "none" ? prediction.mean : 28),
+        );
+      }
 
       if (loadedCycles.length > 0 && prediction) {
         if (prediction.windowStartISO && prediction.windowEndISO && prediction.predictedStartISO) {
-          const winStart = parseISO(prediction.windowStartISO);
-          const winEnd = parseISO(prediction.windowEndISO);
-          const center = parseISO(prediction.predictedStartISO);
-          const thisDayDate = new Date(dateStr);
+          const winStart = parseLocalDate(localDateKey(prediction.windowStartISO));
+          const winEnd = parseLocalDate(localDateKey(prediction.windowEndISO));
+          const center = parseLocalDate(localDateKey(prediction.predictedStartISO));
+          const thisDayDate = parseLocalDate(dateStr);
           if (thisDayDate >= winStart && thisDayDate <= winEnd) {
-            const halfSpan = Math.max(differenceInDays(winEnd, winStart) / 2, 1);
-            const distFromCenter = Math.abs(differenceInDays(thisDayDate, center));
+            const halfSpan = Math.max(differenceInCalendarDays(winEnd, winStart) / 2, 1);
+            const distFromCenter = Math.abs(differenceInCalendarDays(thisDayDate, center));
             dayData.predictionConfidence = Math.max(0, 1 - distFromCenter / halfSpan);
             dayData.predictionEdgeFade = Math.max(0.12, dayData.predictionConfidence * 0.34);
           }
@@ -121,7 +129,7 @@ export default function CalendarScreen() {
     const allEntries = await getAllEntries();
     const entriesMap: Record<string, SymptomEntryRow> = {};
     allEntries.forEach(e => {
-      const d = e.logged_date.split('T')[0];
+      const d = localDateKey(e.logged_date);
       if (!entriesMap[d]) entriesMap[d] = e;
     });
     setEntriesByDate(entriesMap);

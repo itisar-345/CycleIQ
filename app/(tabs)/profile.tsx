@@ -151,7 +151,7 @@ export default function ProfileScreen() {
   const confirmDeleteLocalData = () => {
     Alert.alert(
       tx("delete everything? 🗑️", "Delete all data?"),
-      tx("This wipes all your CycleIQ data and saved reports from this phone. There's no undo — export first if you might want it back.", "This permanently deletes all CycleIQ data and saved reports from this device. Export first if you may need it."),
+      tx("This wipes all your CycleIQ data, settings, reminders and saved reports from this phone, and takes you back to setup. There's no undo — export first if you might want it back.", "This permanently deletes all CycleIQ data, settings, reminders and saved reports from this device and returns you to setup. Export first if you may need it."),
       [
         { text: "Cancel", style: "cancel" },
         {

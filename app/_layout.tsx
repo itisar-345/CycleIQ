@@ -6,6 +6,7 @@ import { Stack, router, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
 import { AppState, View, StyleSheet } from "react-native";
+import { currentTx } from "@/utils/tone";
 import "react-native-reanimated";
 import {
   cancelCycleNotifications,
@@ -22,6 +23,8 @@ export default function RootLayout() {
   const segments = useSegments();
   const [mounted, setMounted] = useState(false);
   const [dbReady, setDbReady] = useState(false);
+  const [dbFailed, setDbFailed] = useState(false);
+  const [dbAttempt, setDbAttempt] = useState(0);
   const [storeReady, setStoreReady] = useState(false);
 
   useEffect(() => {
@@ -30,10 +33,14 @@ export default function RootLayout() {
   }, []);
 
   useEffect(() => {
+    setDbFailed(false);
     initDb()
       .then(() => { setDbReady(true); })
-      .catch((error) => { console.error("Database initialization error:", error); });
-  }, []);
+      .catch((error) => {
+        console.error("Database initialization error:", error);
+        setDbFailed(true);
+      });
+  }, [dbAttempt]);
 
   // Sync notifications on every cold launch and foreground — OS permission check only, never prompts.
   useEffect(() => {
@@ -84,7 +91,17 @@ export default function RootLayout() {
       <AppLockGate ready={mounted && dbReady && storeReady} />
       {(!mounted || !dbReady || !storeReady) && (
         <View style={StyleSheet.absoluteFill} pointerEvents="auto">
-          <AppLoading />
+          {dbFailed ? (
+            <AppLoading
+              message={currentTx()(
+                "couldn't open your data 😕 it's still safe on this phone — try again, or restart the app.",
+                "Your data couldn't be opened. It's still stored safely on this device. Try again or restart the app.",
+              )}
+              onRetry={() => setDbAttempt((n) => n + 1)}
+            />
+          ) : (
+            <AppLoading />
+          )}
         </View>
       )}
       <StatusBar style="auto" />

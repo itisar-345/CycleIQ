@@ -3,6 +3,7 @@ import { OnboardingProgress } from "@/components/onboarding-progress";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useAppStore } from "@/store";
 import { DateField } from "@/components/date-field";
+import { localDateKey } from "@/utils/dates";
 import { useTx, type Tx } from "@/utils/tone";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useState } from "react";
@@ -12,9 +13,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 const MIN_LENGTH = 18;
 const MAX_LENGTH = 60;
 
-/** Local calendar date as YYYY-MM-DD. */
-const toDateKey = (d: Date) =>
-  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+const toDateKey = localDateKey;
 
 const daysAgo = (n: number) => {
   const d = new Date();
@@ -44,7 +43,7 @@ const validateDate = (value: string, tx: Tx): string | null => {
 export default function CycleHistoryInputScreen() {
   const theme = Colors[useColorScheme() ?? "light"];
   const tx = useTx();
-  const { setCycleHistory, currentMode } = useAppStore();
+  const { setCycleHistory, currentMode, postPillMode, setPostPillMode } = useAppStore();
   const { next } = useLocalSearchParams<{ next?: string }>();
 
   const [averageLength, setAverageLength] = useState(28);
@@ -166,6 +165,21 @@ export default function CycleHistoryInputScreen() {
             </Text>
           </TouchableOpacity>
         </View>
+
+        {currentMode === "peri" && (
+          <View style={[styles.card, { backgroundColor: theme.surface }, Shadow]}>
+            <Text style={[styles.question, { color: theme.text }]} accessibilityRole="header">
+              {tx("Did you recently stop hormonal birth control? 💊", "Did you recently stop hormonal contraception?")}
+            </Text>
+            <Text style={[styles.hint, { color: theme.textSecondary }]}>
+              {tx("pill, patch, ring, implant or hormonal IUD — your body needs ~3 months to find its rhythm", "Pill, patch, ring, implant or hormonal IUD. Cycles can take about 3 months to settle.")}
+            </Text>
+            <View style={styles.chips} accessibilityRole="radiogroup">
+              {chip(tx("yep, in the last 3 months", "Yes, in the last 3 months"), postPillMode, () => setPostPillMode(true))}
+              {chip(tx("nope", "No"), !postPillMode, () => setPostPillMode(false))}
+            </View>
+          </View>
+        )}
 
         <TouchableOpacity
           style={[styles.nextButton, { backgroundColor: theme.tint, opacity: dateError ? 0.5 : 1 }]}

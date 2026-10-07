@@ -4,7 +4,9 @@ import HomeScreen from "@/app/(tabs)/index";
 import ProfileScreen from "@/app/(tabs)/profile";
 import * as db from "@/database";
 import type { CycleRow, SymptomEntryRow } from "@/database";
+import { getCopy } from "@/constants/copy";
 import { useAppStore } from "@/store";
+import { format } from "date-fns";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react-native";
 import React from "react";
 import { Alert, type AlertButton } from "react-native";
@@ -136,6 +138,46 @@ describe("Calendar screen", () => {
     // Day cells describe their state for screen readers, not just colour dots.
     expect(screen.getAllByLabelText(/high pain/).length).toBeGreaterThan(0);
     expect(findUnlabelledPressables(screen.root)).toEqual([]);
+  });
+
+  // Local days this month, at times that differ from UTC midnight in every time zone.
+  const thisMonth = (dayOfMonth: number, hour: number) => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), dayOfMonth, hour, 30);
+  };
+  const dayLabel = (d: Date) => new RegExp(`^${format(d, "EEEE, MMMM d")}(,|$)`);
+  const isPeriod = (label: string) => /(^|, )period(,|$)/.test(label);
+  const labelOf = (d: Date) => screen.getByLabelText(dayLabel(d)).props.accessibilityLabel as string;
+
+  test("shades every day of a logged period, including the first", async () => {
+    const start = thisMonth(1, 8);
+    const end = thisMonth(4, 20);
+    mock(db.getAllCycles).mockResolvedValue([
+      { ...cycle("real", 0, null), start_date: start.toISOString(), end_date: end.toISOString(), period_length: 4 },
+    ]);
+    mock(db.getAllEntries).mockResolvedValue([]);
+    mock(db.getCyclePredictions).mockResolvedValue(prediction({ windowStartISO: null, windowEndISO: null, predictedStartISO: null }));
+
+    render(<CalendarScreen />);
+    await screen.findAllByLabelText(/today/);
+    for (const d of [1, 2, 3, 4]) expect(isPeriod(labelOf(thisMonth(d, 12)))).toBe(true);
+    expect(isPeriod(labelOf(thisMonth(5, 12)))).toBe(false);
+  });
+
+  test("the onboarding estimate is not shown as a period", async () => {
+    mock(db.getAllCycles).mockResolvedValue([
+      { ...cycle("current", 0, null), start_date: thisMonth(20, 8).toISOString(), end_date: thisMonth(22, 8).toISOString() },
+      { ...cycle("estimate", 0, 18), start_date: thisMonth(2, 12).toISOString(), period_length: null, is_confirmed: 0 },
+    ]);
+    mock(db.getAllEntries).mockResolvedValue([]);
+    mock(db.getCyclePredictions).mockResolvedValue(prediction({ windowStartISO: null, windowEndISO: null, predictedStartISO: null }));
+
+    render(<CalendarScreen />);
+    await screen.findAllByLabelText(/today/);
+    expect(isPeriod(labelOf(thisMonth(2, 12)))).toBe(false);
+    expect(isPeriod(labelOf(thisMonth(20, 12)))).toBe(true);
+    // Phase follows the newest cycle: day 21 is day 2 of the current cycle.
+    expect(labelOf(thisMonth(21, 12))).toContain(`${getCopy("chill").phases.menstrual.name} phase`);
   });
 });
 

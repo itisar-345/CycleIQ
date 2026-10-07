@@ -1,5 +1,6 @@
 import { isHeavyFlow } from "./safetyRules";
-import { getPhaseForDay, readExtendedSymptoms, type CyclePhase, type CycleRow, type RedFlagPromptLogRow, type SymptomEntryRow } from "../database";
+import { localDateKey } from "./dates";
+import { getDayOfCycle, getPhaseForDay, readExtendedSymptoms, type CyclePhase, type CycleRow, type RedFlagPromptLogRow, type SymptomEntryRow } from "../database";
 
 /** Escapes text for interpolation into the report HTML. */
 const esc = (value: unknown): string =>
@@ -63,7 +64,7 @@ export const generateSpecialistReportHtml = (
         if (e.cycle_id) {
             const thisCycle = cycles.find(c => c.id === e.cycle_id);
             if (thisCycle && thisCycle.start_date) {
-                const dayOfCycle = Math.floor((new Date(e.logged_date).getTime() - new Date(thisCycle.start_date).getTime()) / 86400000) + 1;
+                const dayOfCycle = getDayOfCycle(e.logged_date, thisCycle.start_date);
                 phase = getPhaseForDay(dayOfCycle, thisCycle.cycle_length || 28);
             }
         }
@@ -90,7 +91,7 @@ export const generateSpecialistReportHtml = (
 
     html += `<h3>Medication & Symptom Overlay</h3><table><tr><th>Date</th><th>Logged Medication</th><th>Pain</th><th>Energy</th></tr>`;
     entries.filter(e => e.medication_log_encrypted).slice(0, 15).forEach(e => {
-        html += `<tr><td>${e.logged_date.split("T")[0]}</td><td>Encrypted Log Present</td><td>${e.pain_score || "-"}</td><td>${e.energy_score || "-"}</td></tr>`;
+        html += `<tr><td>${localDateKey(e.logged_date)}</td><td>Encrypted Log Present</td><td>${e.pain_score || "-"}</td><td>${e.energy_score || "-"}</td></tr>`;
     });
     if (!entries.some(e => e.medication_log_encrypted)) {
         html += `<tr><td colspan="4">No medications logged in this cycle.</td></tr>`;
@@ -125,7 +126,7 @@ export const generateSpecialistReportHtml = (
 
     html += `<h3>Flare Detail Log</h3><table><tr><th>Date</th><th>Peak Pain (0-10)</th><th>Flow Intensity</th></tr>`;
     flareEvents.slice(0, 15).forEach(f => {
-       html += `<tr><td>${f.date.split("T")[0]}</td><td>${f.pain}</td><td>${esc(f.flow)}</td></tr>`;
+       html += `<tr><td>${localDateKey(f.date)}</td><td>${f.pain}</td><td>${esc(f.flow)}</td></tr>`;
     });
     if (flareEvents.length === 0) html += `<tr><td colspan="3">No flares recorded.</td></tr>`;
     html += `</table>`;
@@ -139,7 +140,7 @@ export const generateSpecialistReportHtml = (
     complexSymptoms.slice(0, 15).forEach(e => {
        const endo = readExtendedSymptoms(e).endo;
        html += `<tr>
-         <td>${e.logged_date.split("T")[0]}</td>
+         <td>${localDateKey(e.logged_date)}</td>
          <td>${endo?.bowel.length ? esc(endo.bowel.join(", ")) : '-'}</td>
          <td>${endo?.bladder.length ? esc(endo.bladder.join(", ")) : '-'}</td>
          <td>${esc(e.flow_intensity || '-')}${e.clots_size ? ` (Clots: ${esc(e.clots_size)})` : ''}</td>
@@ -152,7 +153,7 @@ export const generateSpecialistReportHtml = (
     redFlagPromptLogs.slice(0, 15).forEach(log => {
        const trigger = String(log.trigger_type || "").replace(/_/g, " ");
        html += `<tr>
-         <td>${String(log.logged_date || log.triggered_at).split("T")[0]}</td>
+         <td>${localDateKey(String(log.logged_date || log.triggered_at))}</td>
          <td style="text-transform:capitalize">${esc(trigger)}</td>
          <td><span class="highlight">${esc(log.message)}</span></td>
        </tr>`;
@@ -187,7 +188,7 @@ export const generateSpecialistReportHtml = (
     if (!e.cycle_id) return;
     const thisCycle = cycles.find((c) => c.id === e.cycle_id);
     if (!thisCycle?.start_date) return;
-    const cd = Math.floor((new Date(e.logged_date).getTime() - new Date(thisCycle.start_date).getTime()) / 86400000) + 1;
+    const cd = getDayOfCycle(e.logged_date, thisCycle.start_date);
     if (cd >= 1 && cd <= 35) {
       cdBuckets[cd].pain += e.pain_score || 0;
       cdBuckets[cd].mood += e.mood_score || 0;
@@ -225,12 +226,12 @@ export const generateSpecialistReportHtml = (
     if (e.cycle_id) {
       const thisCycle = cycles.find((c) => c.id === e.cycle_id);
       if (thisCycle?.start_date) {
-        const cd = Math.floor((new Date(e.logged_date).getTime() - new Date(thisCycle.start_date).getTime()) / 86400000) + 1;
+        const cd = getDayOfCycle(e.logged_date, thisCycle.start_date);
         phase = getPhaseForDay(cd, thisCycle.cycle_length || 28);
       }
     }
     html += `<tr>
-      <td>${e.logged_date.split('T')[0]}</td>
+      <td>${localDateKey(e.logged_date)}</td>
       <td style="text-transform:capitalize">${phase}</td>
       <td>${e.mood_score ?? '—'}</td>
       <td>${e.energy_score ?? '—'}</td>
@@ -242,7 +243,7 @@ export const generateSpecialistReportHtml = (
   html += `<h2>Detailed Log (Rolling View)</h2><table><tr><th>Date</th><th>Pain</th><th>Mood</th><th>Sleep</th></tr>`;
   entries.slice(0, 30).forEach(e => {
       html += `<tr>
-        <td>${e.logged_date.split("T")[0]}</td>
+        <td>${localDateKey(e.logged_date)}</td>
         <td>${e.pain_score ? e.pain_score : "-"}</td>
         <td>${e.mood_score ? e.mood_score : "-"}</td>
         <td>${e.sleep_hours ? e.sleep_hours + "h" : "-"}</td>

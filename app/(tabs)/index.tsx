@@ -1,6 +1,7 @@
 import { useCopy } from "@/constants/copy";
 import { useReducedMotion } from "@/hooks/use-reduced-motion";
 import { useTx } from "@/utils/tone";
+import { localDateKey } from "@/utils/dates";
 import { Colors, getModeColor, Radius, Shadow } from "@/constants/theme";
 import { closeCycle, createCycle, getAllEntries, getLatestCycle, getDayOfCycle, getPhaseForDay, getCyclePredictions, generateInsights, CycleInsight, getLatestPredictionFeedback } from "@/database";
 import { PredictionResult } from "@/utils/predictions";
@@ -130,9 +131,9 @@ export default function HomeScreen() {
       validInsights.sort((a: CycleInsight, b: CycleInsight) => Math.abs(b.correlation || 0) - Math.abs(a.correlation || 0));
       setLatestInsight(validInsights.length > 0 ? validInsights[0] : null);
 
-      const todayStr = new Date().toISOString().split("T")[0];
+      const todayStr = localDateKey(new Date());
       const allEntries = await getAllEntries();
-      const todayEntry = allEntries.find((e) => e.logged_date.startsWith(todayStr));
+      const todayEntry = allEntries.find((e) => localDateKey(e.logged_date) === todayStr);
       setMedicationLoggedToday(!!(todayEntry?.medication_log_encrypted));
 
       if (!missShownRef.current) {

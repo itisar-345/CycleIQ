@@ -250,7 +250,6 @@ export default function LogScreen() {
     try {
       const nowISO = new Date().toISOString();
       await createSymptomEntry({
-        cycle_id: activePeriodId ?? null,
         logged_date: nowISO,
         pain_score: pain ?? undefined,
         pain_locations: painLocations,
@@ -314,7 +313,7 @@ export default function LogScreen() {
     setEndingFlare(false);
     setFlareReflection("");
     try {
-      await saveFlareEnd(activePeriodId ?? null, startISO ?? endDate, endDate, reflection, flareDurationDays ?? 1);
+      await saveFlareEnd(startISO ?? endDate, endDate, reflection, flareDurationDays ?? 1);
     } catch (error) {
       console.error("Failed saving flare end:", error);
       Alert.alert(tx("Hmm, that didn't save 😕", "Couldn't save"), tx("Couldn't record the end of your flare — try once more.", "The end of your flare couldn't be saved. Please try again."));

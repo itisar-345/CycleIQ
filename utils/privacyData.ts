@@ -1,6 +1,8 @@
 import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
-import { checkpointDatabase, exportLocalDataSnapshot, getActiveDbName, restoreLocalDataSnapshot, wipeLocalDatabase } from "@/database";
+import { checkpointDatabase, exportLocalDataSnapshot, getActiveDbName, getCycle, restoreLocalDataSnapshot, wipeLocalDatabase } from "@/database";
+import { resetAppStore, useAppStore } from "@/store";
+import { cancelAllNotifications } from "@/utils/notifications";
 import { deleteLocalReports, ensureReportsDirectory } from "@/utils/localReports";
 
 const escapeCsvCell = (value: unknown): string => {
@@ -68,6 +70,9 @@ export const restoreLocalDataBackupFromUri = async (uri: string): Promise<void> 
   });
   const snapshot = JSON.parse(contents);
   await restoreLocalDataSnapshot(snapshot);
+  // A period in progress that isn't in the backup no longer exists.
+  const { activePeriodId, setActivePeriod } = useAppStore.getState();
+  if (activePeriodId && !(await getCycle(activePeriodId))) setActivePeriod(null, null);
 };
 
 export const exportAndShareDatabaseFileBackup = async (): Promise<string> => {
@@ -90,7 +95,10 @@ export const exportAndShareDatabaseFileBackup = async (): Promise<string> => {
   return targetUri;
 };
 
+/** "Delete all my data": database, saved reports, scheduled reminders and every stored setting. */
 export const wipeLocalDataAndFiles = async (): Promise<void> => {
   await wipeLocalDatabase();
   await deleteLocalReports();
+  await cancelAllNotifications();
+  await resetAppStore();
 };

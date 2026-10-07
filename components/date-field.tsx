@@ -11,8 +11,9 @@ import { format } from "date-fns";
 import React, { useState } from "react";
 import { Modal, Platform, Pressable, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 
-export const toDateKey = (d: Date) =>
-  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+import { localDateKey as toDateKey } from "@/utils/dates";
+
+export { toDateKey };
 
 const fromDateKey = (key: string | null): Date | null => {
   if (!key || !/^\d{4}-\d{2}-\d{2}$/.test(key)) return null;

@@ -2,6 +2,7 @@ import {
   SAFEGUARDING_LOW_MOOD_SCORE,
   SAFEGUARDING_LOW_MOOD_THRESHOLD_DAYS,
 } from "../constants/safeguarding";
+import { localDateKey } from "./dates";
 
 export type RedFlagTriggerType = "severe_pain_3_days" | "bowel_shoulder_heavy_flow";
 
@@ -24,9 +25,6 @@ const heavyFlowValues = new Set(["Heavy", "Very Heavy", "heavy", "very heavy"]);
 
 export const isHeavyFlow = (flow: string | null | undefined): boolean => !!flow && heavyFlowValues.has(flow);
 
-/** Local calendar date "YYYY-MM-DD". */
-const localDateKey = (date: Date): string =>
-  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 
 /**
  * For each of the `days` calendar days before `today` (most recent first), that day's

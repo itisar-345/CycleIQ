@@ -2,6 +2,7 @@
  * Pure cycle-phase maths (no database access) — safe to use anywhere, including tests.
  */
 import { differenceInCalendarDays } from "date-fns";
+import { parseLocalDate } from "../utils/dates";
 import { LUTEAL_PHASE_DAYS } from "../utils/predictions";
 
 export interface CyclePhase {
@@ -25,7 +26,7 @@ export const getCyclePhases = (cycleLength: number = 28): CyclePhase[] => {
 };
 
 export const getDayOfCycle = (loggedDate: string, cycleStart: string): number => {
-  return differenceInCalendarDays(new Date(loggedDate), new Date(cycleStart)) + 1;
+  return differenceInCalendarDays(parseLocalDate(loggedDate), parseLocalDate(cycleStart)) + 1;
 };
 
 export const getPhaseForDay = (day: number, cycleLength = 28): CyclePhase['name'] => {

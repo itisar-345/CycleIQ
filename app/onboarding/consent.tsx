@@ -8,7 +8,7 @@ import { useAppStore } from "@/store";
 import { router } from "expo-router";
 import { addDays, format, parseISO } from "date-fns";
 import React, { useState } from "react";
-import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 type Pair = readonly [chill: string, classic: string];
@@ -131,6 +131,10 @@ export default function ConsentScreen() {
     } catch (error) {
       console.error("Onboarding completion failed", error);
       setCompleting(false);
+      Alert.alert(
+        tx("hmm, setup didn't finish 😕", "Setup couldn't finish"),
+        tx("Nothing's lost — tap \"let's go\" again. If it keeps happening, close and reopen the app.", "Nothing was lost. Please tap Get started again. If this keeps happening, restart the app."),
+      );
     }
   };
 
@@ -171,7 +175,9 @@ export default function ConsentScreen() {
           <View style={[styles.ahaCard, { backgroundColor: theme.surface, borderColor: theme.tint }]}>
             <Text style={styles.ahaIcon} importantForAccessibility="no" accessibilityElementsHidden>{meta.icon}</Text>
             <Text style={[styles.ahaNote, { color: theme.textSecondary }]}>
-              {tx("Log your first period and your personal prediction unlocks ✨", "Log your first period to see your personal prediction.")}
+              {postPillMode
+                ? tx("Post-pill mode is on: your body's finding its rhythm, so predictions unlock after ~90 days. Keep logging meanwhile 🫶", "Post-pill mode is on. Predictions start after about 90 days while your cycle settles. Keep logging in the meantime.")
+                : tx("Log your first period and your personal prediction unlocks ✨", "Log your first period to see your personal prediction.")}
             </Text>
           </View>
         )}

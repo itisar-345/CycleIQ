@@ -35,7 +35,7 @@ export default function AnalyticsScreen() {
   useEffect(() => {
     const loadData = async () => {
       const allCycles = await getAllCycles();
-      setCycles(allCycles);
+      setCycles(allCycles.filter((c) => c.is_confirmed !== 0)); // the onboarding estimate is not a logged period
       const pred = await getCyclePredictions(currentMode, postPillMode, postPillStartDate ?? null);
       setPrediction(pred);
       if (allCycles.length > 0) {

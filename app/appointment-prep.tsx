@@ -26,7 +26,7 @@ export default function AppointmentPrepScreen() {
 
   useEffect(() => {
     const load = async () => {
-      const cycles = await getAllCycles();
+      const cycles = (await getAllCycles()).filter((c) => c.is_confirmed !== 0); // the onboarding estimate is not a logged period
       const entries = await getAllEntries();
       setSummary(buildAppointmentPrepSummary(cycles, entries, currentMode));
     };

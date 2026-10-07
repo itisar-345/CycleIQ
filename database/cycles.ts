@@ -4,6 +4,7 @@
 import { addDays, differenceInCalendarDays, differenceInDays, parseISO } from "date-fns";
 import * as SQLite from "expo-sqlite";
 import { computeCycleLength, computePeriodLength } from "../utils/cycleMath";
+import { localDateKey } from "../utils/dates";
 import { invalidatePredictions } from "../utils/predictionInvalidation";
 import type { PredictionResult } from "../utils/predictions";
 
@@ -12,8 +13,48 @@ import { parseJsonColumn, type CycleRow } from "./types";
 import { retrainAndStoreCyclePrediction } from "./predictionStore";
 
 /**
+ * The cycle a day belongs to: the latest cycle that started on or before that local day.
+ * `starts` must be sorted oldest first. Returns null for days before the first cycle.
+ */
+export const owningCycleId = (starts: { id: string; key: string }[], dayKey: string): string | null => {
+  let owner: string | null = null;
+  for (const s of starts) {
+    if (s.key > dayKey) break;
+    owner = s.id;
+  }
+  return owner;
+};
+
+const loadCycleStarts = async (database: SQLite.SQLiteDatabase) =>
+  (await database.getAllAsync<{ id: string; start_date: string }>(
+    `SELECT id, start_date FROM cycles ORDER BY start_date ASC;`,
+  )).map((c) => ({ id: c.id, key: localDateKey(c.start_date) }));
+
+/**
+ * Every symptom entry belongs to the whole cycle its day falls in (not only period days).
+ * Re-run whenever cycles are added, moved or deleted.
+ */
+export const reassignEntryCycles = async (database: SQLite.SQLiteDatabase): Promise<void> => {
+  const starts = await loadCycleStarts(database);
+  const entries = await database.getAllAsync<{ id: string; logged_date: string; cycle_id: string | null }>(
+    `SELECT id, logged_date, cycle_id FROM symptom_entries;`,
+  );
+  for (const e of entries) {
+    const owner = owningCycleId(starts, localDateKey(e.logged_date));
+    if (owner !== e.cycle_id) {
+      await database.runAsync(`UPDATE symptom_entries SET cycle_id = ? WHERE id = ?;`, [owner, e.id]);
+    }
+  }
+};
+
+/** Cycle id for a new entry logged at `loggedDate`. */
+export const cycleIdForDate = async (loggedDate: string): Promise<string | null> =>
+  owningCycleId(await loadCycleStarts(await ensureDb()), localDateKey(loggedDate));
+
+/**
  * Single source of truth for cycle lengths: each completed cycle's length is the gap
  * to the next cycle's start; the latest (in-progress) cycle has no length.
+ * Also keeps entries attached to the right cycle.
  */
 export const recomputeCycleLengths = async (database: SQLite.SQLiteDatabase): Promise<void> => {
   const rows = await database.getAllAsync<{ id: string; start_date: string; cycle_length: number | null }>(
@@ -26,6 +67,7 @@ export const recomputeCycleLengths = async (database: SQLite.SQLiteDatabase): Pr
       await database.runAsync(`UPDATE cycles SET cycle_length = ? WHERE id = ?;`, [length, rows[i].id]);
     }
   }
+  await reassignEntryCycles(database);
 };
 
 export const getLatestCycle = (): Promise<CycleRow | null> =>
@@ -96,9 +138,11 @@ export const seedInitialCycleFromOnboarding = async (
     : `${lastPeriodDate}T12:00:00.000Z`;
   const prevStart = addDays(parseISO(normalizedDate), -averageLength).toISOString();
 
+  // The previous cycle is only an estimate from the typical length the user gave: it feeds the
+  // prediction prior but is not a logged period (is_confirmed = 0), so screens and reports skip it.
   const prevId = createLocalId();
   await execSql(
-    `INSERT INTO cycles (id, start_date, cycle_length, is_confirmed) VALUES (?,?,?,1);`,
+    `INSERT INTO cycles (id, start_date, cycle_length, is_confirmed) VALUES (?,?,?,0);`,
     [prevId, prevStart, averageLength],
   );
 
@@ -108,6 +152,7 @@ export const seedInitialCycleFromOnboarding = async (
     `INSERT INTO cycles (id, start_date, cycle_length, is_confirmed) VALUES (?,?,NULL,1);`,
     [currentId, normalizedDate],
   );
+  await recomputeCycleLengths(await ensureDb());
 
   invalidatePredictions("seedInitialCycleFromOnboarding");
   await retrainAndStoreCyclePrediction();
@@ -195,8 +240,9 @@ export const updateCycle = async (
   await retrainAndStoreCyclePrediction();
 };
 
+/** Deletes a period. Symptom logs are kept — they're about days, not the period — and move to the previous cycle. */
 export const deleteCycle = async (cycleId: string): Promise<void> => {
-  await execSql(`DELETE FROM symptom_entries WHERE cycle_id = ?;`, [cycleId]);
+  await execSql(`UPDATE symptom_entries SET cycle_id = NULL WHERE cycle_id = ?;`, [cycleId]);
   await execSql(`DELETE FROM cycles WHERE id = ?;`, [cycleId]);
   await recomputeCycleLengths(await ensureDb());
   invalidatePredictions("deleteCycle");

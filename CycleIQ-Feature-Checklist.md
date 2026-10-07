@@ -363,6 +363,7 @@
 - [x] Data export: full local data export as JSON or CSV (saved to device or shared via share sheet)
 - [x] Data wipe: one-tap "Delete all my data" — removes all local SQLite data and files
 - [x] Data wipe: confirmation dialog before irreversible deletion
+- [x] Data wipe also clears stored settings, condition answers and scheduled reminders, and returns to setup
 - [x] No analytics SDKs that transmit personal or health data off-device
 - [x] No third-party crash reporting SDKs that include health data in payloads
 - [x] Boot gate: routing waits for both DB init and Zustand AsyncStorage hydration
@@ -384,7 +385,7 @@
 - [x] prediction_feedback table — actual vs predicted for bias correction
 - [x] red_flag_prompt_logs table — red-flag alert history for reports
 - [x] app_settings table — condition, language, notification prefs, dismissed insights (partial Zustand mirror)
-- [x] schema_migrations table — versioned migration framework (dbSchemaVersion = 4)
+- [x] schema_migrations table — versioned migration framework (dbSchemaVersion = 5)
 - [x] All health data read/written from local SQLite only — no network calls for core features
 - [x] Database migration framework for app update schema changes
 - [x] Local backup: export full encrypted database to file on demand (via share sheet)

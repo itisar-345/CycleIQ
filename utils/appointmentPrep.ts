@@ -1,5 +1,5 @@
 import { format } from "date-fns";
-import { getPhaseForDay, readExtendedSymptoms, type CycleRow, type SymptomEntryRow } from "@/database";
+import { getDayOfCycle, getPhaseForDay, readExtendedSymptoms, type CycleRow, type SymptomEntryRow } from "@/database";
 
 export interface AppointmentPrepSummary {
   dateRange: string;
@@ -44,7 +44,7 @@ export const buildAppointmentPrepSummary = (
     if (!entry.cycle_id) return;
     const cycle = cycles.find((item) => item.id === entry.cycle_id);
     if (!cycle?.start_date) return;
-    const cycleDay = Math.floor((new Date(entry.logged_date).getTime() - new Date(cycle.start_date).getTime()) / 86400000) + 1;
+    const cycleDay = getDayOfCycle(entry.logged_date, cycle.start_date);
     const phase = getPhaseForDay(cycleDay, cycle.cycle_length || 28);
     topPhaseSymptoms[phase] = (topPhaseSymptoms[phase] ?? 0) + (entry.pain_score ?? 0);
   });

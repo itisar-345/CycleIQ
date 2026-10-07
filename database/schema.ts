@@ -4,9 +4,9 @@
 import * as SQLite from "expo-sqlite";
 
 import { ensureDb } from "./connection";
-import { recomputeCycleLengths } from "./cycles";
+import { reassignEntryCycles, recomputeCycleLengths } from "./cycles";
 
-export const dbSchemaVersion = 4;
+export const dbSchemaVersion = 5;
 
 type DatabaseMigration = {
   id: number;
@@ -54,6 +54,15 @@ const databaseMigrations: DatabaseMigration[] = [
     // never recomputed neighbours. Rebuild every length from start dates.
     up: async (database) => {
       await recomputeCycleLengths(database);
+    },
+  },
+  {
+    id: 5,
+    name: "entries-belong-to-whole-cycles",
+    // Logs used to get a cycle_id only during an active period, so phase analysis only ever
+    // saw period days. Attach every log to the cycle its local day falls in.
+    up: async (database) => {
+      await reassignEntryCycles(database);
     },
   },
 ];

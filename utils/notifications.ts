@@ -202,6 +202,15 @@ export const scheduleDailyLogReminder = async (enabled: boolean, hourOfDay = 20)
   } catch { /* non-fatal */ }
 };
 
+/** Removes every scheduled reminder — used when all data is deleted. */
+export const cancelAllNotifications = async () => {
+  if (isExpoGo) return;
+  try {
+    const N = await getNotifications();
+    await N.cancelAllScheduledNotificationsAsync();
+  } catch { /* non-fatal */ }
+};
+
 export const cancelCycleNotifications = async () => {
   await Promise.all([
     cancelId("period-reminder"),

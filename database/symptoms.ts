@@ -1,9 +1,11 @@
 /**
  * Daily symptom log entries.
  */
+import { localDateKey } from "../utils/dates";
 import { encryptField } from "../utils/fieldEncryption";
 
 import { createLocalId, execSql, queryAll, queryFirst } from "./connection";
+import { cycleIdForDate } from "./cycles";
 import type { ExtendedSymptoms, SymptomEntryRow } from "./types";
 
 export interface SymptomEntry {
@@ -41,8 +43,10 @@ export interface SymptomEntry {
   medication_log_encrypted?: string;
 }
 
+/** Saves a log. `cycle_id` defaults to the cycle the log's local day falls in. */
 export const createSymptomEntry = async (entry: SymptomEntry) => {
   const id = createLocalId();
+  const cycleId = entry.cycle_id !== undefined ? entry.cycle_id : await cycleIdForDate(entry.logged_date);
   await execSql(
     `INSERT INTO symptom_entries (
         id, cycle_id, logged_date, pain_score, pain_locations, pain_type, mood_score, mood_tags,
@@ -54,7 +58,7 @@ export const createSymptomEntry = async (entry: SymptomEntry) => {
       ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);`,
     [
       id,
-      entry.cycle_id ?? null,
+      cycleId ?? null,
       entry.logged_date,
       entry.pain_score ?? null,
       entry.pain_locations ? JSON.stringify(entry.pain_locations) : null,
@@ -103,34 +107,32 @@ export const getAllEntries = (): Promise<SymptomEntryRow[]> =>
   queryAll<SymptomEntryRow>(`SELECT * FROM symptom_entries ORDER BY logged_date DESC;`);
 
 export const saveFlareEnd = async (
-  cycleId: string | null,
   loggedDate: string,
   endDate: string,
   reflection: string,
   durationDays: number
 ): Promise<void> => {
   const encryptedReflection = reflection ? await encryptField(reflection) : null;
-  // Update the symptom entry that started the flare (same logged_date)
+  // Update the entry that started the flare (its flare_start is the flare's start time).
   // UPDATE … ORDER BY/LIMIT needs a non-default SQLite build flag, so pick the row in a subquery.
   await execSql(
     `UPDATE symptom_entries
      SET flare_end = ?, flare_reflection_encrypted = ?
      WHERE id = (
        SELECT id FROM symptom_entries
-       WHERE cycle_id IS ? AND date(logged_date) = date(?)
-       ORDER BY logged_date DESC LIMIT 1
+       WHERE flare_start = ? OR date(logged_date) = date(?)
+       ORDER BY (flare_start = ?) DESC, logged_date DESC LIMIT 1
      );`,
-    [endDate, encryptedReflection, cycleId, loggedDate]
+    [endDate, encryptedReflection, loggedDate, loggedDate, loggedDate]
   );
   // Also insert a closing entry if none exists for today
-  const today = new Date().toISOString().split("T")[0];
-  const existing = await queryFirst<{ id: string }>(
-    `SELECT id FROM symptom_entries WHERE date(logged_date) = ? LIMIT 1;`,
-    [today]
+  const today = localDateKey(new Date());
+  const todays = await queryAll<{ logged_date: string }>(
+    `SELECT logged_date FROM symptom_entries WHERE logged_date >= ?;`,
+    [new Date(Date.now() - 2 * 86400000).toISOString()]
   );
-  if (!existing) {
+  if (!todays.some((e) => localDateKey(e.logged_date) === today)) {
     await createSymptomEntry({
-      cycle_id: cycleId,
       logged_date: endDate,
       flare_end: endDate,
       flare_reflection_encrypted: encryptedReflection ?? undefined,

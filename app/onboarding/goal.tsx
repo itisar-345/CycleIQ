@@ -38,11 +38,13 @@ const GOALS = [
 export default function GoalScreen() {
   const colorScheme = useColorScheme() ?? "light";
   const theme = Colors[colorScheme];
-  const { setMode, tone, setTone } = useAppStore();
+  const { setMode, setPostPillMode, tone, setTone } = useAppStore();
   const tx = useTx();
 
   const handleSelect = (goal: (typeof GOALS)[number]) => {
     setMode(goal.mode);
+    // The post-pill question only appears on the "unpredictable" path.
+    if (goal.mode !== "peri") setPostPillMode(false);
     router.push(goal.next);
   };
 

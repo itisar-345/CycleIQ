@@ -3,6 +3,7 @@ import { format } from "date-fns";
 import { useTx } from "@/utils/tone";
 import { deleteCycle, getAllCycles, type CycleRow } from "@/database";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import { useAppStore } from "@/store";
 import { router, useFocusEffect } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
 import {
@@ -38,15 +39,23 @@ export default function HistoryScreen() {
 
   const handleDelete = (cycleId: string) => {
     Alert.alert(
-      tx("delete this cycle? 🗑️", "Delete this cycle?"),
-      tx("This also deletes its symptom logs, and it can't be undone.", "This also deletes its symptom logs. This can't be undone."),
+      tx("delete this period? 🗑️", "Delete this period?"),
+      tx("Your daily logs stay — they just move to the cycle before. Can't be undone.", "Your daily logs are kept and move to the previous cycle. This can't be undone."),
       [
         { text: tx("keep it", "Cancel"), style: "cancel" },
         {
           text: tx("delete", "Delete"),
           style: "destructive",
           onPress: async () => {
-            await deleteCycle(cycleId);
+            try {
+              await deleteCycle(cycleId);
+              // Deleting the period that's in progress also ends it on Home.
+              const { activePeriodId, setActivePeriod } = useAppStore.getState();
+              if (activePeriodId === cycleId) setActivePeriod(null, null);
+            } catch (error) {
+              console.error("Failed deleting cycle", error);
+              Alert.alert(tx("hmm, that didn't work 😕", "Couldn't delete"), tx("Couldn't delete that period — try again.", "The period couldn't be deleted. Please try again."));
+            }
             loadCycles();
           },
         },
@@ -90,7 +99,9 @@ export default function HistoryScreen() {
                   {cycle.cycle_length === null ? tx("  ·  current cycle 🔄", "  ·  Current cycle") : ""}
                 </Text>
                 <Text style={{ color: theme.textSecondary }}>
-                  {cycle.cycle_length !== null ? `${cycle.cycle_length}-day cycle` : tx("still going", "In progress")} · {cycle.period_length !== null ? `${cycle.period_length}-day period` : tx("period length not logged", "Period length not logged")}
+                  {cycle.is_confirmed === 0
+                    ? tx("estimated from your setup answers — not a logged period", "Estimated from your setup answers (not a logged period)")
+                    : <>{cycle.cycle_length !== null ? `${cycle.cycle_length}-day cycle` : tx("still going", "In progress")} · {cycle.period_length !== null ? `${cycle.period_length}-day period` : tx("period length not logged", "Period length not logged")}</>}
                 </Text>
               </TouchableOpacity>
               <View style={styles.row}>

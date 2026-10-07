@@ -3,13 +3,15 @@ import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useReducedMotion } from "@/hooks/use-reduced-motion";
 import { useTx } from "@/utils/tone";
 import React, { useEffect, useRef } from "react";
-import { ActivityIndicator, Animated, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Animated, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 type Props = {
   message?: string;
+  /** When set, loading failed: show the message with a retry button instead of a spinner. */
+  onRetry?: () => void;
 };
 
-export function AppLoading({ message }: Props) {
+export function AppLoading({ message, onRetry }: Props) {
   const colorScheme = useColorScheme() ?? "light";
   const theme = Colors[colorScheme];
   const tx = useTx();
@@ -31,15 +33,20 @@ export function AppLoading({ message }: Props) {
   return (
     <View
       style={[styles.container, { backgroundColor: theme.background }]}
-      accessible
-      accessibilityRole="progressbar"
+      accessible={!onRetry}
+      accessibilityRole={onRetry ? undefined : "progressbar"}
       accessibilityLabel={message ?? tx("Loading CycleIQ", "Loading CycleIQ")}
     >
       <Animated.Text style={[styles.logo, { color: theme.tint, transform: [{ scale: pulse }] }]}>
         CycleIQ
       </Animated.Text>
-      <ActivityIndicator size="large" color={theme.tint} style={styles.spinner} />
+      {!onRetry && <ActivityIndicator size="large" color={theme.tint} style={styles.spinner} />}
       <Text style={[styles.message, { color: theme.textSecondary }]}>{message ?? tx("locking in your private vault 🔒…", "Loading your data securely…")}</Text>
+      {onRetry && (
+        <TouchableOpacity onPress={onRetry} style={[styles.retry, { backgroundColor: theme.tint }]} accessibilityRole="button">
+          <Text style={[styles.retryText, { color: theme.onTint }]}>{tx("try again", "Try again")}</Text>
+        </TouchableOpacity>
+      )}
     </View>
   );
 }
@@ -49,4 +56,6 @@ const styles = StyleSheet.create({
   logo: { fontSize: 36, fontWeight: "bold", marginBottom: 24 },
   spinner: { marginBottom: 16 },
   message: { fontSize: 15, textAlign: "center", lineHeight: 22 },
+  retry: { marginTop: 24, paddingHorizontal: 28, minHeight: 48, borderRadius: 24, justifyContent: "center" },
+  retryText: { fontSize: 16, fontWeight: "800" },
 });

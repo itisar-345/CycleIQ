@@ -2,6 +2,7 @@ import { useCopy } from '@/constants/copy';
 import { useTx } from '@/utils/tone';
 import { Colors } from '@/constants/theme';
 import { format } from 'date-fns';
+import { BatteryMedium, Flame, Smile, type LucideIcon } from "@/components/icons";
 import { getCycle, getCycleEntries, getCyclePhases, getDayOfCycle, getPhaseForDay, type CyclePhase, type CycleRow, type SymptomEntryRow } from '@/database';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -48,7 +49,7 @@ export default function CycleDetail() {
           <Text style={[styles.label, { color: theme.textSecondary }]}>{tx("period length", "Period length")}</Text>
           <Text style={[styles.value, { color: theme.text }]}>{cycle.period_length ? `${cycle.period_length} days` : tx('not logged', 'Not logged')}</Text>
           <Text style={[styles.label, { color: theme.textSecondary }]}>{tx("cycle length", "Cycle length")}</Text>
-          <Text style={[styles.value, { color: theme.text }]}>{cycle.cycle_length ? `${cycle.cycle_length} days` : tx('still going 🔄', 'In progress')}</Text>
+          <Text style={[styles.value, { color: theme.text }]}>{cycle.cycle_length ? `${cycle.cycle_length} days` : tx('still going', 'In progress')}</Text>
         </View>
 
         <Text style={[styles.section, { color: theme.text }]} accessibilityRole="header">{tx("phases, roughly", "Estimated phases")}</Text>
@@ -76,14 +77,21 @@ export default function CycleDetail() {
                   accessible
                   accessibilityLabel={`Pain ${entry.pain_score ?? 'not logged'}, mood ${entry.mood_score ?? 'not logged'}, energy ${entry.energy_score ?? 'not logged'}`}
                 >
-                  <Text style={{ color: theme.text }}>{tx("🔥", "Pain")} {entry.pain_score ?? '—'}</Text>
-                  <Text style={{ color: theme.text }}>{tx("✨", "Mood")} {entry.mood_score ?? '—'}</Text>
-                  <Text style={{ color: theme.text }}>{tx("🔋", "Energy")} {entry.energy_score ?? '—'}</Text>
+                  {([
+                    [Flame, tx("pain", "Pain"), entry.pain_score],
+                    [Smile, tx("mood", "Mood"), entry.mood_score],
+                    [BatteryMedium, tx("energy", "Energy"), entry.energy_score],
+                  ] as [LucideIcon, string, number | null][]).map(([Icon, label, score]) => (
+                    <View key={label} style={styles.stat}>
+                      <Icon size={16} color={theme.tint} strokeWidth={2.25} />
+                      <Text style={{ color: theme.text }}>{label} {score ?? '—'}</Text>
+                    </View>
+                  ))}
                 </View>
                 {entry.flow_intensity && <Text style={[styles.periodNote, { color: theme.error }]}>{tx("flow:", "Flow:")} {tx(entry.flow_intensity.toLowerCase(), entry.flow_intensity)}</Text>}
                 {(entry.health_sleep_source || entry.health_activity_source) && (
                   <Text style={[styles.sourceNote, { color: theme.textSecondary }]}>
-                    {tx("⌚ synced from", "From")} {Array.from(new Set([entry.health_sleep_source, entry.health_activity_source].filter(Boolean))).join(" + ")}
+                    {tx("synced from", "From")} {Array.from(new Set([entry.health_sleep_source, entry.health_activity_source].filter(Boolean))).join(" + ")}
                   </Text>
                 )}
               </View>
@@ -111,6 +119,7 @@ const styles = StyleSheet.create({
   dayCard: { padding: 16, borderRadius: 12, marginBottom: 12 },
   dayHeader: { fontWeight: 'bold', marginBottom: 8 },
   symptomRow: { flexDirection: 'row', gap: 20, marginBottom: 4 },
+  stat: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   periodNote: { fontWeight: '500', marginTop: 4 },
   sourceNote: { fontSize: 12, fontWeight: '600', marginTop: 6 },
 });

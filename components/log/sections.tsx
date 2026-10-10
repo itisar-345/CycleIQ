@@ -7,6 +7,7 @@ import { Colors, Radius, Spacing } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import type { EndoLog, FlareLog, PcosLog, PeriLog } from "@/utils/logEntry";
 import { useTx } from "@/utils/tone";
+import { Activity, HeartPulse, Thermometer } from "@/components/icons";
 import React from "react";
 import { StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { Card, Divider, Question } from "./card";
@@ -34,7 +35,7 @@ export function PcosSection({ value, onChange }: { value: PcosLog; onChange: (pa
   const tx = useTx();
   const { captions: Captions, options: Options, severity: SeverityLabels } = useCopy();
   return (
-    <Card title={tx("PCOS check-in 💚", "PCOS symptoms")} subtitle={tx("the stuff your doctor will actually want to know", "Details that are useful for your doctor.")} accent={theme.pcos}>
+    <Card icon={HeartPulse} title={tx("PCOS check-in", "PCOS symptoms")} subtitle={tx("the stuff your doctor will actually want to know", "Details that are useful for your doctor.")} accent={theme.pcos}>
       <Question first>{tx("Skin today?", "Acne today")}</Question>
       <Slider4 value={value.acneSeverity} onChange={(acneSeverity) => onChange(acneSeverity === 0 ? { acneSeverity, acneLocations: [] } : { acneSeverity })} labels={SeverityLabels.acne} />
       {value.acneSeverity > 0 && (
@@ -106,11 +107,12 @@ export function PeriSection({
   const { options: Options, severity: SeverityLabels } = useCopy();
   return (
     <Card
-      title={inclusiveLanguage ? tx("Body changes check-in 🌡️", "Body changes") : tx("Perimenopause check-in 🌡️", "Perimenopause symptoms")}
+      icon={Thermometer}
+      title={inclusiveLanguage ? tx("Body changes check-in", "Body changes") : tx("Perimenopause check-in", "Perimenopause symptoms")}
       subtitle={tx("tracking this helps spot patterns your doctor can use", "Tracking these helps identify patterns.")}
       accent={theme.peri}
     >
-      <ToggleRow label={tx("Hot flashes today 🔥", "Hot flashes")} value={value.hotFlashes} onChange={(hotFlashes) => onChange({ hotFlashes })} />
+      <ToggleRow label={tx("Hot flashes today", "Hot flashes")} value={value.hotFlashes} onChange={(hotFlashes) => onChange({ hotFlashes })} />
       {value.hotFlashes && (
         <View style={{ marginBottom: Spacing.sm }}>
           <Question>{tx("How many?", "Number of hot flashes")}</Question>
@@ -137,7 +139,7 @@ export function PeriSection({
           <RadioGroup options={Options.hotFlashTime} selected={value.hotFlashTimeOfDay} onChange={(hotFlashTimeOfDay) => onChange({ hotFlashTimeOfDay })} />
         </View>
       )}
-      <ToggleRow label={tx("Night sweats 💦", "Night sweats")} value={value.nightSweats} onChange={(nightSweats) => onChange({ nightSweats })} />
+      <ToggleRow label={tx("Night sweats", "Night sweats")} value={value.nightSweats} onChange={(nightSweats) => onChange({ nightSweats })} />
       <ToggleRow label={tx("Vaginal dryness / changes", "Vaginal dryness or changes")} value={value.vaginalChanges} onChange={(vaginalChanges) => onChange({ vaginalChanges })} />
       <ToggleRow label={tx("Brain blanks / forgetting stuff", "Memory or concentration problems")} value={value.memoryIssues} onChange={(memoryIssues) => onChange({ memoryIssues })} />
     </Card>
@@ -178,7 +180,7 @@ export function EndoSection({
   const tx = useTx();
   const { captions: Captions, options: Options, severity: SeverityLabels } = useCopy();
   return (
-    <Card title={tx("Endo check-in 💜", "Endometriosis symptoms")} subtitle={tx("flare on? flip the switch and we'll keep it short", "If you're in a flare, switch on flare mode for a shorter log.")} accent={theme.endo}>
+    <Card icon={Activity} title={tx("Endo check-in", "Endometriosis symptoms")} subtitle={tx("flare on? flip the switch and we'll keep it short", "If you're in a flare, switch on flare mode for a shorter log.")} accent={theme.endo}>
       <ToggleRow
         label={tx("I'm in a flare", "Flare mode")}
         hint={tx("switches to a quick 3-question log", "Shows a shorter 3-question log")}
@@ -189,7 +191,7 @@ export function EndoSection({
       {/* Alert.alert can't collect text, so ending a flare opens this inline reflection card. */}
       {endingFlare && (
         <View style={[styles.reflection, { backgroundColor: theme.surfaceAlt }]}>
-          <Text style={[styles.reflectionTitle, { color: theme.endo }]} accessibilityRole="header">{tx("Flare over — you made it through 💜", "Flare ended")}</Text>
+          <Text style={[styles.reflectionTitle, { color: theme.endo }]} accessibilityRole="header">{tx("Flare over — you made it through", "Flare ended")}</Text>
           <Text style={[styles.reflectionHint, { color: theme.textSecondary }]}>
             {tx("What helped, even a little? Future-you will thank you. (optional)", "What helped during this flare? (optional)")}
           </Text>
@@ -212,10 +214,10 @@ export function EndoSection({
       {flareActive ? (
         // Condensed 3-field flare mode
         <View>
-          <Text style={[styles.flareBadge, { color: theme.endo }]}>{tx("⚡ flare mode — just the essentials", "Flare mode: essentials only")}</Text>
+          <Text style={[styles.flareBadge, { color: theme.endo }]}>{tx("flare mode — just the essentials", "Flare mode: essentials only")}</Text>
           <Question>{tx("Flare pain right now?", "Flare pain")}</Question>
           <Scale min={0} max={10} value={flare.pain} onChange={(pain) => onFlareChange({ pain })} caption={Captions.pain} lowLabel={tx("none", "None")} highLabel={tx("worst", "Worst")} />
-          <ToggleRow label={tx("Nauseous 🤢", "Nausea")} value={flare.nausea} onChange={(nausea) => onFlareChange({ nausea })} />
+          <ToggleRow label={tx("Nauseous", "Nausea")} value={flare.nausea} onChange={(nausea) => onFlareChange({ nausea })} />
           <Question>{tx("How's moving around?", "Mobility")}</Question>
           <RadioGroup options={Options.flareMovement} selected={flare.movement} onChange={(movement) => onFlareChange({ movement })} />
         </View>

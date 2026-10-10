@@ -174,7 +174,7 @@ export default function CalendarScreen() {
         }
       >
         <View style={styles.titleRow}>
-          <Text style={[styles.title, { color: theme.text }]} accessibilityRole="header">{tx("your calendar 📅", "Calendar")}</Text>
+          <Text style={[styles.title, { color: theme.text }]} accessibilityRole="header">{tx("your calendar", "Calendar")}</Text>
           <TouchableOpacity onPress={() => router.push('/history')} style={styles.historyLink} accessibilityRole="link">
             <Text style={{ color: theme.tint, fontWeight: '800' }}>{tx("history →", "History")}</Text>
           </TouchableOpacity>
@@ -274,9 +274,9 @@ export default function CalendarScreen() {
             )}
             {selectedEntry ? (
               <View style={styles.detailStats}>
-                <Text style={{ color: theme.text }}>{tx("🔥 pain", "Pain")} {selectedEntry.pain_score ?? '—'}/10</Text>
-                <Text style={{ color: theme.text }}>{tx("✨ mood", "Mood")} {selectedEntry.mood_score ?? '—'}/5</Text>
-                <Text style={{ color: theme.text }}>{tx("🔋 energy", "Energy")} {selectedEntry.energy_score ?? '—'}/10</Text>
+                <Text style={{ color: theme.text }}>{tx("pain", "Pain")} {selectedEntry.pain_score ?? '—'}/10</Text>
+                <Text style={{ color: theme.text }}>{tx("mood", "Mood")} {selectedEntry.mood_score ?? '—'}/5</Text>
+                <Text style={{ color: theme.text }}>{tx("energy", "Energy")} {selectedEntry.energy_score ?? '—'}/10</Text>
               </View>
             ) : (
               <Text style={{ color: theme.textSecondary, marginTop: 8 }}>{tx("nothing logged this day — no stress.", "Nothing logged for this day.")}</Text>
@@ -308,7 +308,7 @@ export default function CalendarScreen() {
 
         {phaseAverages.length > 0 && (
           <View style={styles.overlaysSection}>
-            <Text style={[styles.sectionTitle, { color: theme.text }]} accessibilityRole="header">{tx("how you feel by phase 📊", "Phase trends")}</Text>
+            <Text style={[styles.sectionTitle, { color: theme.text }]} accessibilityRole="header">{tx("how you feel by phase", "Phase trends")}</Text>
             {phaseAverages.map(avg => (
               <View key={avg.phase} style={[styles.avgRow, { backgroundColor: theme.surface }]}>
                 <Text style={{ color: theme.text, fontWeight: '700' }}>{copy.phases[avg.phase]?.vibe ?? avg.phase}</Text>

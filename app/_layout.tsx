@@ -101,7 +101,7 @@ export default function RootLayout() {
           {dbFailed ? (
             <AppLoading
               message={currentTx()(
-                "couldn't open your data 😕 it's still safe on this phone — try again, or restart the app.",
+                "couldn't open your data it's still safe on this phone — try again, or restart the app.",
                 "Your data couldn't be opened. It's still stored safely on this device. Try again or restart the app.",
               )}
               onRetry={() => setDbAttempt((n) => n + 1)}

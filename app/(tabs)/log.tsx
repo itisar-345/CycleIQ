@@ -33,6 +33,7 @@ import {
   valuesForPreviousDays,
 } from "@/utils/safetyRules";
 import { router } from "expo-router";
+import { BatteryMedium, Brain, Droplet, Flame, Leaf, Moon, Smile } from "@/components/icons";
 import React, { useState, useEffect } from "react";
 import {
   Alert,
@@ -190,7 +191,7 @@ export default function LogScreen() {
       if (shouldShowSafeguardingPrompt(mood, priorLowMoodDays, cooldownOpen)) {
         useAppStore.getState().setLastSafeguardPrompt(new Date().toISOString());
         Alert.alert(
-          tx("Hey, checking in 🫶", "Checking in"),
+          tx("Hey, checking in", "Checking in"),
           tx(
             "You've had a few really hard days in a row. You don't have to carry this alone — want to see some people you can talk to?",
             "You've logged several very difficult days in a row. You don't have to manage this alone. Would you like to see support options?",
@@ -234,7 +235,7 @@ export default function LogScreen() {
             flow_intensity: flow,
           },
         });
-        Alert.alert(tx("Please check this out 💛", "Please review"), redFlag.message, [{ text: tx("Okay, noted", "OK") }]);
+        Alert.alert(tx("Please check this out", "Please review"), redFlag.message, [{ text: tx("Okay, noted", "OK") }]);
       }
     }
   };
@@ -289,11 +290,11 @@ export default function LogScreen() {
         diet_notes_encrypted: dietNotes ? await encryptField(dietNotes) : undefined,
         medication_log_encrypted: medicationLog ? await encryptField(medicationLog) : undefined,
       });
-      Alert.alert(tx("Logged ✨", "Saved"), tx("Saved to your phone. Future-you says thanks.", "Your log has been saved on this device."));
+      Alert.alert(tx("Logged", "Saved"), tx("Saved to your phone. Future-you says thanks.", "Your log has been saved on this device."));
       router.push("/");
     } catch (error) {
       console.error("Failed saving log entry:", error);
-      Alert.alert(tx("Hmm, that didn't save 😕", "Couldn't save"), tx("Nothing was lost on screen — give it another tap.", "Your entries are still on screen. Please try again."));
+      Alert.alert(tx("Hmm, that didn't save", "Couldn't save"), tx("Nothing was lost on screen — give it another tap.", "Your entries are still on screen. Please try again."));
     }
   };
 
@@ -316,12 +317,12 @@ export default function LogScreen() {
       await saveFlareEnd(startISO ?? endDate, endDate, reflection, flareDurationDays ?? 1);
     } catch (error) {
       console.error("Failed saving flare end:", error);
-      Alert.alert(tx("Hmm, that didn't save 😕", "Couldn't save"), tx("Couldn't record the end of your flare — try once more.", "The end of your flare couldn't be saved. Please try again."));
+      Alert.alert(tx("Hmm, that didn't save", "Couldn't save"), tx("Couldn't record the end of your flare — try once more.", "The end of your flare couldn't be saved. Please try again."));
     }
   };
 
   const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
-  const flowTitle = tx(`${capitalize(term.flow)} check 🩸`, capitalize(term.flow));
+  const flowTitle = tx(`${capitalize(term.flow)} check`, capitalize(term.flow));
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]} edges={["top"]}>
@@ -329,27 +330,27 @@ export default function LogScreen() {
         <Text style={[styles.eyebrow, { color: theme.tint }]}>{new Date().toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" })}</Text>
         <Text style={[styles.title, { color: theme.text }]} accessibilityRole="header">{tx("How we doing today?", "Daily log")}</Text>
         <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
-          {tx("30 seconds, no wrong answers. Skip anything you don't feel like answering 💅", "Answer whatever you like — every question is optional.")}
+          {tx("30 seconds, no wrong answers. Skip anything you don't feel like answering", "Answer whatever you like — every question is optional.")}
         </Text>
 
         {/* Teen simplified view — only core fields */}
         {isTeen ? (
           <>
-            <Card title={tx("Vibe check ✨", "Mood")}>
+            <Card icon={Smile} title={tx("Vibe check", "Mood")}>
               <MoodFaces value={mood} onChange={setMood} />
             </Card>
-            <Card title={tx("Any pain?", "Pain")}>
+            <Card icon={Flame} title={tx("Any pain?", "Pain")}>
               <Scale min={0} max={10} value={pain} onChange={setPain} caption={Captions.pain} lowLabel={tx("none", "None")} highLabel={tx("worst", "Worst")} />
             </Card>
-            <Card title={tx("Energy battery 🔋", "Energy")}>
+            <Card icon={BatteryMedium} title={tx("Energy battery", "Energy")}>
               <Scale min={0} max={10} value={energy} onChange={setEnergy} caption={Captions.energy} lowLabel={tx("empty", "Low")} highLabel={tx("full", "High")} />
             </Card>
             {activePeriodId && (
-              <Card title={flowTitle} accent={theme.error}>
+              <Card icon={Droplet} title={flowTitle} accent={theme.error}>
                 <RadioGroup options={Options.flowTeen} selected={flow} onChange={setFlow} />
               </Card>
             )}
-            <Card title={tx("Sleep last night 😴", "Hours of sleep")}>
+            <Card icon={Moon} title={tx("Sleep last night", "Hours of sleep")}>
               <Scale min={0} max={12} value={sleepHours === null ? null : Math.round(sleepHours)} onChange={setSleepHours} caption={Captions.sleepHours} lowLabel="0h" highLabel="12h" />
             </Card>
           </>
@@ -368,13 +369,13 @@ export default function LogScreen() {
           />
         </View>
 
-        <Card title={tx("Vibe check ✨", "Mood")} subtitle={tx("how are you feeling, honestly?", "How are you feeling today?")}>
+        <Card icon={Smile} title={tx("Vibe check", "Mood")} subtitle={tx("how are you feeling, honestly?", "How are you feeling today?")}>
           <MoodFaces value={mood} onChange={setMood} />
           <Question hint={tx("pick any that fit", "Select any that apply")}>{tx("What's the mood made of?", "Mood details")}</Question>
           <MultiSelect options={Options.moodTags} selected={moodTags} onChange={setMoodTags} />
         </Card>
 
-        <Card title={tx("Pain check 🔥", "Pain")}>
+        <Card icon={Flame} title={tx("Pain check", "Pain")}>
           <Question first>{tx("How bad is it?", "Pain level")}</Question>
           <Scale min={0} max={10} value={pain} onChange={setPain} caption={Captions.pain} lowLabel={tx("none", "None")} highLabel={tx("worst", "Worst")} />
           {(pain ?? 0) > 0 && (
@@ -387,23 +388,23 @@ export default function LogScreen() {
           )}
         </Card>
 
-        <Card title={tx("Body & brain 🧠", "Body and mind")}>
-          <Question first>{tx("Energy battery 🔋", "Energy")}</Question>
+        <Card icon={Brain} title={tx("Body & brain", "Body and mind")}>
+          <Question first>{tx("Energy battery", "Energy")}</Question>
           <Scale min={0} max={10} value={energy} onChange={setEnergy} caption={Captions.energy} lowLabel={tx("empty", "Low")} highLabel={tx("full", "High")} />
           <Question>{tx("How foggy is it up there?", "Brain fog")}</Question>
           <Scale min={0} max={10} value={brainFog} onChange={setBrainFog} caption={Captions.brainFog} lowLabel={tx("clear", "Clear")} highLabel={tx("foggy", "Foggy")} />
           <Question>{tx("How drained are you?", "Fatigue")}</Question>
           <Scale min={0} max={10} value={fatigue} onChange={setFatigue} caption={Captions.fatigue} lowLabel={tx("fresh", "None")} highLabel={tx("wiped", "Exhausted")} />
-          <Question>{tx("Bloat status 🎈", "Bloating")}</Question>
+          <Question>{tx("Bloat status", "Bloating")}</Question>
           <RadioGroup options={Options.bloating} selected={bloating} onChange={setBloating} />
           <Divider />
           <ToggleRow label="Spotting" value={spotting} onChange={setSpotting} />
-          <ToggleRow label={tx("Headache 🤕", "Headache")} value={headache} onChange={setHeadache} />
-          <ToggleRow label={tx("Nauseous 🤢", "Nausea")} value={nausea} onChange={setNausea} />
+          <ToggleRow label={tx("Headache", "Headache")} value={headache} onChange={setHeadache} />
+          <ToggleRow label={tx("Nauseous", "Nausea")} value={nausea} onChange={setNausea} />
         </Card>
 
         {activePeriodId && (
-          <Card title={flowTitle} subtitle={tx(`your ${term.cycle} is on — how's the ${term.flow}?`, `How heavy is your ${term.flow} today?`)} accent={theme.error}>
+          <Card icon={Droplet} title={flowTitle} subtitle={tx(`your ${term.cycle} is on — how's the ${term.flow}?`, `How heavy is your ${term.flow} today?`)} accent={theme.error}>
             <RadioGroup options={Options.flow} selected={flow} onChange={setFlow} />
             <Divider />
             <ToggleRow label={tx("Any clots?", "Clots")} hint={tx("totally normal to track — helps spot heavy days", "Tracking clots helps identify heavy days.")} value={clots} onChange={setClots} />
@@ -447,11 +448,11 @@ export default function LogScreen() {
         )}
 
         {/* 4.5 Lifestyle & Trigger Analysis */}
-        <Card title={tx("Lifestyle stuff 🌙", "Lifestyle")} subtitle={tx("sleep, movement and stress — the usual suspects", "Sleep, activity and stress")}>
+        <Card icon={Leaf} title={tx("Lifestyle stuff", "Lifestyle")} subtitle={tx("sleep, movement and stress — the usual suspects", "Sleep, activity and stress")}>
           <Question first>{tx("Sleep last night", "Hours of sleep")}</Question>
           {healthSleepSource && (
             <Text style={[styles.sourceTag, { color: theme.tint }]}>
-              {tx("⌚ synced from", "From")} {healthSleepSource}
+              {tx("synced from", "From")} {healthSleepSource}
             </Text>
           )}
           <Scale min={0} max={12} value={sleepHours === null ? null : Math.round(sleepHours)} onChange={setSleepHours} caption={Captions.sleepHours} lowLabel="0h" highLabel="12h" />
@@ -473,7 +474,7 @@ export default function LogScreen() {
               <Question>{tx("For how long?", "Duration")}</Question>
               {healthActivitySource && (
                 <Text style={[styles.sourceTag, { color: theme.tint }]}>
-                  {tx("⌚ synced from", "From")} {healthActivitySource}{stepsCount !== null ? ` • ${stepsCount.toLocaleString()} steps` : ""}
+                  {tx("synced from", "From")} {healthActivitySource}{stepsCount !== null ? ` • ${stepsCount.toLocaleString()} steps` : ""}
                 </Text>
               )}
               <View style={styles.durationRow}>
@@ -501,7 +502,7 @@ export default function LogScreen() {
           <Question>{tx("Stress level?", "Stress")}</Question>
           <Scale min={1} max={5} value={stressScore} onChange={setStressScore} caption={Captions.stress} lowLabel={tx("chill", "Low")} highLabel={tx("maxed", "High")} />
 
-          <Question hint={tx("🔒 encrypted on your phone", "Encrypted on this device")}>{tx("What did you eat? (optional)", "Diet notes (optional)")}</Question>
+          <Question hint={tx("encrypted on your phone", "Encrypted on this device")}>{tx("What did you eat? (optional)", "Diet notes (optional)")}</Question>
           <TextInput
             style={[styles.inputText, { color: theme.text, borderColor: theme.border, backgroundColor: theme.surfaceAlt }]}
             value={dietNotes}
@@ -512,7 +513,7 @@ export default function LogScreen() {
             multiline
           />
 
-          <Question hint={tx("🔒 encrypted on your phone", "Encrypted on this device")}>{tx("Meds or supplements? (optional)", "Medication and supplements (optional)")}</Question>
+          <Question hint={tx("encrypted on your phone", "Encrypted on this device")}>{tx("Meds or supplements? (optional)", "Medication and supplements (optional)")}</Question>
           <TextInput
             style={[styles.inputText, { color: theme.text, borderColor: theme.border, backgroundColor: theme.surfaceAlt }]}
             value={medicationLog}
@@ -532,9 +533,9 @@ export default function LogScreen() {
           activeOpacity={0.85}
           accessibilityRole="button"
         >
-          <Text style={[styles.saveButtonText, { color: theme.onTint }]}>{tx("Save today's log ✨", "Save log")}</Text>
+          <Text style={[styles.saveButtonText, { color: theme.onTint }]}>{tx("Save today's log", "Save log")}</Text>
         </TouchableOpacity>
-        <Text style={[styles.privacyNote, { color: theme.textSecondary }]}>{tx("🔒 stays on your phone. always.", "Your data is stored only on this device.")}</Text>
+        <Text style={[styles.privacyNote, { color: theme.textSecondary }]}>{tx("stays on your phone. always.", "Your data is stored only on this device.")}</Text>
       </ScrollView>
     </SafeAreaView>
   );

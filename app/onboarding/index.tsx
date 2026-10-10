@@ -10,19 +10,19 @@ import { useTx } from "@/utils/tone";
 
 const CONDITIONS = [
   {
-    title: ["PCOS 💚", "PCOS"],
+    title: ["PCOS", "PCOS"],
     desc: ["Polycystic ovary syndrome — irregular cycles, skin, hair, cravings & the hormone rollercoaster.", "Polycystic ovary syndrome — irregular cycles, hormonal and metabolic symptoms."],
     mode: "pcos" as AppMode,
     path: "/onboarding/pcos",
   },
   {
-    title: ["PCOD 💙", "PCOD"],
+    title: ["PCOD", "PCOD"],
     desc: ["Polycystic ovarian disease — cyst-linked patterns and hormonal symptoms.", "Polycystic ovarian disease — cyst-related patterns and hormonal symptoms."],
     mode: "pcod" as AppMode,
     path: "/onboarding/pcod",
   },
   {
-    title: ["Endometriosis 💜", "Endometriosis"],
+    title: ["Endometriosis", "Endometriosis"],
     desc: ["Flare mode, detailed pain logging, and alerts when something needs a doctor.", "Flare tracking, detailed pain logging and medical alerts."],
     mode: "endo" as AppMode,
     path: "/onboarding/endo",

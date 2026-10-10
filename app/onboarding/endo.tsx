@@ -60,11 +60,11 @@ export default function EndoSetupScreen() {
         <OnboardingProgress step={4} total={5} label={tx("step 4 · a few details", "Step 4: details")} />
       </View>
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={[styles.title, { color: theme.text }]} accessibilityRole="header">{tx("Let's set up endo mode 💜", "Endometriosis setup")}</Text>
+        <Text style={[styles.title, { color: theme.text }]} accessibilityRole="header">{tx("Let's set up endo mode", "Endometriosis setup")}</Text>
 
         <View style={[styles.privacyNote, { backgroundColor: theme.surface, borderColor: theme.border }]}>
           <Text style={[styles.privacyText, { color: theme.textSecondary }]}>
-            {tx("🔒 This stays on your phone. We never see it — we literally can't.", "Your health data stays on this device. We never see it.")}
+            {tx("This stays on your phone. We never see it — we literally can't.", "Your health data stays on this device. We never see it.")}
           </Text>
         </View>
 
@@ -82,7 +82,7 @@ export default function EndoSetupScreen() {
           <Text style={[styles.sectionTitle, { color: theme.text }]} accessibilityRole="header">{tx("In a flare right now?", "Are you currently in a flare?")}</Text>
           <Text style={[styles.hint, { color: theme.textSecondary }]}>{tx("A flare = pain or symptoms ramping up, period or not. We'll keep logging extra short while it lasts.", "A flare is a period of increased pain or symptoms, with or without menstruation.")}</Text>
           <View style={styles.buttonGroup}>
-            {([[tx('yep, flaring 😮‍💨', 'Yes'), true], [tx('nope, all good', 'No'), false]] as const).map(([label, val]) => (
+            {([[tx('yep, flaring', 'Yes'), true], [tx('nope, all good', 'No'), false]] as const).map(([label, val]) => (
               <TouchableOpacity
                 key={label}
                 style={[styles.optionButton, {

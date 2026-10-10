@@ -6,7 +6,7 @@
 
 CycleIQ shows a small number of safety prompts. They are **signposting only** — they do not diagnose, triage or replace care. A qualified clinician (gynaecology / women's health) and a mental-health professional should review every item below before App Store / Play Store submission.
 
-The app has two voices the user can choose: **chill** (casual, emoji) and **classic** (plain). Safety prompts carry the same information in both; please review **both** wordings. All wording is reproduced verbatim below.
+The app has two voices the user can choose: **chill** (casual, lowercase) and **classic** (plain). Safety prompts carry the same information in both; please review **both** wordings. All wording is reproduced verbatim below.
 
 ---
 
@@ -24,7 +24,7 @@ The app has two voices the user can choose: **chill** (casual, emoji) and **clas
 
 | Voice | Title | Body | Buttons |
 |-------|-------|------|---------|
-| chill | Hey, checking in 🫶 | You've had a few really hard days in a row. You don't have to carry this alone — want to see some people you can talk to? | Not right now · Show me support |
+| chill | Hey, checking in | You've had a few really hard days in a row. You don't have to carry this alone — want to see some people you can talk to? | Not right now · Show me support |
 | classic | Checking in | You've logged several very difficult days in a row. You don't have to manage this alone. Would you like to see support options? | Not now · View support |
 
 **Crisis lines shown (by device time zone)**
@@ -66,7 +66,7 @@ Region is inferred from the device time zone (`getUserRegion` in `app/education/
 
 Endometriosis mode only. Where: `utils/safetyRules.ts` (`evaluateEndoRedFlag`), called from `app/(tabs)/log.tsx` on save. Every prompt shown is recorded in `red_flag_prompt_logs` and included in the doctor PDF.
 
-**Wording** (alert title is "Please check this out 💛" / "Please review"; body is the same in both voices):
+**Wording** (alert title is "Please check this out" / "Please review"; body is the same in both voices):
 
 - Severe pain: *"You've had severe pain (8 or higher) three days in a row. That's not something you should have to push through — please contact a healthcare provider."*
 - Complex symptoms: *"You've logged bowel symptoms, shoulder pain and heavy flow on the same day. This combination is worth getting checked by a doctor — please don't brush it off."*
@@ -91,21 +91,21 @@ Endometriosis mode only. Where: `utils/safetyRules.ts` (`evaluateEndoRedFlag`), 
 
 | Days since last period | Voice | Title | Body |
 |------------------------|-------|-------|------|
-| 90–119 | chill | it's been a minute 👀 | It's been N days since your last period. All good? Logging symptoms helps us (and your doctor) spot patterns. |
+| 90–119 | chill | it's been a minute | It's been N days since your last period. All good? Logging symptoms helps us (and your doctor) spot patterns. |
 | 90–119 | classic | It's been a while | It has been N days since your last period. Logging symptoms can help identify patterns. |
-| ≥ 120 | chill | checking in on you 💛 | It's been N days since your last period. Worth a quick chat with a healthcare provider, just to be safe 🫶 |
+| ≥ 120 | chill | checking in on you | It's been N days since your last period. Worth a quick chat with a healthcare provider, just to be safe |
 | ≥ 120 | classic | Time to check in | It has been N days since your last period. Please consider speaking with a healthcare provider. |
 
 **Scheduled notifications (PCOS mode, counted from when they're scheduled).** Where: `utils/notifications.ts` (`schedulePcosNotifications`; classic text in `CLASSIC_COPY`).
 
 | Day | chill | classic |
 |-----|-------|---------|
-| 35 (irregular pattern only) | day 35 check-in 💚: 35 days since your last period. Daily logs help us learn your pattern 📊 | Day 35 check-in: It's been 35 days since your last period. Daily logs help identify your pattern. |
-| 60 | 60 days — checking in 💚: Still no period after 60 days. Worth bringing up with your doctor if that's unusual for you 🫶 | 60 days without a period: If this is unusual for you, it's worth mentioning to your doctor. |
-| 90 | time for a doctor chat 💬: It's been 90 days without a period — please check in with a healthcare provider. Your report in the app can help 💜 | Please see your doctor: It has been 90 days without a period. Please contact a healthcare provider. Your CycleIQ report can help. |
+| 35 (irregular pattern only) | day 35 check-in: 35 days since your last period. Daily logs help us learn your pattern | Day 35 check-in: It's been 35 days since your last period. Daily logs help identify your pattern. |
+| 60 | 60 days — checking in: Still no period after 60 days. Worth bringing up with your doctor if that's unusual for you | 60 days without a period: If this is unusual for you, it's worth mentioning to your doctor. |
+| 90 | time for a doctor chat: It's been 90 days without a period — please check in with a healthcare provider. Your report in the app can help | Please see your doctor: It has been 90 days without a period. Please contact a healthcare provider. Your CycleIQ report can help. |
 
 **Any mode: amenorrhoea flag and > 60 days** (`scheduleRedFlagNotification`):
-chill "please check in with a doctor 💛 — It's been N days without a period. That's worth a proper check-up — you can share your CycleIQ report 💜" /
+chill "please check in with a doctor — It's been N days without a period. That's worth a proper check-up — you can share your CycleIQ report" /
 classic "Medical check recommended — You haven't had a period for N days. Please see a healthcare provider; your CycleIQ report can help."
 
 ### Questions for reviewer

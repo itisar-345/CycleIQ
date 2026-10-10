@@ -9,6 +9,7 @@ import { Colors, Radius, Spacing } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useTx } from "@/utils/tone";
 import * as Haptics from "expo-haptics";
+import { Annoyed, Frown, Laugh, Meh, Smile, type LucideIcon } from "@/components/icons";
 import React from "react";
 import { Platform, StyleSheet, Switch, Text, TouchableOpacity, View } from "react-native";
 
@@ -174,12 +175,12 @@ export function Slider4({
   );
 }
 
-const FACES = [
-  { emoji: "😭", chill: "rough", classic: "Very low" },
-  { emoji: "🙁", chill: "meh", classic: "Low" },
-  { emoji: "😐", chill: "mid", classic: "Okay" },
-  { emoji: "🙂", chill: "decent", classic: "Good" },
-  { emoji: "🤩", chill: "thriving", classic: "Great" },
+const FACES: { Icon: LucideIcon; chill: string; classic: string }[] = [
+  { Icon: Frown, chill: "rough", classic: "Very low" },
+  { Icon: Annoyed, chill: "meh", classic: "Low" },
+  { Icon: Meh, chill: "mid", classic: "Okay" },
+  { Icon: Smile, chill: "decent", classic: "Good" },
+  { Icon: Laugh, chill: "thriving", classic: "Great" },
 ];
 
 /** 1–5 mood picker; null = not answered yet. */
@@ -207,9 +208,12 @@ export function MoodFaces({ value, onChange }: { value: number | null; onChange:
             accessibilityLabel={`Mood ${val} of 5: ${label}`}
             accessibilityState={{ selected: isSelected }}
           >
-            <Text style={{ fontSize: isSelected ? 34 : 28, opacity: isSelected || value === null ? 1 : 0.45 }}>
-              {face.emoji}
-            </Text>
+            <face.Icon
+              size={isSelected ? 34 : 30}
+              strokeWidth={isSelected ? 2.25 : 1.75}
+              color={isSelected ? theme.tint : theme.textSecondary}
+              style={{ opacity: isSelected || value === null ? 1 : 0.5 }}
+            />
             <Text
               style={[
                 styles.faceLabel,

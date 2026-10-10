@@ -142,16 +142,16 @@ export const generateInsights = async (mode: string = "standard", tone: Tone = "
   };
 
   // Standard Correlations (Section 8)
-  if (mode !== "endo") test(sleepScore, painScore, "Sleep & Pain", "Plot twist: more sleep tends to show up with higher pain for you — maybe pain is keeping you in bed?", "Less sleep tends to mean more pain the next day for you. Sleep = pain relief, apparently 😴");
-  test(stressScore, moodScore, "Stress & Mood", "Interesting — higher stress tends to come with a better mood for you. Busy-but-thriving era?", "When stress goes up, your mood tends to dip. Not a coincidence 🫠", true);
-  test(sleepScore, moodScore, "Sleep & Mood", "More sleep tends to = better mood for you. Protect that bedtime 🌙", "More sleep tends to show up on lower-mood days — could be low mood making you want to sleep more 💛", true);
-  test(exerciseScore, moodScore, "Movement & Mood", "Days you move more tend to be better-mood days. Even a walk counts 🚶", "More movement tends to come with lower mood for you — maybe you're pushing too hard on rough days?", true);
-  test(exerciseScore, energyScore, "Movement & Energy", "Moving more tends to come with more energy for you ⚡", "More movement tends to show up with lower energy — rest days might be your friend.");
-  if (mode !== "endo") test(stressScore, painScore, "Stress & Pain", "Stressful days tend to be more painful days for you 😮‍💨", "Interesting — your pain tends to be lower on stressful days.");
-  test(stressScore, bloatingScore, "Stress & Bloating", "Stress tends to show up as bloat for you 🎈", "You tend to bloat less on stressful days.");
+  if (mode !== "endo") test(sleepScore, painScore, "Sleep & Pain", "Plot twist: more sleep tends to show up with higher pain for you — maybe pain is keeping you in bed?", "Less sleep tends to mean more pain the next day for you. Sleep = pain relief, apparently");
+  test(stressScore, moodScore, "Stress & Mood", "Interesting — higher stress tends to come with a better mood for you. Busy-but-thriving era?", "When stress goes up, your mood tends to dip. Not a coincidence", true);
+  test(sleepScore, moodScore, "Sleep & Mood", "More sleep tends to = better mood for you. Protect that bedtime", "More sleep tends to show up on lower-mood days — could be low mood making you want to sleep more", true);
+  test(exerciseScore, moodScore, "Movement & Mood", "Days you move more tend to be better-mood days. Even a walk counts", "More movement tends to come with lower mood for you — maybe you're pushing too hard on rough days?", true);
+  test(exerciseScore, energyScore, "Movement & Energy", "Moving more tends to come with more energy for you", "More movement tends to show up with lower energy — rest days might be your friend.");
+  if (mode !== "endo") test(stressScore, painScore, "Stress & Pain", "Stressful days tend to be more painful days for you", "Interesting — your pain tends to be lower on stressful days.");
+  test(stressScore, bloatingScore, "Stress & Bloating", "Stress tends to show up as bloat for you", "You tend to bloat less on stressful days.");
   test(stressScore, cycleLengthSeries, "Stress & Cycle Length", "Stressful cycles tend to run longer for you — stress can delay ovulation.", "Stressful cycles tend to be shorter for you.");
-  test(docSeries, brainFogScore, "Cycle Phase & Brain Fog", "Brain fog tends to roll in later in your cycle ☁️", "Brain fog tends to hit earlier in your cycle ☁️");
-  test(docSeries, energyScore, "Cycle Phase & Energy", "Your energy tends to climb later in your cycle ⚡", "Your energy tends to peak earlier in your cycle ⚡");
+  test(docSeries, brainFogScore, "Cycle Phase & Brain Fog", "Brain fog tends to roll in later in your cycle", "Brain fog tends to hit earlier in your cycle");
+  test(docSeries, energyScore, "Cycle Phase & Energy", "Your energy tends to climb later in your cycle", "Your energy tends to peak earlier in your cycle");
 
   if (mode === "pcos") {
     const acneScore = getExtendedSeries((v) => {
@@ -167,10 +167,10 @@ export const generateInsights = async (mode: string = "standard", tone: Tone = "
         return toNumber(v.cravings?.int ?? v.pcos?.cravings?.int);
     });
 
-    test(sleepScore, acneScore, "Sleep & Skin", "More sleep tends to show up with more breakouts — weird, but that's what your logs say.", "Less sleep tends to = more breakouts for you. Beauty sleep is real 💤");
-    test(stressScore, acneScore, "Stress & Skin", "Stress tends to show up on your skin 😩", "Your skin tends to be clearer on stressful days — interesting.");
-    test(docSeries, cravingScore, "Cycle Phase & Cravings", "Cravings tend to ramp up later in your cycle 🍫 (totally normal)", "Cravings tend to hit earlier in your cycle 🍫");
-    test(sleepScore, anxietyScore, "Sleep & Anxiety", "More sleep tends to come with more anxiety spikes — anxiety might be wiping you out 💛", "Less sleep tends to mean more anxiety spikes for you 💛", true);
+    test(sleepScore, acneScore, "Sleep & Skin", "More sleep tends to show up with more breakouts — weird, but that's what your logs say.", "Less sleep tends to = more breakouts for you. Beauty sleep is real");
+    test(stressScore, acneScore, "Stress & Skin", "Stress tends to show up on your skin", "Your skin tends to be clearer on stressful days — interesting.");
+    test(docSeries, cravingScore, "Cycle Phase & Cravings", "Cravings tend to ramp up later in your cycle (totally normal)", "Cravings tend to hit earlier in your cycle");
+    test(sleepScore, anxietyScore, "Sleep & Anxiety", "More sleep tends to come with more anxiety spikes — anxiety might be wiping you out", "Less sleep tends to mean more anxiety spikes for you", true);
   }
 
   if (mode === "endo") {
@@ -187,13 +187,13 @@ export const generateInsights = async (mode: string = "standard", tone: Tone = "
             insights.push({
                title: "Flare Onset Pattern",
                onsetDay: avgOnset,
-               description: tx(`Your flares usually kick off around cycle day ${avgOnset}. Plan a softer few days around then if you can 💜`, `Your flares most often begin around cycle day ${avgOnset}. Consider planning lighter days around then.`)
+               description: tx(`Your flares usually kick off around cycle day ${avgOnset}. Plan a softer few days around then if you can`, `Your flares most often begin around cycle day ${avgOnset}. Consider planning lighter days around then.`)
             });
         }
      }
 
-     test(sleepScore, painScore, "Sleep & Flare Severity", "More sleep tends to show up on worse flare days — flares can knock you out.", "Less sleep tends to come with worse flare pain for you 💜");
-     test(stressScore, painScore, "Stress & Flare Severity", "Stress tends to make your flares hit harder 💜", "Your flare pain tends to be lower on stressful days.");
+     test(sleepScore, painScore, "Sleep & Flare Severity", "More sleep tends to show up on worse flare days — flares can knock you out.", "Less sleep tends to come with worse flare pain for you");
+     test(stressScore, painScore, "Stress & Flare Severity", "Stress tends to make your flares hit harder", "Your flare pain tends to be lower on stressful days.");
   }
 
   const significant = benjaminiHochberg(candidates.map((c) => c.pValue), 0.1);

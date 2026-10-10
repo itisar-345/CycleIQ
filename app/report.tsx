@@ -3,7 +3,7 @@ import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAppStore } from '@/store';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { IconSymbol } from '@/components/ui/icon-symbol';
+import { ChevronLeft } from "@/components/icons";
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { getAllCycles, getAllEntries, getRedFlagPromptLogs, readExtendedSymptoms, type CycleRow, type RedFlagPromptLogRow, type SymptomEntryRow } from '@/database';
@@ -80,10 +80,10 @@ export default function ReportScreen() {
       const fileName = `CycleIQ_Report_${format(new Date(), 'yyyy-MM-dd_HHmm')}.pdf`;
       const permanentUri = await savePdfToReports(tempUri, fileName);
       const shared = await shareReport(permanentUri);
-      if (!shared) Alert.alert(tx('report saved 📄', 'Report saved'), tx(`It's in Saved Reports.\n\n${permanentUri}`, `Saved to Saved Reports.\n\n${permanentUri}`));
+      if (!shared) Alert.alert(tx('report saved', 'Report saved'), tx(`It's in Saved Reports.\n\n${permanentUri}`, `Saved to Saved Reports.\n\n${permanentUri}`));
     } catch (e) {
       console.error('PDF generation failed', e);
-      Alert.alert(tx("report didn't work 😕", 'Report failed'), tx("Couldn't make or share the PDF — try again?", 'The PDF could not be created or shared. Please try again.'));
+      Alert.alert(tx("report didn't work", 'Report failed'), tx("Couldn't make or share the PDF — try again?", 'The PDF could not be created or shared. Please try again.'));
     }
   };
 
@@ -91,9 +91,9 @@ export default function ReportScreen() {
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
       <View style={[styles.header, { borderBottomColor: theme.border }]}>
         <TouchableOpacity onPress={() => router.back()} style={{ padding: 8, minWidth: 44, minHeight: 44, justifyContent: 'center' }} accessibilityRole="button" accessibilityLabel={tx("Back", "Back")}>
-          <IconSymbol name="chevron.left" size={24} color={theme.tint} />
+          <ChevronLeft size={24} color={theme.tint} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: theme.text }]} accessibilityRole="header">{tx("doctor report 🩺", "Doctor report")}</Text>
+        <Text style={[styles.headerTitle, { color: theme.text }]} accessibilityRole="header">{tx("doctor report", "Doctor report")}</Text>
         <View style={{ width: 40 }} />
       </View>
       
@@ -114,7 +114,7 @@ export default function ReportScreen() {
               <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
                  <Text style={[styles.cardTitle, { color: theme.text }]} accessibilityRole="header">{tx("condition tracking", "Condition tracking")}</Text>
                  <Text style={[styles.text, { color: theme.textSecondary }]}>{tx("flare days documented:", "Flare days documented:")} {data.flares}</Text>
-                 <Text style={[styles.text, { color: theme.textSecondary, marginTop: 8 }]}>{tx("The PDF is written in proper doctor-speak so your appointment goes smoother 💪", "The PDF is written in clinical language for your healthcare provider.")}</Text>
+                 <Text style={[styles.text, { color: theme.textSecondary, marginTop: 8 }]}>{tx("The PDF is written in proper doctor-speak so your appointment goes smoother", "The PDF is written in clinical language for your healthcare provider.")}</Text>
               </View>
             )}
             

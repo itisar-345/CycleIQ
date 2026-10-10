@@ -34,7 +34,8 @@ It's built for people whose cycles don't fit a 28-day template: honest predictio
 - **Calendar.** Period, predicted window, pain heat-map and cycle phases, with a detail view for every day.
 - **Doctor-ready reports.** PDF summaries and appointment prep.
 - **Privacy you can check.** An SQLCipher-encrypted database, AES-256-GCM for free-text notes, app lock (Face ID / fingerprint / passcode), discreet notifications, export and one-tap delete.
-- **Your voice.** *Chill* (casual, emoji) or *classic* (plain, calm) wording across the whole app, including notifications.
+- **Your voice.** *Chill* (casual, lowercase) or *classic* (plain, calm) wording across the whole app, including notifications.
+- **Clean, consistent icons.** [Lucide](https://lucide.dev) line icons throughout, with no emoji in the interface.
 - **Accessible.** WCAG AA contrast in light and dark, screen-reader labels throughout, 44pt touch targets, and support for Reduce Motion.
 - **Gentle safety prompts.** Signposting (never diagnosis) after several very low mood days or a run of severe endometriosis pain. These are pending clinical review ([details](docs/CLINICAL_REVIEW.md)).
 
@@ -96,6 +97,7 @@ Database tests run the real `database/` modules against SQLite through an expo-s
 | Layer | Tech |
 |---|---|
 | App | Expo SDK 54, React Native 0.81, React 19, Expo Router (typed routes) |
+| Icons | lucide-react-native |
 | State | Zustand, persisted through an AES-256-GCM encrypted storage adapter |
 | Data | expo-sqlite with SQLCipher on device; sql.js in the web preview |
 | Crypto | @noble/ciphers (AES-GCM), keys in Keychain / Keystore via expo-secure-store |

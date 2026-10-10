@@ -16,6 +16,7 @@ All notable changes to CycleIQ are listed here. The format follows [Keep a Chang
 - Jest + React Native Testing Library screen tests with an automatic accessibility check, Maestro flows, GitHub Actions CI, EAS build profiles.
 
 ### Changed
+- Emoji removed from the interface, notifications and insights; Lucide icons now used throughout (tab bar, Log cards, mood faces, onboarding, Home, Profile, Support).
 - Symptom logs belong to the whole cycle they fall in, not only period days (migration 5). Phase charts, reports and insights now use every day.
 - Deleting a period keeps its logs.
 - "Delete all my data" also clears settings, condition answers and scheduled reminders, and returns to setup.

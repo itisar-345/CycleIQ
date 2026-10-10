@@ -41,7 +41,7 @@ export function AppLoading({ message, onRetry }: Props) {
         CycleIQ
       </Animated.Text>
       {!onRetry && <ActivityIndicator size="large" color={theme.tint} style={styles.spinner} />}
-      <Text style={[styles.message, { color: theme.textSecondary }]}>{message ?? tx("locking in your private vault 🔒…", "Loading your data securely…")}</Text>
+      <Text style={[styles.message, { color: theme.textSecondary }]}>{message ?? tx("locking in your private vault…", "Loading your data securely…")}</Text>
       {onRetry && (
         <TouchableOpacity onPress={onRetry} style={[styles.retry, { backgroundColor: theme.tint }]} accessibilityRole="button">
           <Text style={[styles.retryText, { color: theme.onTint }]}>{tx("try again", "Try again")}</Text>

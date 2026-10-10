@@ -9,5 +9,5 @@ name: Switch tone and enable discreet notifications
 - scrollUntilVisible:
     element: "Discreet notifications"
 - tapOn: "Discreet notifications"
-- tapOn: "Casual, Relaxed with emoji"
-- assertVisible: "you 💅"
+- tapOn: "Casual, Relaxed wording"
+- assertVisible: "you"

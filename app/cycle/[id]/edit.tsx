@@ -45,7 +45,7 @@ export default function CycleEdit() {
         try {
           decrypted = thisCycle.notes_encrypted ? await decryptField(thisCycle.notes_encrypted) : "";
         } catch {
-          Alert.alert(tx("can't open these notes 🔒", "Notes unavailable"), tx("They were encrypted with a key this phone doesn't have anymore.", "These notes were encrypted with a key this device no longer has."));
+          Alert.alert(tx("can't open these notes", "Notes unavailable"), tx("They were encrypted with a key this phone doesn't have anymore.", "These notes were encrypted with a key this device no longer has."));
         }
         setNotes(decrypted);
         setOriginalNotes(decrypted);
@@ -59,11 +59,11 @@ export default function CycleEdit() {
     !/^\d{4}-\d{2}-\d{2}$/.test(startDate)
       ? tx("pick a start date", "Please choose a start date.")
       : startDate > today
-      ? tx("the start can't be in the future 👀", "The start date can't be in the future.")
+      ? tx("the start can't be in the future", "The start date can't be in the future.")
       : endDate && endDate < startDate
       ? tx("the end has to be after the start", "The end date must be on or after the start date.")
       : endDate && endDate > today
-      ? tx("the end can't be in the future 👀", "The end date can't be in the future.")
+      ? tx("the end can't be in the future", "The end date can't be in the future.")
       : null;
 
   const handleSave = async () => {
@@ -77,7 +77,7 @@ export default function CycleEdit() {
       updates.notes_encrypted = notes ? await encryptField(notes) : "";
 
     await updateCycle(id, updates);
-    Alert.alert(tx("updated ✅", "Saved"), tx("Your cycle's been fixed up.", "Your cycle has been updated."));
+    Alert.alert(tx("updated", "Saved"), tx("Your cycle's been fixed up.", "Your cycle has been updated."));
     router.back();
   };
 
@@ -91,7 +91,7 @@ export default function CycleEdit() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backHit} accessibilityRole="button">
           <Text style={{ color: theme.tint, fontWeight: "700", fontSize: 16 }}>{tx("‹ back", "‹ Back")}</Text>
         </TouchableOpacity>
-        <Text style={[styles.title, { color: theme.text }]} accessibilityRole="header">{tx("edit this cycle ✏️", "Edit cycle")}</Text>
+        <Text style={[styles.title, { color: theme.text }]} accessibilityRole="header">{tx("edit this cycle", "Edit cycle")}</Text>
 
         <View style={styles.field}>
           <Text style={[styles.label, { color: theme.textSecondary }]}>
@@ -128,7 +128,7 @@ export default function CycleEdit() {
 
         <View style={styles.field}>
           <Text style={[styles.label, { color: theme.textSecondary }]}>
-            {tx("notes 🔒 (encrypted)", "Notes (encrypted)")}
+            {tx("notes (encrypted)", "Notes (encrypted)")}
           </Text>
           <TextInput
             style={[

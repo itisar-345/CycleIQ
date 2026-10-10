@@ -25,7 +25,7 @@ This script covers what automation can't: how it actually *sounds* and whether t
 
 - Focus order follows the visual order; nothing is skipped or trapped (especially the lock screen and date picker sheet).
 - Headers are announced as headings and the rotor/heading navigation jumps between sections.
-- Decorative emoji are not read aloud as noise ("fire", "sparkles") where they're only decoration.
+- Decorative icons are skipped by the screen reader; icon-only buttons are announced by name.
 - Text scales to the largest accessibility size without clipping.
 - Nothing relies on colour alone (calendar dots have spoken equivalents).
 

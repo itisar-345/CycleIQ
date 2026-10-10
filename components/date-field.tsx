@@ -88,7 +88,7 @@ export function DateField({
         accessibilityLabel={`${label}: ${date ? format(date, "MMMM d, yyyy") : tx("not set", "not set")}`}
         accessibilityHint={tx("Opens a date picker", "Opens a date picker")}
       >
-        <Text style={{ color: date ? theme.text : theme.textSecondary, fontSize: 16 }}>📅  {shown}</Text>
+        <Text style={{ color: date ? theme.text : theme.textSecondary, fontSize: 16 }}> {shown}</Text>
       </TouchableOpacity>
       {onClear && date && (
         <TouchableOpacity onPress={onClear} style={styles.clear} accessibilityRole="button" accessibilityLabel={`Clear ${label}`}>

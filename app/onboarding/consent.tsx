@@ -7,16 +7,17 @@ import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useAppStore } from "@/store";
 import { router } from "expo-router";
 import { addDays, format, parseISO } from "date-fns";
+import { Activity, CalendarDays, HeartPulse, Moon, type LucideIcon } from "@/components/icons";
 import React, { useState } from "react";
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 type Pair = readonly [chill: string, classic: string];
 
-const MODE_META: Record<string, { icon: string; headline: Pair; bullets: Pair[] }> = {
+const MODE_META: Record<string, { Icon: LucideIcon; headline: Pair; bullets: Pair[] }> = {
   standard: {
-    icon: "🗓️",
-    headline: ["Here's what you'll get ✨", "What CycleIQ tracks"],
+    Icon: CalendarDays,
+    headline: ["Here's what you'll get", "What CycleIQ tracks"],
     bullets: [
       ["Period start & end + flow, in two taps", "Period start, end and flow"],
       ["Daily vibe check: mood, pain, energy, sleep", "Daily mood, pain, energy and sleep"],
@@ -25,8 +26,8 @@ const MODE_META: Record<string, { icon: string; headline: Pair; bullets: Pair[] 
     ],
   },
   peri: {
-    icon: "🌙",
-    headline: ["Here's what you'll get ✨", "What CycleIQ tracks"],
+    Icon: Moon,
+    headline: ["Here's what you'll get", "What CycleIQ tracks"],
     bullets: [
       ["Predictions that adapt — no 28-day assumptions", "Adaptive predictions with no fixed cycle length assumed"],
       ["Hot flashes, night sweats, brain blanks", "Hot flashes, night sweats and cognitive changes"],
@@ -35,8 +36,8 @@ const MODE_META: Record<string, { icon: string; headline: Pair; bullets: Pair[] 
     ],
   },
   pcos: {
-    icon: "💚",
-    headline: ["Here's what you'll get for PCOS ✨", "What CycleIQ tracks for PCOS"],
+    Icon: HeartPulse,
+    headline: ["Here's what you'll get for PCOS", "What CycleIQ tracks for PCOS"],
     bullets: [
       ["Honest prediction windows built for irregular cycles", "Wider prediction windows suited to irregular cycles"],
       ["Skin, cravings, weight & hormone symptoms", "Acne, cravings, weight and hormonal symptoms"],
@@ -45,8 +46,8 @@ const MODE_META: Record<string, { icon: string; headline: Pair; bullets: Pair[] 
     ],
   },
   pcod: {
-    icon: "💙",
-    headline: ["Here's what you'll get for PCOD ✨", "What CycleIQ tracks for PCOD"],
+    Icon: HeartPulse,
+    headline: ["Here's what you'll get for PCOD", "What CycleIQ tracks for PCOD"],
     bullets: [
       ["Cycle regularity & cyst-linked patterns", "Cycle regularity and cyst-related patterns"],
       ["Skin, hair & weight trends", "Skin, hair and weight trends"],
@@ -55,8 +56,8 @@ const MODE_META: Record<string, { icon: string; headline: Pair; bullets: Pair[] 
     ],
   },
   endo: {
-    icon: "💜",
-    headline: ["Here's what you'll get for endo ✨", "What CycleIQ tracks for endometriosis"],
+    Icon: Activity,
+    headline: ["Here's what you'll get for endo", "What CycleIQ tracks for endometriosis"],
     bullets: [
       ["Flare mode: a 3-question log for bad days + reflections", "Flare mode: a short log for difficult days, plus reflections"],
       ["Bowel, bladder & shoulder pain tracking", "Bowel, bladder and referred shoulder pain"],
@@ -95,10 +96,10 @@ export default function ConsentScreen() {
       if (!prediction.predictedStartISO || !prediction.windowStartISO || !prediction.windowEndISO) return null;
       const qualifier =
         currentMode === "peri"
-          ? tx("Your cycles like to freestyle, so this is a best guess — it gets sharper every time you log 🎯", "Your cycles vary, so this is an estimate. It will improve as you log.")
+          ? tx("Your cycles like to freestyle, so this is a best guess — it gets sharper every time you log", "Your cycles vary, so this is an estimate. It will improve as you log.")
           : isCondition
-          ? tx("Early days! This gets way more accurate with each period you log 🎯", "This is an early estimate. It becomes more accurate with each period you log.")
-          : tx("Based on the cycle length you gave us. It learns your real rhythm as you log 🎯", "Based on the cycle length you entered. It will adjust as you log.");
+          ? tx("Early days! This gets way more accurate with each period you log", "This is an early estimate. It becomes more accurate with each period you log.")
+          : tx("Based on the cycle length you gave us. It learns your real rhythm as you log", "Based on the cycle length you entered. It will adjust as you log.");
       return {
         date: format(parseISO(prediction.predictedStartISO), "MMMM d"),
         window: `${format(parseISO(prediction.windowStartISO), "MMM d")} – ${format(parseISO(prediction.windowEndISO), "MMM d")}`,
@@ -132,7 +133,7 @@ export default function ConsentScreen() {
       console.error("Onboarding completion failed", error);
       setCompleting(false);
       Alert.alert(
-        tx("hmm, setup didn't finish 😕", "Setup couldn't finish"),
+        tx("hmm, setup didn't finish", "Setup couldn't finish"),
         tx("Nothing's lost — tap \"let's go\" again. If it keeps happening, close and reopen the app.", "Nothing was lost. Please tap Get started again. If this keeps happening, restart the app."),
       );
     }
@@ -144,14 +145,14 @@ export default function ConsentScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn} accessibilityRole="button">
           <Text style={[styles.backText, { color: theme.tint }]}>{tx("← back", "← Back")}</Text>
         </TouchableOpacity>
-        <OnboardingProgress step={isCondition ? 5 : 3} total={isCondition ? 5 : 3} label={tx("last step ✨", "Final step")} />
+        <OnboardingProgress step={isCondition ? 5 : 3} total={isCondition ? 5 : 3} label={tx("last step", "Final step")} />
       </View>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
 
         {/* 1. AHA MOMENT — single-date anchor + confidence bar + mode-specific qualifier */}
         {predictionDisplay ? (
           <View style={[styles.ahaCard, { backgroundColor: theme.surface, borderColor: theme.tint }]}>
-            <Text style={[styles.ahaLabel, { color: theme.textSecondary }]} accessibilityRole="header">{tx("your next period, probably 🔮", "Estimated next period")}</Text>
+            <Text style={[styles.ahaLabel, { color: theme.textSecondary }]} accessibilityRole="header">{tx("your next period, probably", "Estimated next period")}</Text>
             <Text style={[styles.ahaDate, { color: theme.tint }]}>{predictionDisplay.date}</Text>
             <Text style={[styles.ahaWindow, { color: theme.textSecondary }]}>{tx("likely window:", "Likely window:")} {predictionDisplay.window}</Text>
 
@@ -173,11 +174,13 @@ export default function ConsentScreen() {
           </View>
         ) : (
           <View style={[styles.ahaCard, { backgroundColor: theme.surface, borderColor: theme.tint }]}>
-            <Text style={styles.ahaIcon} importantForAccessibility="no" accessibilityElementsHidden>{meta.icon}</Text>
+            <View style={styles.ahaIcon} importantForAccessibility="no" accessibilityElementsHidden>
+              <meta.Icon size={40} color={theme.tint} strokeWidth={2} />
+            </View>
             <Text style={[styles.ahaNote, { color: theme.textSecondary }]}>
               {postPillMode
-                ? tx("Post-pill mode is on: your body's finding its rhythm, so predictions unlock after ~90 days. Keep logging meanwhile 🫶", "Post-pill mode is on. Predictions start after about 90 days while your cycle settles. Keep logging in the meantime.")
-                : tx("Log your first period and your personal prediction unlocks ✨", "Log your first period to see your personal prediction.")}
+                ? tx("Post-pill mode is on: your body's finding its rhythm, so predictions unlock after ~90 days. Keep logging meanwhile", "Post-pill mode is on. Predictions start after about 90 days while your cycle settles. Keep logging in the meantime.")
+                : tx("Log your first period and your personal prediction unlocks", "Log your first period to see your personal prediction.")}
             </Text>
           </View>
         )}
@@ -202,7 +205,7 @@ export default function ConsentScreen() {
         {/* 3. PRIVACY — minimal, with link to full policy */}
         <View style={[styles.privacyRow, { borderColor: theme.border, backgroundColor: theme.surface }]}>
           <View style={styles.privacyText}>
-            <Text style={[styles.privacyTitle, { color: theme.text }]}>{tx("🔒 your data, your phone", "Your data stays on your device")}</Text>
+            <Text style={[styles.privacyTitle, { color: theme.text }]}>{tx("your data, your phone", "Your data stays on your device")}</Text>
             <Text style={[styles.privacyBody, { color: theme.textSecondary }]}>
               {tx("No account, no cloud, no tracking. Nothing leaves this device unless you export it yourself.", "No account, cloud storage or tracking. Data leaves this device only if you export it.")}
             </Text>
@@ -223,7 +226,7 @@ export default function ConsentScreen() {
           {completing ? (
             <ActivityIndicator color={theme.onTint} />
           ) : (
-            <Text style={[styles.finishText, { color: theme.onTint }]}>{tx("let's go ✨", "Get started")}</Text>
+            <Text style={[styles.finishText, { color: theme.onTint }]}>{tx("let's go", "Get started")}</Text>
           )}
         </TouchableOpacity>
 
@@ -244,7 +247,7 @@ const styles = StyleSheet.create({
   ahaDate: { fontSize: 36, fontWeight: "800", letterSpacing: -1 },
   ahaWindow: { fontSize: 14, fontWeight: "600", marginBottom: 12 },
   ahaNote: { fontSize: 13, lineHeight: 19 },
-  ahaIcon: { fontSize: 40, textAlign: "center", marginBottom: 6 },
+  ahaIcon: { alignItems: "center", marginBottom: 6 },
   ahaBarRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: 4 },
   ahaBarLabel: { fontSize: 13 },
   ahaBarTrack: { height: 8, borderRadius: 4, overflow: "hidden", marginBottom: 10 },

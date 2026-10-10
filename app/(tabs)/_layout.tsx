@@ -1,9 +1,9 @@
 import { HapticTab } from "@/components/haptic-tab";
-import { IconSymbol } from "@/components/ui/icon-symbol";
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useTx } from "@/utils/tone";
 import { Tabs } from "expo-router";
+import { CalendarDays, ChartColumn, House, PencilLine, User } from "@/components/icons";
 import React from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -37,45 +37,35 @@ export default function TabLayout() {
         name="index"
         options={{
           title: tx("Home", "Home"),
-          tabBarIcon: ({ color }: { color: string | import('react-native').ColorValue }) => (
-            <IconSymbol size={24} name="house.fill" color={color as string} />
-          ),
+          tabBarIcon: ({ color, focused }) => <House size={24} color={color} strokeWidth={focused ? 2.5 : 2} />,
         }}
       />
       <Tabs.Screen
         name="log"
         options={{
           title: tx("Log", "Log"),
-          tabBarIcon: ({ color }: { color: string | import('react-native').ColorValue }) => (
-            <IconSymbol size={24} name="square.and.pencil" color={color as string} />
-          ),
+          tabBarIcon: ({ color, focused }) => <PencilLine size={24} color={color} strokeWidth={focused ? 2.5 : 2} />,
         }}
       />
       <Tabs.Screen
         name="calendar"
         options={{
           title: tx("Calendar", "Calendar"),
-          tabBarIcon: ({ color }: { color: string | import('react-native').ColorValue }) => (
-            <IconSymbol size={24} name="calendar" color={color as string} />
-          ),
+          tabBarIcon: ({ color, focused }) => <CalendarDays size={24} color={color} strokeWidth={focused ? 2.5 : 2} />,
         }}
       />
       <Tabs.Screen
         name="analytics"
         options={{
           title: tx("Insights", "Insights"),
-          tabBarIcon: ({ color }: { color: string | import('react-native').ColorValue }) => (
-            <IconSymbol size={24} name="chart.bar.fill" color={color as string} />
-          ),
+          tabBarIcon: ({ color, focused }) => <ChartColumn size={24} color={color} strokeWidth={focused ? 2.5 : 2} />,
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
           title: tx("You", "Profile"),
-          tabBarIcon: ({ color }: { color: string | import('react-native').ColorValue }) => (
-            <IconSymbol size={24} name="person.fill" color={color as string} />
-          ),
+          tabBarIcon: ({ color, focused }) => <User size={24} color={color} strokeWidth={focused ? 2.5 : 2} />,
         }}
       />
       {/* Routable but kept off the tab bar (5 tabs max): History opens from Calendar

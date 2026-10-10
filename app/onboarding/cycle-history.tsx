@@ -35,7 +35,7 @@ const validateDate = (value: string, tx: Tx): string | null => {
   const [y, m, d] = value.split("-").map(Number);
   const date = new Date(y, m - 1, d);
   if (date.getFullYear() !== y || date.getMonth() !== m - 1 || date.getDate() !== d) return tx("that date doesn't exist", "That date doesn't exist.");
-  if (value > toDateKey(new Date())) return tx("that's in the future 👀", "That date is in the future.");
+  if (value > toDateKey(new Date())) return tx("that's in the future", "That date is in the future.");
   if (value < daysAgo(180)) return tx("that's over 6 months ago — pick your most recent period", "That's more than 6 months ago. Please choose your most recent period.");
   return null;
 };
@@ -97,13 +97,13 @@ export default function CycleHistoryInputScreen() {
         />
       </View>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <Text style={[styles.title, { color: theme.text }]} accessibilityRole="header">{tx("Quick setup ⚡", "Your cycle")}</Text>
+        <Text style={[styles.title, { color: theme.text }]} accessibilityRole="header">{tx("Quick setup", "Your cycle")}</Text>
         <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
           {tx("Two questions, then you get your first prediction. Best guesses are totally fine.", "Two quick questions, then you'll see your first prediction. Estimates are fine.")}
         </Text>
 
         <View style={[styles.card, { backgroundColor: theme.surface }, Shadow]}>
-          <Text style={[styles.question, { color: theme.text }]} accessibilityRole="header">{tx("When did your last period start? 🩸", "When did your last period start?")}</Text>
+          <Text style={[styles.question, { color: theme.text }]} accessibilityRole="header">{tx("When did your last period start?", "When did your last period start?")}</Text>
           <View style={styles.chips} accessibilityRole="radiogroup">
             {QUICK_DATES.map((q) =>
               chip(tx<string>(q.label[0], q.label[1]), customDate === null && lastPeriodDate === daysAgo(q.days), () => {
@@ -111,7 +111,7 @@ export default function CycleHistoryInputScreen() {
                 setLastPeriodDate(daysAgo(q.days));
               }),
             )}
-            {chip(tx("pick a date 📅", "Choose a date"), customDate !== null, () => {
+            {chip(tx("pick a date", "Choose a date"), customDate !== null, () => {
               setCustomDate(lastPeriodDate);
             })}
           </View>
@@ -169,7 +169,7 @@ export default function CycleHistoryInputScreen() {
         {currentMode === "peri" && (
           <View style={[styles.card, { backgroundColor: theme.surface }, Shadow]}>
             <Text style={[styles.question, { color: theme.text }]} accessibilityRole="header">
-              {tx("Did you recently stop hormonal birth control? 💊", "Did you recently stop hormonal contraception?")}
+              {tx("Did you recently stop hormonal birth control?", "Did you recently stop hormonal contraception?")}
             </Text>
             <Text style={[styles.hint, { color: theme.textSecondary }]}>
               {tx("pill, patch, ring, implant or hormonal IUD — your body needs ~3 months to find its rhythm", "Pill, patch, ring, implant or hormonal IUD. Cycles can take about 3 months to settle.")}
@@ -188,7 +188,7 @@ export default function CycleHistoryInputScreen() {
           accessibilityRole="button"
         >
           <Text style={[styles.nextText, { color: theme.onTint }]}>
-            {next === "condition" ? tx("Next →", "Continue") : tx("Show my prediction ✨", "See my prediction")}
+            {next === "condition" ? tx("Next →", "Continue") : tx("Show my prediction", "See my prediction")}
           </Text>
         </TouchableOpacity>
       </ScrollView>

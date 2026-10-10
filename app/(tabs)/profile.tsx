@@ -4,12 +4,12 @@ import { Colors, getModeColor, Radius, Shadow } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAppStore, AppMode, type BooleanNotificationPref } from '@/store';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { IconSymbol } from '@/components/ui/icon-symbol';
+import { ChevronRight, ClipboardList, DatabaseBackup, FileDown, FileText, FileUp, Files, Share, ShieldCheck, Trash2, type LucideIcon } from "@/components/icons";
 import { differenceInDays, parseISO } from 'date-fns';
 import { scheduleDailyLogReminder } from '@/utils/notifications';
 import { isHealthBridgeAvailable, requestHealthPermissions } from '@/utils/healthIntegrations';
 import { getDatabaseEncryptionStatus } from '@/database';
-import { useEffect, useState, type ComponentProps } from 'react';
+import { useEffect, useState } from 'react';
 import { exportAndShareDatabaseFileBackup, exportAndShareLocalData, restoreLocalDataBackupFromUri, wipeLocalDataAndFiles } from '@/utils/privacyData';
 import * as DocumentPicker from 'expo-document-picker';
 import { authenticate, getLockSupport } from '@/utils/appLock';
@@ -64,12 +64,12 @@ export default function ProfileScreen() {
     }
     const support = await getLockSupport();
     if (support === "unsupported") {
-      Alert.alert(tx("not available here 😅", "Not available"), tx("App lock needs a phone with Face ID, fingerprint or a passcode.", "App lock requires Face ID, fingerprint or a device passcode."));
+      Alert.alert(tx("not available here", "Not available"), tx("App lock needs a phone with Face ID, fingerprint or a passcode.", "App lock requires Face ID, fingerprint or a device passcode."));
       return;
     }
     if (support === "no-security") {
       Alert.alert(
-        tx("set up a phone lock first 🔐", "Set up a device lock first"),
+        tx("set up a phone lock first", "Set up a device lock first"),
         tx("Add a passcode, Face ID or fingerprint in your phone's settings, then come back.", "Add a passcode, Face ID or fingerprint in your device settings, then try again."),
       );
       return;
@@ -86,13 +86,13 @@ export default function ProfileScreen() {
     return Math.min(days, 90);
   })();
 
-  const ActionRow = ({ title, iconName, color, onPress }: { title: string; iconName: ComponentProps<typeof IconSymbol>['name']; color: string; onPress?: () => void }) => (
+  const ActionRow = ({ title, icon: Icon, color, onPress }: { title: string; icon: LucideIcon; color: string; onPress?: () => void }) => (
     <TouchableOpacity onPress={onPress} activeOpacity={0.7} style={[styles.actionRow, { borderBottomColor: theme.border }]} accessibilityRole="button" accessibilityLabel={title}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-        <IconSymbol name={iconName} size={24} color={color} />
+        <Icon size={22} color={color} strokeWidth={2.25} />
         <Text style={[styles.actionText, { color: theme.text }]}>{title}</Text>
       </View>
-      <IconSymbol name="chevron.right" size={20} color={theme.textSecondary} />
+      <ChevronRight size={20} color={theme.textSecondary} />
     </TouchableOpacity>
   );
 
@@ -108,7 +108,7 @@ export default function ProfileScreen() {
     if (!value) return;
     if (!isHealthBridgeAvailable()) {
       Alert.alert(
-        tx("not available here 😅", "Health sync unavailable"),
+        tx("not available here", "Health sync unavailable"),
         tx("Health app syncing only works in the real CycleIQ app (not Expo Go or web). Your choice is saved and kicks in there.", "Health app syncing requires the full CycleIQ app (not Expo Go or web). Your preference has been saved."),
       );
       return;
@@ -116,7 +116,7 @@ export default function ProfileScreen() {
     const granted = await requestHealthPermissions(nextPrefs);
     if (!granted && Platform.OS === "android") {
       Alert.alert(
-        tx("Health Connect said no 🚫", "Access not granted"),
+        tx("Health Connect said no", "Access not granted"),
         tx("We couldn't get access. Make sure Health Connect is installed & updated, then allow sleep, steps and exercise for CycleIQ.", "Make sure Health Connect is installed and up to date, then allow sleep, steps and exercise for CycleIQ."),
       );
     }
@@ -126,10 +126,10 @@ export default function ProfileScreen() {
     try {
       setPrivacyActionInProgress(true);
       const uri = await exportAndShareLocalData(format);
-      Alert.alert(tx("export ready 📦", "Export ready"), tx(`Your ${format.toUpperCase()} file is saved on your phone. It only went somewhere else if you picked a destination.\n\n${uri}`, `Your ${format.toUpperCase()} file was saved on this device and shared only if you chose a destination.\n\n${uri}`));
+      Alert.alert(tx("export ready", "Export ready"), tx(`Your ${format.toUpperCase()} file is saved on your phone. It only went somewhere else if you picked a destination.\n\n${uri}`, `Your ${format.toUpperCase()} file was saved on this device and shared only if you chose a destination.\n\n${uri}`));
     } catch (error) {
       console.error("Local data export failed", error);
-      Alert.alert(tx("export didn't work 😕", "Export failed"), tx("Couldn't create your export — try again in a sec.", "Your export couldn't be created. Please try again."));
+      Alert.alert(tx("export didn't work", "Export failed"), tx("Couldn't create your export — try again in a sec.", "Your export couldn't be created. Please try again."));
     } finally {
       setPrivacyActionInProgress(false);
     }
@@ -139,10 +139,10 @@ export default function ProfileScreen() {
     try {
       setPrivacyActionInProgress(true);
       const uri = await exportAndShareDatabaseFileBackup();
-      Alert.alert(tx("backup ready 💾", "Backup ready"), tx(`Saved on your phone (encrypted with this device's key, so it restores here). It only went elsewhere if you picked a destination.\n\n${uri}`, `Saved on this device, encrypted with this device's key. It was shared only if you chose a destination.\n\n${uri}`));
+      Alert.alert(tx("backup ready", "Backup ready"), tx(`Saved on your phone (encrypted with this device's key, so it restores here). It only went elsewhere if you picked a destination.\n\n${uri}`, `Saved on this device, encrypted with this device's key. It was shared only if you chose a destination.\n\n${uri}`));
     } catch (error) {
       console.error("Database backup failed", error);
-      Alert.alert(tx("backup didn't work 😕", "Backup failed"), tx("Couldn't make a database backup in this version of the app. The JSON export still works.", "A database backup isn't available in this version of the app. The JSON export still works."));
+      Alert.alert(tx("backup didn't work", "Backup failed"), tx("Couldn't make a database backup in this version of the app. The JSON export still works.", "A database backup isn't available in this version of the app. The JSON export still works."));
     } finally {
       setPrivacyActionInProgress(false);
     }
@@ -150,7 +150,7 @@ export default function ProfileScreen() {
 
   const confirmDeleteLocalData = () => {
     Alert.alert(
-      tx("delete everything? 🗑️", "Delete all data?"),
+      tx("delete everything?", "Delete all data?"),
       tx("This wipes all your CycleIQ data, settings, reminders and saved reports from this phone, and takes you back to setup. There's no undo — export first if you might want it back.", "This permanently deletes all CycleIQ data, settings, reminders and saved reports from this device and returns you to setup. Export first if you may need it."),
       [
         { text: "Cancel", style: "cancel" },
@@ -161,10 +161,10 @@ export default function ProfileScreen() {
             try {
               setPrivacyActionInProgress(true);
               await wipeLocalDataAndFiles();
-              Alert.alert(tx("all cleared ✨", "Data deleted"), tx("Everything's been deleted from this phone. Fresh start.", "All data has been deleted from this device."));
+              Alert.alert(tx("all cleared", "Data deleted"), tx("Everything's been deleted from this phone. Fresh start.", "All data has been deleted from this device."));
             } catch (error) {
               console.error("Local data wipe failed", error);
-              Alert.alert(tx("hmm, that didn't fully work 😕", "Delete failed"), tx("Some data couldn't be deleted — please try again.", "Some data couldn't be deleted. Please try again."));
+              Alert.alert(tx("hmm, that didn't fully work", "Delete failed"), tx("Some data couldn't be deleted — please try again.", "Some data couldn't be deleted. Please try again."));
             } finally {
               setPrivacyActionInProgress(false);
             }
@@ -179,7 +179,7 @@ export default function ProfileScreen() {
       const result = await DocumentPicker.getDocumentAsync({ type: 'application/json', copyToCacheDirectory: true });
       if (result.canceled || !result.assets?.[0]?.uri) return;
       Alert.alert(
-        tx("restore this backup? ⏪", "Restore backup?"),
+        tx("restore this backup?", "Restore backup?"),
         tx("This swaps everything currently in the app for what's in the backup. No undo.", "This replaces all current data with the backup. This can't be undone."),
         [
           { text: "Cancel", style: "cancel" },
@@ -190,9 +190,9 @@ export default function ProfileScreen() {
               try {
                 setPrivacyActionInProgress(true);
                 await restoreLocalDataBackupFromUri(result.assets[0].uri);
-                Alert.alert(tx("restored ✅", "Restore complete"), tx("Your backup is back. Close and reopen the app to see it.", "Your backup has been restored. Restart the app to see your data."));
+                Alert.alert(tx("restored", "Restore complete"), tx("Your backup is back. Close and reopen the app to see it.", "Your backup has been restored. Restart the app to see your data."));
               } catch {
-                Alert.alert(tx("couldn't restore that 😕", "Restore failed"), tx("That file doesn't look like a CycleIQ JSON backup.", "The selected file isn't a valid CycleIQ JSON backup."));
+                Alert.alert(tx("couldn't restore that", "Restore failed"), tx("That file doesn't look like a CycleIQ JSON backup.", "The selected file isn't a valid CycleIQ JSON backup."));
               } finally {
                 setPrivacyActionInProgress(false);
               }
@@ -201,14 +201,14 @@ export default function ProfileScreen() {
         ],
       );
     } catch {
-      Alert.alert(tx("files won't open 😕", "Couldn't open files"), tx("Couldn't open the file picker — try again?", "The file picker couldn't be opened. Please try again."));
+      Alert.alert(tx("files won't open", "Couldn't open files"), tx("Couldn't open the file picker — try again?", "The file picker couldn't be opened. Please try again."));
     }
   };
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={[styles.title, { color: theme.text }]} accessibilityRole="header">{tx("you 💅", "Profile")}</Text>
+        <Text style={[styles.title, { color: theme.text }]} accessibilityRole="header">{tx("you", "Profile")}</Text>
 
         {/* How the app talks */}
         <View style={[styles.section, { backgroundColor: theme.surface, borderColor: theme.border }]}>
@@ -218,7 +218,7 @@ export default function ProfileScreen() {
           </Text>
           <View style={styles.toneRow} accessibilityRole="radiogroup">
             {([
-              ["chill", tx("chill ✨", "Casual"), tx("casual, emoji, lowercase", "Relaxed with emoji")],
+              ["chill", tx("chill", "Casual"), tx("casual, lowercase, relaxed", "Relaxed wording")],
               ["classic", tx("classic", "Classic"), tx("calm, plain sentences", "Plain and calm")],
             ] as const).map(([value, label, hint]) => {
               const selected = tone === value;
@@ -242,9 +242,9 @@ export default function ProfileScreen() {
         {/* Post-pill progress bar */}
         {postPillMode && postPillProgress !== null && (
           <View style={[styles.section, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-            <Text style={[styles.sectionTitle, { color: theme.text }]} accessibilityRole="header">{tx("post-pill reset 💊", "Post-pill baseline")}</Text>
+            <Text style={[styles.sectionTitle, { color: theme.text }]} accessibilityRole="header">{tx("post-pill reset", "Post-pill baseline")}</Text>
             <Text style={[styles.description, { color: theme.textSecondary }]}>
-              {tx(`day ${postPillProgress} of 90 — predictions unlock once your hormones settle. be patient with your body 🫶`, `Day ${postPillProgress} of 90. Predictions unlock once your hormones settle.`)}
+              {tx(`day ${postPillProgress} of 90 — predictions unlock once your hormones settle. be patient with your body`, `Day ${postPillProgress} of 90. Predictions unlock once your hormones settle.`)}
             </Text>
             <View style={[styles.progressTrack, { backgroundColor: theme.border }]}>
               <View style={[styles.progressFill, { backgroundColor: theme.tint, width: `${(postPillProgress / 90) * 100}%` }]} />
@@ -265,11 +265,11 @@ export default function ProfileScreen() {
             {(['standard', 'pcos', 'pcod', 'endo', 'peri'] as AppMode[]).map((mode) => {
               const selected = currentMode === mode;
               const label = ({
-                standard: tx('just tracking 🗓️', 'Cycle tracking'),
-                pcos: tx('PCOS 💚', 'PCOS'),
-                pcod: tx('PCOD 💙', 'PCOD'),
-                endo: tx('endometriosis 💜', 'Endometriosis'),
-                peri: tx('perimenopause 🌙', 'Perimenopause'),
+                standard: tx('just tracking', 'Cycle tracking'),
+                pcos: tx('PCOS', 'PCOS'),
+                pcod: tx('PCOD', 'PCOD'),
+                endo: tx('endometriosis', 'Endometriosis'),
+                peri: tx('perimenopause', 'Perimenopause'),
               } as Record<string, string>)[mode];
               return (
                 <TouchableOpacity
@@ -291,7 +291,7 @@ export default function ProfileScreen() {
 
           <View style={[styles.toggleRow, { alignItems: 'flex-start' }]}>
             <View style={{ flex: 1, paddingRight: 12 }}>
-              <Text style={[styles.toggleText, { color: theme.text }]}>{tx("💊 just came off the pill", "Recently stopped hormonal contraception")}</Text>
+              <Text style={[styles.toggleText, { color: theme.text }]}>{tx("just came off the pill", "Recently stopped hormonal contraception")}</Text>
               <Text style={{ color: theme.textSecondary, fontSize: 12, marginTop: 2 }}>
                 {tx("your first few cycles can be all over the place, so we go easy on predictions for ~90 days", "Cycles can be irregular at first, so predictions are held back for about 90 days")}
               </Text>
@@ -317,7 +317,7 @@ export default function ProfileScreen() {
               accessibilityState={{ checked: languagePreset === preset }}
             >
               <Text style={{ color: languagePreset === preset ? theme.tint : theme.text, fontWeight: languagePreset === preset ? 'bold' : 'normal' }}>
-                {{ default: tx('default', 'Default'), inclusive: tx('gender-neutral', 'Gender-neutral'), custom: tx('my own words ✍️', 'Custom') }[preset]}
+                {{ default: tx('default', 'Default'), inclusive: tx('gender-neutral', 'Gender-neutral'), custom: tx('my own words', 'Custom') }[preset]}
               </Text>
             </TouchableOpacity>
           ))}
@@ -345,11 +345,11 @@ export default function ProfileScreen() {
 
         {/* Notifications */}
         <View style={[styles.section, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-          <Text style={[styles.sectionTitle, { color: theme.text }]} accessibilityRole="header">{tx("reminders & pings 🔔", "Notifications")}</Text>
+          <Text style={[styles.sectionTitle, { color: theme.text }]} accessibilityRole="header">{tx("reminders & pings", "Notifications")}</Text>
 
           <View style={[styles.toggleRow, { alignItems: 'flex-start' }]}>
             <View style={{ flex: 1, paddingRight: 12 }}>
-              <Text style={[styles.toggleText, { color: theme.text }]}>{tx("🤫 discreet mode", "Discreet notifications")}</Text>
+              <Text style={[styles.toggleText, { color: theme.text }]}>{tx("discreet mode", "Discreet notifications")}</Text>
               <Text style={{ color: theme.textSecondary, fontSize: 12, marginTop: 2 }}>
                 {tx("lock screen just says \"CycleIQ reminder\" — no period or symptom details", "Notifications show only \"CycleIQ\" with no health details.")}
               </Text>
@@ -363,19 +363,19 @@ export default function ProfileScreen() {
           </View>
 
           {([
-            { key: 'period',           label: tx('🩸 period incoming heads-up', 'Period reminder') },
-            { key: 'dailyLog',         label: tx('✏️ daily check-in reminder', 'Daily log reminder') },
-            { key: 'padReminder',      label: tx('🛍️ restock reminder (5 days before)', 'Restock reminder (5 days before)') },
-            { key: 'hydrationNudge',   label: tx('💧 water check (3 days before)', 'Hydration reminder (3 days before)') },
-            { key: 'ironFoodReminder', label: tx('🥑 cramp-fighting food tips (2 days before)', 'Nutrition tips (2 days before)') },
-            { key: 'heatPadReminder',  label: tx('🔥 heat pad reminder (day 1)', 'Heat pad reminder (day 1)') },
-            { key: 'periodDayTips',    label: tx('🌸 period survival tips (days 1–5)', 'Period day tips (days 1–5)') },
-            { key: 'moodCheckIn',      label: tx('💭 PMS vibe check', 'PMS mood check-in') },
-            { key: 'insights',         label: tx('👀 new pattern alerts', 'New insight alerts') },
-            { key: 'ovulation',        label: tx('✨ ovulation heads-up', 'Ovulation reminder') },
-            { key: 'flares',           label: tx('💜 flare & symptom warnings', 'Flare and symptom warnings') },
-            ...(currentMode === 'endo' ? [{ key: 'endoDayTips', label: tx('💜 endo care tips (period + recovery)', 'Endometriosis care tips') }] : []),
-            ...(currentMode === 'pcos' ? [{ key: 'pcosNotifications', label: tx('💚 PCOS check-ins & tips', 'PCOS reminders and tips') }] : []),
+            { key: 'period',           label: tx('period incoming heads-up', 'Period reminder') },
+            { key: 'dailyLog',         label: tx('daily check-in reminder', 'Daily log reminder') },
+            { key: 'padReminder',      label: tx('restock reminder (5 days before)', 'Restock reminder (5 days before)') },
+            { key: 'hydrationNudge',   label: tx('water check (3 days before)', 'Hydration reminder (3 days before)') },
+            { key: 'ironFoodReminder', label: tx('cramp-fighting food tips (2 days before)', 'Nutrition tips (2 days before)') },
+            { key: 'heatPadReminder',  label: tx('heat pad reminder (day 1)', 'Heat pad reminder (day 1)') },
+            { key: 'periodDayTips',    label: tx('period survival tips (days 1–5)', 'Period day tips (days 1–5)') },
+            { key: 'moodCheckIn',      label: tx('PMS vibe check', 'PMS mood check-in') },
+            { key: 'insights',         label: tx('new pattern alerts', 'New insight alerts') },
+            { key: 'ovulation',        label: tx('ovulation heads-up', 'Ovulation reminder') },
+            { key: 'flares',           label: tx('flare & symptom warnings', 'Flare and symptom warnings') },
+            ...(currentMode === 'endo' ? [{ key: 'endoDayTips', label: tx('endo care tips (period + recovery)', 'Endometriosis care tips') }] : []),
+            ...(currentMode === 'pcos' ? [{ key: 'pcosNotifications', label: tx('PCOS check-ins & tips', 'PCOS reminders and tips') }] : []),
           ] as { key: BooleanNotificationPref; label: string }[]).map(({ key, label }) => (
             <View key={key} style={styles.toggleRow}>
               <Text style={[styles.toggleText, { color: theme.text }]}>{label}</Text>
@@ -406,7 +406,7 @@ export default function ProfileScreen() {
 
           {/* Quiet hours */}
           <Text style={[styles.description, { color: theme.textSecondary, marginTop: 12 }]}>
-            {tx("do-not-disturb hours 🌙 (we stay quiet)", "Quiet hours (no notifications)")}
+            {tx("do-not-disturb hours (we stay quiet)", "Quiet hours (no notifications)")}
           </Text>
           <View style={{ flexDirection: 'row', gap: 16, marginTop: 4 }}>
             {(['quietHoursStart', 'quietHoursEnd'] as const).map((field) => (
@@ -441,7 +441,7 @@ export default function ProfileScreen() {
         </View>
 
         <View style={[styles.section, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-          <Text style={[styles.sectionTitle, { color: theme.text }]} accessibilityRole="header">{tx("sync your Health app ⌚", "Health app import")}</Text>
+          <Text style={[styles.sectionTitle, { color: theme.text }]} accessibilityRole="header">{tx("sync your Health app", "Health app import")}</Text>
           <Text style={[styles.description, { color: theme.textSecondary }]}>
             {tx("we only read sleep, steps & exercise to pre-fill your log. we never write anything back.", "Read-only: sleep, steps and exercise are used to pre-fill your log. Nothing is written back.")}
           </Text>
@@ -491,11 +491,11 @@ export default function ProfileScreen() {
         </View>
 
         <View style={[styles.section, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-          <Text style={[styles.sectionTitle, { color: theme.text }]} accessibilityRole="header">{tx("your privacy 🔒", "Privacy and security")}</Text>
+          <Text style={[styles.sectionTitle, { color: theme.text }]} accessibilityRole="header">{tx("your privacy", "Privacy and security")}</Text>
 
           <View style={[styles.toggleRow, { alignItems: 'flex-start' }]}>
             <View style={{ flex: 1, paddingRight: 12 }}>
-              <Text style={[styles.toggleText, { color: theme.text }]}>{tx("🔐 app lock", "App lock")}</Text>
+              <Text style={[styles.toggleText, { color: theme.text }]}>{tx("app lock", "App lock")}</Text>
               <Text style={{ color: theme.textSecondary, fontSize: 12, marginTop: 2 }}>
                 {tx("Face ID, fingerprint or passcode to get in", "Require Face ID, fingerprint or passcode to open")}
               </Text>
@@ -513,8 +513,8 @@ export default function ProfileScreen() {
           </Text>
           <Text style={[styles.description, { color: databaseEncryption?.sqlCipherAvailable ? theme.tint : theme.error }]}>
             {databaseEncryption?.sqlCipherAvailable
-              ? tx(`✅ whole database encrypted (SQLCipher${databaseEncryption.cipherVersion ? ` ${databaseEncryption.cipherVersion}` : ""})`, `Database encryption: on (SQLCipher${databaseEncryption.cipherVersion ? ` ${databaseEncryption.cipherVersion}` : ""})`)
-              : tx("⚠️ full database encryption isn't available in this version of the app (e.g. Expo Go)", "Database encryption: not available in this build (e.g. Expo Go)")}
+              ? tx(`whole database encrypted (SQLCipher${databaseEncryption.cipherVersion ? ` ${databaseEncryption.cipherVersion}` : ""})`, `Database encryption: on (SQLCipher${databaseEncryption.cipherVersion ? ` ${databaseEncryption.cipherVersion}` : ""})`)
+              : tx("full database encryption isn't available in this version of the app (e.g. Expo Go)", "Database encryption: not available in this build (e.g. Expo Go)")}
           </Text>
           <Text style={[styles.description, { color: theme.textSecondary }]}>
             {tx("zero trackers, zero analytics, zero ads. we can't see your data even if we wanted to.", "No analytics, tracking or advertising. We have no access to your data.")}
@@ -523,38 +523,38 @@ export default function ProfileScreen() {
 
         {/* Reports & Export */}
         <View style={[styles.section, { backgroundColor: theme.surface, borderColor: theme.border, paddingVertical: 8 }]}>
-          <ActionRow onPress={() => router.push('/privacy')} title={tx("privacy policy (no legal jargon)", "Privacy policy")} iconName="lock.shield.fill" color="#4DB6AC" />
-          <ActionRow onPress={() => router.push('/report')} title={tx("doctor-ready report 🩺", "Doctor report")} iconName="doc.text.fill" color="#E57373" />
-          <ActionRow onPress={() => router.push('/reports')} title={tx("saved reports", "Saved reports")} iconName="doc.text.fill" color="#64B5F6" />
-          <ActionRow onPress={() => router.push('/appointment-prep')} title={tx("prep for an appointment 📝", "Appointment preparation")} iconName="doc.text.fill" color="#BA68C8" />
+          <ActionRow onPress={() => router.push('/privacy')} title={tx("privacy policy (no legal jargon)", "Privacy policy")} icon={ShieldCheck} color="#4DB6AC" />
+          <ActionRow onPress={() => router.push('/report')} title={tx("doctor-ready report", "Doctor report")} icon={FileText} color="#E57373" />
+          <ActionRow onPress={() => router.push('/reports')} title={tx("saved reports", "Saved reports")} icon={Files} color="#64B5F6" />
+          <ActionRow onPress={() => router.push('/appointment-prep')} title={tx("prep for an appointment", "Appointment preparation")} icon={ClipboardList} color="#BA68C8" />
           <ActionRow
             onPress={() => !privacyActionInProgress && handleExportLocalData('json')}
             title={tx("export my data (JSON)", "Export data (JSON)")}
-            iconName="arrow.down.doc.fill"
+            icon={FileDown}
             color="#81C784"
           />
           <ActionRow
             onPress={() => !privacyActionInProgress && handleExportLocalData('csv')}
             title={tx("export my data (spreadsheet / CSV)", "Export data (CSV)")}
-            iconName="square.and.arrow.up.fill"
+            icon={Share}
             color="#64B5F6"
           />
           <ActionRow
             onPress={() => !privacyActionInProgress && handleDatabaseBackup()}
             title={tx("back up the database file", "Back up database file")}
-            iconName="lock.shield.fill"
+            icon={DatabaseBackup}
             color="#4DB6AC"
           />
           <ActionRow
             onPress={() => !privacyActionInProgress && handleRestoreBackup()}
             title={tx("restore from a JSON backup", "Restore from JSON backup")}
-            iconName="arrow.down.doc.fill"
+            icon={FileUp}
             color="#FFB74D"
           />
           <ActionRow
             onPress={() => !privacyActionInProgress && confirmDeleteLocalData()}
             title={tx("delete all my data", "Delete all data")}
-            iconName="trash.fill"
+            icon={Trash2}
             color={theme.error}
           />
         </View>

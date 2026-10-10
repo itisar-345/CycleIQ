@@ -42,7 +42,7 @@ describe("Insights screen", () => {
     mock(db.getAllCycles).mockResolvedValue([cycle("c3", 8, null), cycle("c2", 36, 28), cycle("c1", 64, 28)]);
     mock(db.getCyclePredictions).mockResolvedValue(prediction());
     mock(db.generateInsights).mockResolvedValue([
-      { title: "Stress & Pain", description: "Stressful days tend to be more painful days for you 😮‍💨", correlation: 0.62, n: 25 },
+      { title: "Stress & Pain", description: "Stressful days tend to be more painful days for you", correlation: 0.62, n: 25 },
       { title: "Sleep & Mood", description: "More sleep tends to = better mood for you.", correlation: 0.41, n: 22, isMentalHealth: true },
     ]);
   });
@@ -91,7 +91,7 @@ describe("Home screen", () => {
     });
 
     render(<HomeScreen />);
-    fireEvent.press(await screen.findByText("🩸 my period started"));
+    fireEvent.press(await screen.findByText("my period started"));
     await waitFor(() => expect(db.createCycle).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(screen.getByText(/after new period/)).toBeTruthy());
     expect(useAppStore.getState().activePeriodId).toBe("cycle-id");

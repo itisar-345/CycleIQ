@@ -201,6 +201,7 @@ test("export → restore round-trips the data", async () => {
 });
 
 test("field encryption round-trips, uses fresh IVs and rejects tampering", async () => {
+  // Users can still type emoji into notes, so encryption must round-trip them.
   const text = "Ibuprofen 400mg — ü 日本 🌸 " + "x".repeat(70000);
   const sealed = await encryptField(text);
   assert.ok(sealed.startsWith("enc:v1:"));
@@ -238,10 +239,10 @@ test("persisted app state migrates legacy blobs and is stored encrypted", async 
 
 test("tone: chill and classic wording, shared copy", async () => {
   useAppStore.setState({ tone: "chill" });
-  assert.equal(currentTx()("hey 👋", "Hello"), "hey 👋");
+  assert.equal(currentTx()("hey", "Hello"), "hey");
   assert.equal(getCopy("chill").options.flow.find((o) => typeof o !== "string" && o.value === "Very Heavy") !== undefined, true);
   useAppStore.setState({ tone: "classic" });
-  assert.equal(currentTx()("hey 👋", "Hello"), "Hello");
+  assert.equal(currentTx()("hey", "Hello"), "Hello");
   // Stored values never change with tone — only labels do.
   const classicFlow = getCopy("classic").options.flow.map((o) => (typeof o === "string" ? o : o.value));
   const chillFlow = getCopy("chill").options.flow.map((o) => (typeof o === "string" ? o : o.value));
@@ -252,15 +253,15 @@ test("tone: chill and classic wording, shared copy", async () => {
 test("notifications: classic wording by id, discreet hides health details", async () => {
   useAppStore.setState({ tone: "classic", discreetNotifications: false });
   assert.deepEqual(
-    resolveNotificationContent("period-reminder", ["period incoming 🩸", "chill body"]),
+    resolveNotificationContent("period-reminder", ["period incoming", "chill body"]),
     ["Period expected soon", "Your next period is predicted in about 2 days."],
   );
   useAppStore.setState({ tone: "chill" });
-  assert.deepEqual(resolveNotificationContent("period-reminder", ["period incoming 🩸", "chill body"]), ["period incoming 🩸", "chill body"]);
+  assert.deepEqual(resolveNotificationContent("period-reminder", ["period incoming", "chill body"]), ["period incoming", "chill body"]);
   useAppStore.setState({ discreetNotifications: true });
   for (const tone of ["chill", "classic"] as const) {
     useAppStore.setState({ tone });
-    const [title, body] = resolveNotificationContent("pcos-d90", ["time for a doctor chat 💬", "90 days without a period"]);
+    const [title, body] = resolveNotificationContent("pcos-d90", ["time for a doctor chat", "90 days without a period"]);
     assert.equal(title, "CycleIQ");
     assert.ok(!/period|PCOS|pain|flare|ovulat|blood/i.test(`${title} ${body}`), `discreet text leaked details: ${body}`);
   }

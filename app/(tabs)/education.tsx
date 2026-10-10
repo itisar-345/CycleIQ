@@ -27,7 +27,7 @@ export default function EducationScreen() {
         >
           <Text style={{ color: theme.tint, fontWeight: "700", fontSize: 16 }}>{tx("‹ back", "‹ Back")}</Text>
         </TouchableOpacity>
-        <Text style={[styles.title, { color: theme.text }]} accessibilityRole="header">{tx("learn stuff 📚", "Learn")}</Text>
+        <Text style={[styles.title, { color: theme.text }]} accessibilityRole="header">{tx("learn stuff", "Learn")}</Text>
         <TextInput
           accessibilityLabel={tx("Search articles", "Search articles")}
           style={[styles.search, { backgroundColor: theme.surface, color: theme.text, borderColor: theme.border }]}
@@ -40,7 +40,7 @@ export default function EducationScreen() {
 
       <ScrollView contentContainerStyle={styles.content}>
         {articles.length === 0 ? (
-          <Text style={{ color: theme.textSecondary, textAlign: 'center', marginTop: 20 }} accessibilityLiveRegion="polite">{tx("nothing matched that 🤔 try another word?", "No articles found.")}</Text>
+          <Text style={{ color: theme.textSecondary, textAlign: 'center', marginTop: 20 }} accessibilityLiveRegion="polite">{tx("nothing matched that try another word?", "No articles found.")}</Text>
         ) : (
           articles.map((article) => {
             const review = getArticleReviewStatus(article);

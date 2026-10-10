@@ -11,6 +11,7 @@ import { Colors, Radius, Spacing } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useAppStore } from "@/store";
 import { authenticate } from "@/utils/appLock";
+import { Lock } from "@/components/icons";
 import { useTx } from "@/utils/tone";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { AppState, StyleSheet, Text, TouchableOpacity, View } from "react-native";
@@ -33,7 +34,7 @@ export function AppLockGate({ ready }: { ready: boolean }) {
   const unlock = useCallback(async () => {
     if (prompting.current) return;
     prompting.current = true;
-    const ok = await authenticate(tx("unlock CycleIQ 🔒", "Unlock CycleIQ"), tx("not now", "Cancel"));
+    const ok = await authenticate(tx("unlock CycleIQ", "Unlock CycleIQ"), tx("not now", "Cancel"));
     prompting.current = false;
     if (ok) setPhase("unlocked");
   }, [tx]);
@@ -81,14 +82,16 @@ export function AppLockGate({ ready }: { ready: boolean }) {
       style={[StyleSheet.absoluteFill, styles.container, { backgroundColor: theme.background }]}
       accessibilityViewIsModal
     >
-      <Text style={styles.icon} accessibilityElementsHidden importantForAccessibility="no">🔒</Text>
+      <View style={styles.icon} accessibilityElementsHidden importantForAccessibility="no">
+        <Lock size={56} color={theme.tint} strokeWidth={1.75} />
+      </View>
       <Text style={[styles.title, { color: theme.text }]} accessibilityRole="header">
         CycleIQ
       </Text>
       {phase === "locked" && (
         <>
           <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
-            {tx("only you get in here ✨", "Unlock to view your data.")}
+            {tx("only you get in here", "Unlock to view your data.")}
           </Text>
           <TouchableOpacity
             style={[styles.button, { backgroundColor: theme.tint }]}
@@ -106,7 +109,7 @@ export function AppLockGate({ ready }: { ready: boolean }) {
 
 const styles = StyleSheet.create({
   container: { alignItems: "center", justifyContent: "center", padding: Spacing.xxl, gap: Spacing.md, zIndex: 1000 },
-  icon: { fontSize: 56 },
+  icon: { marginBottom: 4 },
   title: { fontSize: 24, fontWeight: "800" },
   subtitle: { fontSize: 15, textAlign: "center" },
   button: { marginTop: Spacing.lg, paddingVertical: 16, paddingHorizontal: 48, borderRadius: Radius.pill, minHeight: 48 },

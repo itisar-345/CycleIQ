@@ -1,4 +1,4 @@
-import { IconSymbol } from "@/components/ui/icon-symbol";
+import { CalendarClock, Info } from "@/components/icons";
 import { useCopy } from "@/constants/copy";
 import { router } from "expo-router";
 import { useTx } from "@/utils/tone";
@@ -95,21 +95,21 @@ export default function AnalyticsScreen() {
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.titleRow}>
           <Text style={[styles.title, { color: theme.text }]} accessibilityRole="header">
-            {tx("your patterns 👀", "Insights")}
+            {tx("your patterns", "Insights")}
           </Text>
           <TouchableOpacity onPress={() => router.push("/education")} style={styles.learnLink} accessibilityRole="link">
-            <Text style={{ color: theme.tint, fontWeight: "800" }}>{tx("learn 📚", "Learn")}</Text>
+            <Text style={{ color: theme.tint, fontWeight: "800" }}>{tx("learn", "Learn")}</Text>
           </TouchableOpacity>
         </View>
         <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
-          {tx("the tea from your own logs ☕ — stuff that tends to happen together for you.", "Patterns found in your own logs.")}
+          {tx("the tea from your own logs — stuff that tends to happen together for you.", "Patterns found in your own logs.")}
         </Text>
 
         {/* Prediction Summary Card */}
         {prediction && prediction.model !== "none" && (
           <View style={[styles.predCard, { backgroundColor: theme.surface, borderColor: theme.tint }]}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-              <Text style={{ fontSize: 20 }} importantForAccessibility="no" accessibilityElementsHidden>🔮</Text>
+              <CalendarClock size={22} color={theme.tint} strokeWidth={2.25} />
               <Text style={{ fontSize: 18, fontWeight: 'bold', color: theme.text }} accessibilityRole="header">{tx("next period, probably", "Next period prediction")}</Text>
             </View>
             {prediction.predictedStartISO && (
@@ -155,13 +155,13 @@ export default function AnalyticsScreen() {
             ]}
           >
             <Text style={[styles.placeholderTitle, { color: theme.text }]}>
-              {tx("patterns loading… 🔍", "Insights are on their way")}
+              {tx("patterns loading…", "Insights are on their way")}
             </Text>
             <Text
               style={[styles.placeholderText, { color: theme.textSecondary }]}
             >
               {tx(
-                "Keep logging daily — after about 20 days we start spotting what affects what for you. we're learning what makes your body, well, yours 💫",
+                "Keep logging daily — after about 20 days we start spotting what affects what for you. we're learning what makes your body, well, yours",
                 "Keep logging daily. After about 20 days of logs, personal patterns will start to appear.",
               )}
             </Text>
@@ -174,7 +174,7 @@ export default function AnalyticsScreen() {
             style={[styles.sectionCard, { backgroundColor: theme.surface }]}
           >
             <Text style={[styles.sectionTitle, { color: theme.text }]} accessibilityRole="header">
-              {tx("how you feel by phase 📊", "Phase trends")}
+              {tx("how you feel by phase", "Phase trends")}
             </Text>
             {phaseAverages.map((avg, i) => (
               <View key={i} style={styles.avgRow}>
@@ -191,7 +191,7 @@ export default function AnalyticsScreen() {
         )}
         {phaseAverages.length === 0 && cycles.length >= 3 && (
           <Text style={{ color: theme.textSecondary, textAlign: "center" }}>
-            {tx("log across different phases and your trends show up here ✨", "Log across different phases to see trends.")}
+            {tx("log across different phases and your trends show up here", "Log across different phases to see trends.")}
           </Text>
         )}
 
@@ -226,7 +226,7 @@ export default function AnalyticsScreen() {
 
             {/* Sec 9: "Patterns we've noticed" label on every card */}
             <Text style={[styles.patternLabel, { color: theme.textSecondary }]}>
-              {tx("pattern spotted 👀", "Pattern we've noticed")}
+              {tx("pattern spotted", "Pattern we've noticed")}
             </Text>
 
             <Text style={[styles.insightTitle, { color: theme.text }]} accessibilityRole="header">{insight.title}</Text>
@@ -237,7 +237,7 @@ export default function AnalyticsScreen() {
               <View style={[styles.mhDisclaimer, { backgroundColor: theme.border + "60" }]}>
                 <Text style={{ color: theme.textSecondary, fontSize: 12, lineHeight: 18 }}>
                   {tx(
-                    "💛 Mood and stress have lots of moving parts — this isn't a diagnosis. If you're struggling, talking to a professional is a power move, not a weakness.",
+                    "Mood and stress have lots of moving parts — this isn't a diagnosis. If you're struggling, talking to a professional is a power move, not a weakness.",
                     "Mood and stress have many contributing factors. This is not a clinical assessment — if you're struggling, please reach out to a healthcare professional.",
                   )}
                 </Text>
@@ -251,7 +251,7 @@ export default function AnalyticsScreen() {
               <TouchableOpacity
                 onPress={() =>
                   Alert.alert(
-                    tx("how we figured this out 🧪", "How this was calculated"),
+                    tx("how we figured this out", "How this was calculated"),
                     tx(
                       "We compare your last 90 days of logs. A pattern only shows up if it's based on 20+ days AND still holds after correcting for all the comparisons we check at once — so it's unlikely to be a fluke. It shows things that tend to happen together, not proof that one causes the other.",
                       "We compare your last 90 days of logs. A pattern is shown only if it's based on at least 20 days and remains statistically significant after correcting for the number of comparisons. It shows association, not causation.",
@@ -262,7 +262,7 @@ export default function AnalyticsScreen() {
                 accessibilityRole="button"
                 accessibilityLabel={tx("How this was calculated", "How this was calculated")}
               >
-                <IconSymbol name="info.circle" size={16} color={theme.textSecondary} />
+                <Info size={16} color={theme.textSecondary} />
               </TouchableOpacity>
             </View>
           </View>
@@ -271,7 +271,7 @@ export default function AnalyticsScreen() {
         {visibleInsights.length === 0 && cycles.length >= 3 && (
           <View style={{ alignItems: "center", marginTop: 40 }}>
             <Text style={{ color: theme.textSecondary }}>
-              {tx("no new patterns rn — keep logging and we'll keep looking 🔍", "No new insights right now. Keep logging.")}
+              {tx("no new patterns rn — keep logging and we'll keep looking", "No new insights right now. Keep logging.")}
             </Text>
           </View>
         )}

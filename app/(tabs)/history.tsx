@@ -39,7 +39,7 @@ export default function HistoryScreen() {
 
   const handleDelete = (cycleId: string) => {
     Alert.alert(
-      tx("delete this period? 🗑️", "Delete this period?"),
+      tx("delete this period?", "Delete this period?"),
       tx("Your daily logs stay — they just move to the cycle before. Can't be undone.", "Your daily logs are kept and move to the previous cycle. This can't be undone."),
       [
         { text: tx("keep it", "Cancel"), style: "cancel" },
@@ -54,7 +54,7 @@ export default function HistoryScreen() {
               if (activePeriodId === cycleId) setActivePeriod(null, null);
             } catch (error) {
               console.error("Failed deleting cycle", error);
-              Alert.alert(tx("hmm, that didn't work 😕", "Couldn't delete"), tx("Couldn't delete that period — try again.", "The period couldn't be deleted. Please try again."));
+              Alert.alert(tx("hmm, that didn't work", "Couldn't delete"), tx("Couldn't delete that period — try again.", "The period couldn't be deleted. Please try again."));
             }
             loadCycles();
           },
@@ -75,10 +75,10 @@ export default function HistoryScreen() {
         >
           <Text style={{ color: theme.tint, fontWeight: "700", fontSize: 16 }}>{tx("‹ back", "‹ Back")}</Text>
         </TouchableOpacity>
-        <Text style={[styles.title, { color: theme.text }]} accessibilityRole="header">{tx("your cycle history 🗂️", "Cycle history")}</Text>
+        <Text style={[styles.title, { color: theme.text }]} accessibilityRole="header">{tx("your cycle history", "Cycle history")}</Text>
         {cycles.length === 0 ? (
           <Text style={{ color: theme.textSecondary }}>
-            {tx('nothing here yet — tap "my period started" on Home and your history starts building ✨', 'No cycles yet. Log a period start from Home to begin your history.')}
+            {tx('nothing here yet — tap "my period started" on Home and your history starts building', 'No cycles yet. Log a period start from Home to begin your history.')}
           </Text>
         ) : (
           cycles.map((cycle) => (
@@ -96,7 +96,7 @@ export default function HistoryScreen() {
               >
                 <Text style={[styles.cardTitle, { color: theme.text }]}>
                   {format(new Date(cycle.start_date), "MMM d, yyyy")}
-                  {cycle.cycle_length === null ? tx("  ·  current cycle 🔄", "  ·  Current cycle") : ""}
+                  {cycle.cycle_length === null ? tx("  ·  current cycle", "  ·  Current cycle") : ""}
                 </Text>
                 <Text style={{ color: theme.textSecondary }}>
                   {cycle.is_confirmed === 0

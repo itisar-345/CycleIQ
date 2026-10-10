@@ -3,6 +3,7 @@ import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useAppStore } from "@/store";
 import { useTx } from "@/utils/tone";
 import { router } from "expo-router";
+import { HeartHandshake, Phone, Sofa, type LucideIcon } from "@/components/icons";
 import React from "react";
 import {
   Linking,
@@ -33,15 +34,15 @@ const CRISIS_LINES: Resource[] = [
   { label: "9-8-8 Suicide Crisis Helpline (24/7)", phone: "988", region: "CA" },
 ];
 
-const SECTIONS: { title: string; emoji: string; items: Resource[] }[] = [
+const SECTIONS: { title: string; Icon: LucideIcon; items: Resource[] }[] = [
   {
     title: "Talk to someone right now",
-    emoji: "📞",
+    Icon: Phone,
     items: CRISIS_LINES,
   },
   {
     title: "Find a therapist",
-    emoji: "🛋️",
+    Icon: Sofa,
     items: [
       { label: "Psychology Today directory (filter by location & cost)" },
       { label: "Open Path Collective (lower-cost therapy)" },
@@ -50,7 +51,7 @@ const SECTIONS: { title: string; emoji: string; items: Resource[] }[] = [
   },
   {
     title: "Chronic pain & mood support",
-    emoji: "💜",
+    Icon: HeartHandshake,
     items: [
       { label: "Pain Connection (chronic pain peer support)" },
       { label: "Anxiety & Depression Association of America (ADAA)" },
@@ -90,7 +91,7 @@ export default function ResourcesScreen() {
         <View style={{ width: 64 }} />
       </View>
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={[styles.title, { color: theme.text }]} accessibilityRole="header">{tx("You don't have to do this alone 🫶", "You don't have to manage this alone")}</Text>
+        <Text style={[styles.title, { color: theme.text }]} accessibilityRole="header">{tx("You don't have to do this alone", "You don't have to manage this alone")}</Text>
         <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
           {tx(
             "Reaching out is a strong move, not a weak one. These are support options — not a replacement for professional care.",
@@ -111,9 +112,10 @@ export default function ResourcesScreen() {
           const shown = items.length > 0 ? items : section.items;
           return (
             <View key={section.title} style={[styles.section, { backgroundColor: theme.surface }, Shadow]}>
-              <Text style={[styles.sectionTitle, { color: theme.text }]}>
-                {tx(`${section.emoji}  ${section.title}`, section.title)}
-              </Text>
+              <View style={styles.sectionTitleRow}>
+                <section.Icon size={20} color={theme.tint} strokeWidth={2.25} />
+                <Text style={[styles.sectionTitle, { color: theme.text }]} accessibilityRole="header">{section.title}</Text>
+              </View>
               {shown.map((item, j) => {
                 const callable = !!item.phone;
                 return (
@@ -142,7 +144,7 @@ export default function ResourcesScreen() {
         {currentMode === "endo" && (
           <View style={[styles.note, { backgroundColor: theme.surfaceAlt }]}>
             <Text style={[styles.noteText, { color: theme.text }]}>
-              {tx("💜 Endo-specific: EndoFound.org has peer support for the pain and the mental load.", "For endometriosis: EndoFound.org offers peer support and resources.")}
+              {tx("Endo-specific: EndoFound.org has peer support for the pain and the mental load.", "For endometriosis: EndoFound.org offers peer support and resources.")}
             </Text>
           </View>
         )}
@@ -150,7 +152,7 @@ export default function ResourcesScreen() {
         {currentMode === "pcos" && (
           <View style={[styles.note, { backgroundColor: theme.surfaceAlt }]}>
             <Text style={[styles.noteText, { color: theme.text }]}>
-              {tx("💚 PCOS-specific: the PCOS Awareness Association has mental health resources made for PCOS life.", "For PCOS: the PCOS Awareness Association provides mental health resources.")}
+              {tx("PCOS-specific: the PCOS Awareness Association has mental health resources made for PCOS life.", "For PCOS: the PCOS Awareness Association provides mental health resources.")}
             </Text>
           </View>
         )}
@@ -178,7 +180,8 @@ const styles = StyleSheet.create({
   emergency: { padding: Spacing.lg, borderRadius: Radius.md, marginBottom: Spacing.xl },
   emergencyText: { fontSize: 15, fontWeight: "700", lineHeight: 21 },
   section: { borderRadius: Radius.lg, padding: Spacing.xl, marginBottom: Spacing.lg },
-  sectionTitle: { fontSize: 18, fontWeight: "800", marginBottom: Spacing.sm },
+  sectionTitleRow: { flexDirection: "row", alignItems: "center", gap: Spacing.sm, marginBottom: Spacing.sm },
+  sectionTitle: { fontSize: 18, fontWeight: "800" },
   resourceItem: { paddingVertical: Spacing.md, gap: Spacing.sm },
   resourceText: { fontSize: 15, lineHeight: 22 },
   callPill: { alignSelf: "flex-start", paddingHorizontal: 14, paddingVertical: 8, borderRadius: Radius.pill },

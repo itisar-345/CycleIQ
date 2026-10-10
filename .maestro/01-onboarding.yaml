@@ -3,13 +3,13 @@ name: Onboarding → first prediction
 ---
 - launchApp:
     clearState: true
-- assertVisible: "hey, welcome 👋"
+- assertVisible: "hey, welcome"
 - tapOn: "Just track my cycle"
-- assertVisible: "Quick setup ⚡"
+- assertVisible: "Quick setup"
 - tapOn: "~2 weeks ago"
 - tapOn: "One day longer"
-- tapOn: "Show my prediction ✨"
-- assertVisible: "your next period, probably 🔮"
-- tapOn: "let's go ✨"
+- tapOn: "Show my prediction"
+- assertVisible: "your next period, probably"
+- tapOn: "let's go"
 - assertVisible: ".*hey.*"
 - assertVisible: "next period, probably"

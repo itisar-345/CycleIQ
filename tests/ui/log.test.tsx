@@ -16,7 +16,7 @@ beforeEach(() => {
 
 test("unanswered questions are saved as not-logged, never as invented defaults", async () => {
   render(<LogScreen />);
-  fireEvent.press(screen.getByText("Save today's log ✨"));
+  fireEvent.press(screen.getByText("Save today's log"));
   await waitFor(() => expect(createSymptomEntry).toHaveBeenCalledTimes(1));
   const entry = createSymptomEntry.mock.calls[0][0];
   expect(entry.pain_score).toBeUndefined();
@@ -31,9 +31,9 @@ test("answers the user gives are saved with their stored values", async () => {
   fireEvent.press(screen.getByLabelText("Mood 1 of 5: rough"));
   fireEvent.press(screen.getAllByLabelText(/^7 out of 10/)[0]); // pain
   // Regression: exercise type used to be impossible to change.
-  fireEvent.press(screen.getByText("yoga 🧘"));
-  fireEvent.press(screen.getByText("full balloon 🎈"));
-  fireEvent.press(screen.getByText("Save today's log ✨"));
+  fireEvent.press(screen.getByText("yoga"));
+  fireEvent.press(screen.getByText("full balloon"));
+  fireEvent.press(screen.getByText("Save today's log"));
   await waitFor(() => expect(createSymptomEntry).toHaveBeenCalled());
   const entry = createSymptomEntry.mock.calls[0][0];
   expect(entry.mood_score).toBe(1);
@@ -47,7 +47,7 @@ test("classic tone shows plain wording", () => {
   render(<LogScreen />);
   expect(screen.getByText("Daily log")).toBeTruthy();
   expect(screen.getByText("Save log")).toBeTruthy();
-  expect(screen.queryByText("Save today's log ✨")).toBeNull();
+  expect(screen.queryByText("Save today's log")).toBeNull();
 });
 
 test("every tappable element is labelled for screen readers", () => {

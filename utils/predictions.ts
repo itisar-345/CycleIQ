@@ -369,7 +369,7 @@ function predictTier4(lengths: number[], prior: ConditionPrior): PointPrediction
     label: `Full engine (${lengths.length} cycles)` +
       (trendDirection === "stable" ? "" : ` — cycles ${trendDirection}`) +
       (removed > 0 ? ` (${removed} outlier${removed > 1 ? "s" : ""} trimmed)` : "") +
-      (regimeChange ? " ⚡ pattern shift detected" : ""),
+      (regimeChange ? " pattern shift detected" : ""),
     outliersRemoved: removed,
     trendDirection,
     regimeChangeDetected: regimeChange,

@@ -46,16 +46,27 @@ CI runs the same checks plus `expo-doctor` and an iOS/Android bundle export. If 
 
 ### Two voices: every user-facing string
 
-The app speaks in **chill** (casual, lowercase, emoji) or **classic** (plain, calm, no emoji). Write both:
+The app speaks in **chill** (casual, lowercase) or **classic** (plain, calm). Write both:
 
 ```tsx
 const tx = useTx();                      // in components
-<Text>{tx("logged ✨", "Saved")}</Text>
+<Text>{tx("logged", "Saved")}</Text>
 
 const tx = currentTx();                  // outside React (notifications, alerts in utils)
 ```
 
-Option lists live in `constants/copy.ts`. The **stored value** never changes with tone, only the label does: `opt("Severe", "full balloon 🎈")`. Safety and medical wording should carry the same information in both voices.
+Option lists live in `constants/copy.ts`. The **stored value** never changes with tone, only the label does: `opt("Severe", "full balloon")`. Safety and medical wording should carry the same information in both voices.
+
+### Icons, not emoji
+
+Don't put emoji in UI text, option labels or notifications. Use [Lucide](https://lucide.dev/icons) icons, coloured with theme tokens. Import them from `@/components/icons`, never from `lucide-react-native` directly: that file imports each icon from its own module, so the bundle only contains the icons we use. Add a line there for a new icon.
+
+```tsx
+import { Droplet } from "@/components/icons";
+<Droplet size={20} color={theme.tint} strokeWidth={2.25} />
+```
+
+Decorative icons next to a text label don't need their own accessibility label. Log cards take an `icon` prop (`<Card icon={Flame} title=…>`).
 
 ### Dates
 

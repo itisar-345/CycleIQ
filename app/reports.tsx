@@ -40,7 +40,7 @@ export default function ReportsScreen() {
 
   const handleShare = async (report: LocalReportFile) => {
     const shared = await shareReport(report.uri);
-    if (!shared) Alert.alert(tx("saved on your phone 📄", "Saved on this device"), report.uri);
+    if (!shared) Alert.alert(tx("saved on your phone", "Saved on this device"), report.uri);
   };
 
   return (
@@ -57,7 +57,7 @@ export default function ReportsScreen() {
           <Text style={{ color: theme.textSecondary }}>{tx("finding your reports…", "Loading reports…")}</Text>
         ) : reports.length === 0 ? (
           <View style={[styles.empty, { borderColor: theme.border, backgroundColor: theme.surface }]}>
-            <Text style={[styles.emptyTitle, { color: theme.text }]}>{tx("no reports yet 📭", "No saved reports")}</Text>
+            <Text style={[styles.emptyTitle, { color: theme.text }]}>{tx("no reports yet", "No saved reports")}</Text>
             <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
               {tx("Make a doctor report or appointment prep PDF and it'll show up here.", "Reports and appointment summaries you export will appear here.")}
             </Text>

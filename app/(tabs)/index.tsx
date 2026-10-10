@@ -1,12 +1,12 @@
 import { useCopy } from "@/constants/copy";
 import { useReducedMotion } from "@/hooks/use-reduced-motion";
 import { useTx } from "@/utils/tone";
+import { CalendarClock, CalendarDays, ChartColumn, Droplet, Eye, FolderOpen, HeartPulse, PencilLine } from "@/components/icons";
 import { localDateKey } from "@/utils/dates";
 import { Colors, getModeColor, Radius, Shadow } from "@/constants/theme";
 import { closeCycle, createCycle, getAllEntries, getLatestCycle, getDayOfCycle, getPhaseForDay, getCyclePredictions, generateInsights, CycleInsight, getLatestPredictionFeedback } from "@/database";
 import { PredictionResult } from "@/utils/predictions";
 import { scheduleAllCycleNotifications, requestNotificationPermission } from "@/utils/notifications";
-import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useAppStore } from "@/store";
 import { differenceInDays, format, parseISO } from "date-fns";
@@ -151,9 +151,9 @@ export default function HomeScreen() {
           const is120 = daysSinceStart >= 120;
           if (checkPCOSPromptCooldown()) {
             setLastPCOSPrompt(new Date().toISOString());
-            const title = is120 ? tx("checking in on you 💛", "Time to check in") : tx("it's been a minute 👀", "It's been a while");
+            const title = is120 ? tx("checking in on you", "Time to check in") : tx("it's been a minute", "It's been a while");
             const message = is120
-              ? tx(`It's been ${daysSinceStart} days since your last period. Worth a quick chat with a healthcare provider, just to be safe 🫶`, `It has been ${daysSinceStart} days since your last period. Please consider speaking with a healthcare provider.`)
+              ? tx(`It's been ${daysSinceStart} days since your last period. Worth a quick chat with a healthcare provider, just to be safe`, `It has been ${daysSinceStart} days since your last period. Please consider speaking with a healthcare provider.`)
               : tx(`It's been ${daysSinceStart} days since your last period. All good? Logging symptoms helps us (and your doctor) spot patterns.`, `It has been ${daysSinceStart} days since your last period. Logging symptoms can help identify patterns.`);
             setTimeout(() => {
               Alert.alert(title, message, [{ text: tx("okay, noted", "OK") }]);
@@ -184,7 +184,7 @@ export default function HomeScreen() {
   };
 
   const handleStartPeriod = () => {
-    Alert.alert(tx("period started? 🩸", "Log period start"), tx("Is today day 1?", "Is today the first day of your period?"), [
+    Alert.alert(tx("period started?", "Log period start"), tx("Is today day 1?", "Is today the first day of your period?"), [
       { text: tx("Cancel", "Cancel"), style: "cancel" },
       {
         text: tx("yep, today", "Yes, log today"),
@@ -201,7 +201,7 @@ export default function HomeScreen() {
               setLastNotificationPrompt(new Date().toISOString());
               setTimeout(() => {
                 Alert.alert(
-                  tx("want a heads-up next time? 🔔", "Turn on reminders?"),
+                  tx("want a heads-up next time?", "Turn on reminders?"),
                   tx("We'll ping you ~2 days before your next predicted period. You can tweak every reminder in Profile.", "We can remind you 2 days before your next predicted period. You can change reminders in Profile."),
                   [
                     { text: tx("Not now", "Not now"), style: "cancel" },
@@ -218,7 +218,7 @@ export default function HomeScreen() {
             }
           } catch (error) {
             console.error("Failed starting period", error);
-            Alert.alert(tx("hmm, that didn't save 😕", "Couldn't save"), tx("Couldn't log your period start — give it another tap.", "Your period start couldn't be saved. Please try again."));
+            Alert.alert(tx("hmm, that didn't save", "Couldn't save"), tx("Couldn't log your period start — give it another tap.", "Your period start couldn't be saved. Please try again."));
           }
         },
       },
@@ -236,7 +236,7 @@ export default function HomeScreen() {
       setPredictionStats(stats);
     } catch (error) {
       console.error("Failed closing period", error);
-      Alert.alert(tx("hmm, that didn't save 😕", "Couldn't save"), tx("Couldn't mark your period as ended — try once more.", "Your period end couldn't be saved. Please try again."));
+      Alert.alert(tx("hmm, that didn't save", "Couldn't save"), tx("Couldn't mark your period as ended — try once more.", "Your period end couldn't be saved. Please try again."));
     }
   };
 
@@ -267,8 +267,10 @@ export default function HomeScreen() {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
         <View style={styles.emptyState}>
-          <Text style={styles.emptyIcon} importantForAccessibility="no" accessibilityElementsHidden>🩸</Text>
-          <Text style={[styles.emptyTitle, { color: theme.text }]} accessibilityRole="header">{tx("you're all set ✨", "You're all set")}</Text>
+          <View importantForAccessibility="no" accessibilityElementsHidden>
+            <Droplet size={64} color={theme.error} strokeWidth={1.75} />
+          </View>
+          <Text style={[styles.emptyTitle, { color: theme.text }]} accessibilityRole="header">{tx("you're all set", "You're all set")}</Text>
           <Text style={[styles.emptyDesc, { color: theme.textSecondary }]}>
             {tx("Log your last period and your dashboard, predictions and insights unlock.", "Log your last period to see your dashboard, predictions and insights.")}
           </Text>
@@ -310,7 +312,7 @@ export default function HomeScreen() {
             {format(new Date(), "EEEE, MMM d")}
           </Text>
           <Text style={[styles.title, { color: theme.text }]} accessibilityRole="header">
-            {tx(`hey${userName ? ` ${userName}` : ""} 👋`, `Hello${userName ? `, ${userName}` : ""}`)}
+            {tx(`hey${userName ? ` ${userName}` : ""}`, `Hello${userName ? `, ${userName}` : ""}`)}
           </Text>
           <View
             style={[
@@ -334,7 +336,7 @@ export default function HomeScreen() {
           >
             <View style={{ flex: 1 }}>
               <Text style={[styles.profileBannerTitle, { color: theme.text }]}>
-                {tx("finish setting up ✨", "Complete your profile")}
+                {tx("finish setting up", "Complete your profile")}
               </Text>
               <Text style={[styles.profileBannerDesc, { color: theme.textSecondary }]}>
                 {profileItems.map(i => i.label).join(" · ")}
@@ -351,10 +353,10 @@ export default function HomeScreen() {
           const remaining = Math.max(0, 90 - elapsed);
           return (
             <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.tint, borderWidth: 1, alignItems: 'flex-start' }]}>
-              <Text style={[styles.cardTitle, { color: theme.text }]}>{tx("post-pill reset 💊", "Post-pill baseline")}</Text>
+              <Text style={[styles.cardTitle, { color: theme.text }]}>{tx("post-pill reset", "Post-pill baseline")}</Text>
               <Text style={{ color: theme.textSecondary, marginBottom: 8 }}>
                 {tx(
-                  `day ${progress} of 90 — ${remaining > 0 ? `${remaining} days till predictions unlock. your body's recalibrating, be patient with it 🫶` : "baseline done — predictions are live ✨"}`,
+                  `day ${progress} of 90 — ${remaining > 0 ? `${remaining} days till predictions unlock. your body's recalibrating, be patient with it` : "baseline done — predictions are live"}`,
                   `Day ${progress} of 90. ${remaining > 0 ? `Predictions unlock in ${remaining} days.` : "Baseline complete — predictions are active."}`,
                 )}
               </Text>
@@ -367,7 +369,7 @@ export default function HomeScreen() {
 
         {currentMode === "endo" && inFlare && (
           <View style={[styles.periodBanner, { backgroundColor: theme.endo + '15', borderColor: theme.endo }]}>
-             <Text style={[styles.bannerTitle, { color: theme.endo }]}>{tx("flare mode is on 💜", "Flare in progress")}</Text>
+             <Text style={[styles.bannerTitle, { color: theme.endo }]}>{tx("flare mode is on", "Flare in progress")}</Text>
              <Text style={{ marginTop: 8, color: theme.textSecondary }}>
                  {tx(`day ${getFlareDuration()} of this flare. Quick logs each day = way better reports for your doctor. You've got this.`, `Day ${getFlareDuration()} of this flare. Logging daily helps produce accurate reports for your doctor.`)}
              </Text>
@@ -386,7 +388,7 @@ export default function HomeScreen() {
             ]}
           >
             <Text style={[styles.bannerTitle, { color: theme.error }]}>
-              {tx(`day ${getDayOfPeriod()} of your ${cycleTerm} 🩸`, `Day ${getDayOfPeriod()} of your ${cycleTerm}`)}
+              {tx(`day ${getDayOfPeriod()} of your ${cycleTerm}`, `Day ${getDayOfPeriod()} of your ${cycleTerm}`)}
             </Text>
             <Text style={{ marginTop: 6, color: theme.textSecondary }}>
               {tx("be gentle with yourself today — rest counts as productive.", "Take care of yourself today.")}
@@ -406,7 +408,7 @@ export default function HomeScreen() {
                 haptic="heavy"
               >
                 <Text style={[styles.bannerBtnText, { color: theme.error }]}>
-                  {tx("it's over 🎉", "Period ended")}
+                  {tx("it's over", "Period ended")}
                 </Text>
               </InteractivePressable>
             </View>
@@ -417,7 +419,8 @@ export default function HomeScreen() {
             onPress={handleStartPeriod}
             haptic="heavy"
           >
-            <Text style={[styles.startPeriodText, { color: theme.onAccent }]}>{tx("🩸 my period started", "Log period start")}</Text>
+            <Droplet size={20} color={theme.onAccent} strokeWidth={2.5} />
+            <Text style={[styles.startPeriodText, { color: theme.onAccent }]}>{tx("my period started", "Log period start")}</Text>
           </InteractivePressable>
         )}
 
@@ -448,7 +451,7 @@ export default function HomeScreen() {
         {predictionStats && predictionStats.model !== "none" ? (
           <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.tint, borderWidth: 2, alignItems: 'flex-start' }]}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-              <Text style={{ fontSize: 22 }} importantForAccessibility="no" accessibilityElementsHidden>🔮</Text>
+              <CalendarClock size={22} color={theme.tint} strokeWidth={2.25} />
               <Text style={[styles.cardTitle, { color: theme.text, marginBottom: 0 }]} accessibilityRole="header">{tx(`next ${cycleTerm}, probably`, `Next ${cycleTerm} prediction`)}</Text>
             </View>
 
@@ -499,7 +502,7 @@ export default function HomeScreen() {
               <View style={[styles.predictionNote, { backgroundColor: theme.tint + "12", borderColor: theme.tint }]}>
                 <Text style={{ color: theme.text, fontSize: 13, lineHeight: 19 }}>
                   {currentMode === "pcos"
-                    ? tx("PCOS keeps timing unpredictable, so a wide window is totally expected. It narrows as we learn your pattern 💚", "PCOS can make cycle timing vary, so a wider window is expected. It will narrow as your pattern builds.")
+                    ? tx("PCOS keeps timing unpredictable, so a wide window is totally expected. It narrows as we learn your pattern", "PCOS can make cycle timing vary, so a wider window is expected. It will narrow as your pattern builds.")
                     : tx("Your cycles vary, so a wider window is normal. It narrows as we learn your pattern.", "Your cycles vary, so a wider window is normal. It will narrow as your pattern builds.")}
                 </Text>
               </View>
@@ -515,7 +518,7 @@ export default function HomeScreen() {
               >
                 <Text style={{ color: theme.text, fontSize: 13, lineHeight: 19 }}>
                   {tx(
-                    `our last guess was ${Math.abs(lastMissErrorDays)}d ${lastMissErrorDays > 0 ? "early" : "late"} — we're learning, promise 🫡 (tap to hide)`,
+                    `our last guess was ${Math.abs(lastMissErrorDays)}d ${lastMissErrorDays > 0 ? "early" : "late"} — we're learning, promise (tap to hide)`,
                     `The last prediction was ${Math.abs(lastMissErrorDays)} days ${lastMissErrorDays > 0 ? "early" : "late"}. Predictions improve as you log. (Tap to dismiss.)`,
                   )}
                 </Text>
@@ -529,7 +532,7 @@ export default function HomeScreen() {
         ) : predictionStats?.model === "none" ? (
           <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border, alignItems: 'flex-start' }]}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-              <Text style={{ fontSize: 22 }} importantForAccessibility="no" accessibilityElementsHidden>🔮</Text>
+              <CalendarClock size={22} color={theme.tint} strokeWidth={2.25} />
               <Text style={[styles.cardTitle, { color: theme.text, marginBottom: 0 }]} accessibilityRole="header">{tx("predictions", "Predictions")}</Text>
             </View>
             <Text style={{ color: theme.textSecondary }}>{predictionStats.label}</Text>
@@ -540,8 +543,8 @@ export default function HomeScreen() {
         {activePeriodId && !medicationLoggedToday && (
           <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.error, borderWidth: 2 }]}>
             <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8, gap: 8 }}>
-              <IconSymbol name="heart.fill" size={20} color={theme.error} />
-              <Text style={[styles.cardTitle, { color: theme.error, flex: 1 }]}>{tx("cramp care 🔥", "Pain relief")}</Text>
+              <HeartPulse size={20} color={theme.error} strokeWidth={2.25} />
+              <Text style={[styles.cardTitle, { color: theme.error, flex: 1 }]}>{tx("cramp care", "Pain relief")}</Text>
             </View>
             <Text style={{ color: theme.text, marginBottom: 12 }}>{tx("A heat pad on your lower belly or back for ~20 mins can really take the edge off cramps.", "Applying heat to your lower abdomen or back for about 20 minutes can ease cramps.")}</Text>
             <InteractivePressable onPress={() => router.push('/(tabs)/education')} style={[styles.bannerBtn, { backgroundColor: theme.error }]} haptic="light">
@@ -552,7 +555,10 @@ export default function HomeScreen() {
 
         {latestInsight && (
           <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.tint, borderWidth: 1 }]}>
-            <Text style={[styles.cardTitle, { color: theme.text }]}>{tx("new pattern unlocked 👀", "Latest insight")}</Text>
+            <View style={styles.cardTitleRow}>
+              <Eye size={20} color={theme.tint} strokeWidth={2.25} />
+              <Text style={[styles.cardTitle, { color: theme.text, marginBottom: 0 }]}>{tx("new pattern unlocked", "Latest insight")}</Text>
+            </View>
             <Text style={{ color: theme.textSecondary, fontWeight: 'bold', marginBottom: 4 }}>{latestInsight.title}</Text>
             <Text style={{ color: theme.text, marginBottom: 12 }}>{latestInsight.description}</Text>
             <InteractivePressable onPress={() => router.push('/analytics')} style={[styles.bannerBtnOutline, { borderColor: theme.tint }]} haptic="light">
@@ -564,9 +570,9 @@ export default function HomeScreen() {
         {/* Quick actions */}
         <View style={styles.quickActions}>
           {([
-            { label: tx("calendar", "Calendar"), icon: "📅", route: "/calendar" },
-            { label: tx("insights", "Insights"), icon: "📊", route: "/analytics" },
-            { label: tx("history", "History"), icon: "🗂️", route: "/history" },
+            { label: tx("calendar", "Calendar"), Icon: CalendarDays, route: "/calendar" },
+            { label: tx("insights", "Insights"), Icon: ChartColumn, route: "/analytics" },
+            { label: tx("history", "History"), Icon: FolderOpen, route: "/history" },
           ] as const).map((action) => (
             <InteractivePressable
               key={action.route}
@@ -575,7 +581,7 @@ export default function HomeScreen() {
               haptic="selection"
               accessibilityLabel={action.label}
             >
-              <Text style={styles.quickIcon} importantForAccessibility="no" accessibilityElementsHidden>{action.icon}</Text>
+              <action.Icon size={22} color={theme.tint} strokeWidth={2.25} />
               <Text style={[styles.quickLabel, { color: theme.text }]}>{action.label}</Text>
             </InteractivePressable>
           ))}
@@ -587,7 +593,8 @@ export default function HomeScreen() {
           onPress={() => router.push("/log")}
           haptic="medium"
         >
-          <Text style={[styles.logButtonText, { color: theme.onTint }]}>{tx("✏️ log today", "Log today")}</Text>
+          <PencilLine size={20} color={theme.onTint} strokeWidth={2.5} />
+          <Text style={[styles.logButtonText, { color: theme.onTint }]}>{tx("log today", "Log today")}</Text>
         </InteractivePressable>
 
       </ScrollView>
@@ -637,7 +644,10 @@ const styles = StyleSheet.create({
     paddingVertical: 18,
     borderRadius: Radius.pill,
     marginBottom: 20,
+    flexDirection: "row",
+    justifyContent: "center",
     alignItems: "center",
+    gap: 8,
     ...Shadow,
   },
   startPeriodText: { fontSize: 17, fontWeight: "800" },
@@ -670,10 +680,10 @@ const styles = StyleSheet.create({
   },
   dayText: { fontSize: 40, fontWeight: "800", letterSpacing: -1 },
   subDayText: { fontSize: 16, marginTop: 4 },
-  logButton: { paddingVertical: 18, borderRadius: Radius.pill, alignItems: "center", ...Shadow },
+  logButton: { paddingVertical: 18, borderRadius: Radius.pill, flexDirection: "row", justifyContent: "center", alignItems: "center", gap: 8, ...Shadow },
+  cardTitleRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 },
   logButtonText: { fontSize: 17, fontWeight: "800" },
   emptyState: { flex: 1, justifyContent: "center", alignItems: "center", padding: 36, gap: 16 },
-  emptyIcon: { fontSize: 64 },
   emptyTitle: { fontSize: 28, fontWeight: "800", textAlign: "center" },
   emptyDesc: { fontSize: 16, textAlign: "center", lineHeight: 24 },
   emptyCTA: { width: "100%", paddingVertical: 18, borderRadius: Radius.pill, alignItems: "center", marginTop: 8, ...Shadow },
@@ -698,6 +708,5 @@ const styles = StyleSheet.create({
     gap: 6,
     ...Shadow,
   },
-  quickIcon: { fontSize: 22 },
   quickLabel: { fontSize: 12, fontWeight: "700", textAlign: "center" },
 });

@@ -59,11 +59,11 @@ export default function PCODSetupScreen() {
         <OnboardingProgress step={4} total={5} label={tx("step 4 · a few details", "Step 4: details")} />
       </View>
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={[styles.title, { color: theme.text }]} accessibilityRole="header">{tx("Let's set up PCOD mode 💙", "PCOD setup")}</Text>
+        <Text style={[styles.title, { color: theme.text }]} accessibilityRole="header">{tx("Let's set up PCOD mode", "PCOD setup")}</Text>
 
         <View style={[styles.privacyNote, { backgroundColor: theme.surface, borderColor: theme.border }]}>
           <Text style={[styles.privacyText, { color: theme.textSecondary }]}>
-            {tx("🔒 This stays on your phone. We never see it — we literally can't.", "Your health data stays on this device. We never see it.")}
+            {tx("This stays on your phone. We never see it — we literally can't.", "Your health data stays on this device. We never see it.")}
           </Text>
         </View>
 
@@ -74,7 +74,7 @@ export default function PCODSetupScreen() {
 
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: theme.text }]} accessibilityRole="header">{tx("What do your periods usually do?", "Cycle pattern")}</Text>
-          {renderSingleSelect('cyclePattern', [{ value: 'Regular with cysts', label: 'regular-ish, but cysts' }, { value: 'Irregular', label: 'all over the place' }, { value: 'Absent (Amenorrhoea)', label: 'basically ghosted me 👻' }])}
+          {renderSingleSelect('cyclePattern', [{ value: 'Regular with cysts', label: 'regular-ish, but cysts' }, { value: 'Irregular', label: 'all over the place' }, { value: 'Absent (Amenorrhoea)', label: 'basically ghosted me' }])}
         </View>
 
         <View style={styles.section}>

@@ -1,6 +1,6 @@
 /**
  * Two voices for the app's wording:
- * - "chill"   — casual, lowercase, emoji (default)
+ * - "chill"   — casual, lowercase, relaxed (default)
  * - "classic" — plain, calm sentences for people who prefer that
  *
  * Every user-facing string is written as tx(chill, classic) at its call site, so both

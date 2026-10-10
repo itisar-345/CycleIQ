@@ -3,6 +3,7 @@
  */
 import { Colors, Radius, Shadow, Spacing } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import type { LucideIcon } from "lucide-react-native";
 import React from "react";
 import { StyleSheet, Text, View } from "react-native";
 
@@ -10,11 +11,14 @@ const useTheme = () => Colors[useColorScheme() ?? "light"];
 
 export function Card({
   title,
+  icon: Icon,
   subtitle,
   accent,
   children,
 }: {
   title?: string;
+  /** Lucide icon shown before the title. */
+  icon?: LucideIcon;
   subtitle?: string;
   /** Colour for a left accent bar (condition / period cards). */
   accent?: string;
@@ -30,7 +34,12 @@ export function Card({
         Shadow,
       ]}
     >
-      {title && <Text style={[styles.title, { color: accent ?? theme.text }]} accessibilityRole="header">{title}</Text>}
+      {title && (
+        <View style={styles.titleRow}>
+          {Icon && <Icon size={20} color={accent ?? theme.tint} strokeWidth={2.25} accessibilityElementsHidden importantForAccessibility="no" />}
+          <Text style={[styles.title, { color: accent ?? theme.text }]} accessibilityRole="header">{title}</Text>
+        </View>
+      )}
       {subtitle && <Text style={[styles.subtitle, { color: theme.textSecondary }]}>{subtitle}</Text>}
       <View style={title || subtitle ? { marginTop: Spacing.md } : undefined}>{children}</View>
     </View>
@@ -59,7 +68,8 @@ const styles = StyleSheet.create({
     padding: Spacing.xl,
     marginBottom: Spacing.lg,
   },
-  title: { fontSize: 19, fontWeight: "800", letterSpacing: -0.2 },
+  titleRow: { flexDirection: "row", alignItems: "center", gap: Spacing.sm },
+  title: { fontSize: 19, fontWeight: "800", letterSpacing: -0.2, flexShrink: 1 },
   subtitle: { fontSize: 14, marginTop: 4, lineHeight: 20 },
   question: { fontSize: 16, fontWeight: "700" },
   hint: { fontSize: 13, marginTop: 2, lineHeight: 18 },

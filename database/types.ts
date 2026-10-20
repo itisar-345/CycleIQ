@@ -99,6 +99,26 @@ export interface PeriExtended {
   memoryIssues: boolean;
 }
 
+/** Stored values of the Daily Log "Had any of these?" food chips. */
+export const FOOD_ITEMS = [
+  "Wholegrains", "IronRich", "CalciumRich", "OilyFish", "RedMeat", "ProcessedMeat", "Fried", "SugaryDrinks",
+] as const;
+export type FoodItem = (typeof FOOD_ITEMS)[number];
+
+/**
+ * Optional structured food log. null = not answered. `foods` lists what was eaten; on a
+ * day with any food answer, a food that isn't listed counts as "not eaten that day".
+ */
+export interface FoodExtended {
+  /** Fruit and vegetable portions (5 = five or more). */
+  fruitVeg: number | null;
+  foods: FoodItem[];
+  /** Caffeinated drinks: coffee, tea, energy drinks (5 = five or more). */
+  caffeine: number | null;
+  /** Alcoholic drinks (3 = three or more). */
+  alcohol: number | null;
+}
+
 export interface FlareExtended {
   start: string;
   mode: { pain: number | null; nausea: boolean; movement: string | null };
@@ -110,6 +130,7 @@ export interface ExtendedSymptoms {
   endo?: EndoExtended;
   peri?: PeriExtended;
   flare?: FlareExtended;
+  food?: FoodExtended;
 }
 
 /** Parses an entry's extended_symptoms; malformed or missing JSON reads as {}. */

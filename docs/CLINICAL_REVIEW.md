@@ -124,12 +124,47 @@ classic "Medical check recommended — You haven't had a period for N days. Plea
 
 ## 4. Health tips in notifications
 
-Around 50 scheduled tips (nutrition, heat, movement, supplements, PCOS lifestyle). Full text in both voices: `utils/notifications.ts` (chill inline, classic in `CLASSIC_COPY`). Claims are hedged ("may help"); supplement tips say to check with a doctor.
+Around 50 scheduled tips (nutrition, heat, movement, supplements, PCOS lifestyle). Full text in both voices: `utils/notifications.ts` (chill inline, classic in `CLASSIC_COPY`). Claims are hedged ("may help"); supplement tips say to check with a doctor. Seven tips that overstated the evidence (Epsom salts, magnesium, turmeric, inositol, spearmint, rosemary oil, "anti-inflammatory" foods) were reworded in October 2026; the before/after table is in [EVIDENCE_REVIEW.md](EVIDENCE_REVIEW.md#tip-notifications-corrected-to-match-the-evidence).
 
 ### Questions for reviewer
 
 1. Any tip that is inaccurate, overstated or unsafe for some users (e.g. ibuprofen for people who can't take NSAIDs, supplements in pregnancy)?
 2. Should ovulation messages state "not for contraception" in both voices (classic already does)?
+
+### Sign-off
+
+| Reviewer | Role | Date | Approved (Y/N) | Notes |
+|----------|------|------|----------------|-------|
+| | | | | |
+
+---
+
+## 5. Lifestyle suggestions and the iron-check warning
+
+Evidence-based suggestions built from the user's own logs, shown on the Insights tab ("Suggestions for you") and, one at a time, as a next-morning notification (`lifestyle-tip`, setting "Activity, sleep and nutrition suggestions"). Rules: `utils/lifestyleGuidance.ts`. Sources, grades and full rule table: [EVIDENCE_REVIEW.md](EVIDENCE_REVIEW.md). Tests: `tests/guidance.test.ts`.
+
+| Item | Trigger | Wording summary |
+|---|---|---|
+| **Iron check (warning)** | ≥ 3 heavy / very heavy flow days in 45 days **and** ≥ 3 days in 14 with fatigue ≥ 7 or energy ≤ 3 (0–10 scales) | Heavy periods are a common cause of low iron; consider asking a provider about a ferritin blood test; iron foods and absorption tips |
+| Iron foods | ≥ 3 heavy days, no tiredness | Heavy periods are linked to low iron and worth mentioning if typical; iron foods |
+| Period pain | Pain ≥ 6 on ≥ 2 bleeding days in 45 days | Exercise (Cochrane), heat, early pain relief; adults also vitamin D / omega-3 "check with a provider first". Endometriosis: separate, limited-evidence wording and "discuss treatment options if pain isn't controlled" |
+| Premenstrual low mood | Mood ≤ 2 of 5 on ≥ 3 days within 7 days before a logged period | Real pattern; calcium-rich foods (adults); effective treatments exist, see a provider if it affects daily life |
+| Activity / steps / sleep | Weekly minutes < 150 (teens < 60/day), steps < 7,000, sleep < 7 h (teens < 8 h), each needing ≥ 4 logged days of 7 | Gentle, guideline-based targets; nothing during a flare or with pain ≥ 7 in the last 3 days |
+| Food and drink | From the optional Daily Log food card (adults only): fruit & veg < 5 portions, wholegrains / calcium-rich food on fewer than half of days (calcium only with PMS pattern or perimenopause), no oily fish in 2 weeks, red meat > 3 days or processed meat > 1 day a week, fried food / sugary drinks / alcohol on ≥ 3 days, caffeine > 4 drinks a day, hot-flush days that follow alcohol or caffeine | Add / swap framing; WHO, WCRF, EFSA and NHS targets; condition links (endometriosis, PMS, PCOS) stated as associations with their grade |
+| Perimenopause | Hot flushes / night sweats on ≥ 3 days in 14; bone health always | What works (HT, CBT, hypnosis, some medicines) and what reviews found doesn't (soy, herbal supplements, exercise); ~1,200 mg calcium food-first, vitamin D, strength exercise |
+
+**Safety rules built in:** signposting only; no supplement doses (except the menopause calcium intake target, food first); no supplement content for teens; no weight-loss messaging; only warnings and personal suggestions are ever notified.
+
+### Questions for reviewer
+
+1. Is "≥ 3 heavy days + ≥ 3 tired days" a reasonable prompt to ask about ferritin? Should very heavy flow alone (e.g. clots larger than a coin, or periods longer than 7 days) also prompt a visit?
+2. Should the iron warning be suppressed or reworded in pregnancy, or for users with known anaemia?
+3. Is mentioning vitamin D and omega-3 for period pain (with "check with a provider first") appropriate for adults?
+4. Is the premenstrual low-mood prompt worded safely, and should it cross-link to the low-mood safeguarding resources?
+5. Perimenopause: is stating that soy, herbal supplements and exercise don't reliably reduce hot flushes acceptable, given users may value them?
+6. Any activity wording that could be harmful for users with eating disorders or relative energy deficiency (RED-S)?
+7. Food tracking: is an optional food card (no calories or weights, adults only) acceptable for users at risk of disordered eating, or should it need an explicit opt-in in Profile?
+8. Alcohol: are the PMS and endometriosis associations (observational, possible reverse causation) worded cautiously enough? Should pregnancy-related caffeine and alcohol advice be added when a pregnancy goal is selected?
 
 ### Sign-off
 

@@ -2,7 +2,7 @@
  * Daily Log form state for the condition-specific sections, and the pure mapping
  * from that state to the stored extended_symptoms JSON.
  */
-import type { EndoExtended, ExtendedSymptoms, PcosExtended, PeriExtended } from "@/database/types";
+import type { EndoExtended, ExtendedSymptoms, FoodExtended, PcosExtended, PeriExtended } from "@/database/types";
 
 export interface PcosLog {
   acneSeverity: number;
@@ -68,6 +68,14 @@ export const EMPTY_PERI_LOG: PeriLog = {
   memoryIssues: false,
 };
 
+export type FoodLog = FoodExtended;
+
+export const EMPTY_FOOD_LOG: FoodLog = { fruitVeg: null, foods: [], caffeine: null, alcohol: null };
+
+/** True once any food question has been answered. */
+export const isFoodLogged = (food: FoodLog | undefined | null): food is FoodLog =>
+  !!food && (food.fruitVeg !== null || food.caffeine !== null || food.alcohol !== null || food.foods.length > 0);
+
 export const buildExtendedSymptoms = (input: {
   mode: string;
   pcos: PcosLog;
@@ -77,6 +85,8 @@ export const buildExtendedSymptoms = (input: {
   inFlare: boolean;
   flare: FlareLog;
   nowISO: string;
+  /** Optional food log; saved only when something was answered. */
+  food?: FoodLog;
 }): ExtendedSymptoms => {
   const extended: ExtendedSymptoms = {};
   if (input.mode === "pcos") {
@@ -108,6 +118,9 @@ export const buildExtendedSymptoms = (input: {
   }
   if (input.inFlare) {
     extended.flare = { start: input.nowISO, mode: { ...input.flare } };
+  }
+  if (isFoodLogged(input.food)) {
+    extended.food = { ...input.food, foods: [...input.food.foods] };
   }
   return extended;
 };

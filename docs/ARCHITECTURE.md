@@ -41,7 +41,7 @@ CycleIQ is a local-only Expo app: every screen, calculation and byte of health d
 | `cycles` | One row per period start: `start_date`, `end_date` (period end), `period_length`, `cycle_length` (gap to the next start; `NULL` for the current cycle), `is_confirmed` (0 = the estimate made from onboarding answers), `notes_encrypted` |
 | `symptom_entries` | One row per log: scores, tags, flow, sleep, exercise, health-import sources, `extended_symptoms` JSON for condition-specific fields, encrypted free text. `cycle_id` = the cycle whose dates contain the log's local day |
 | `cycle_predictions` | Audit trail of predictions shown (de-duplicated by a fingerprint of the cycles) |
-| `prediction_feedback` | Actual vs. predicted start for each completed cycle, used for bias correction |
+| `prediction_feedback` | Actual vs. predicted start for each completed cycle (the prediction shown beforehand, scored) |
 | `user_correlations` | Insights found, so they can be retired after 90 days |
 | `red_flag_prompt_logs` | Safety prompts shown, included in doctor reports |
 | `app_settings` | Mirror of key settings (mode, condition answers) |
@@ -49,7 +49,7 @@ CycleIQ is a local-only Expo app: every screen, calculation and byte of health d
 
 ### Invariants
 
-Every cycle write calls `recomputeCycleLengths`, which keeps three things true:
+Every multi-statement cycle write goes through `commitCycleChange` (`database/cycles.ts`), which runs the change and `recomputeCycleLengths` in **one transaction** and refreshes the prediction audit trail after commit. That keeps three things true, even if the app is killed mid-write:
 
 - Each completed cycle's length is the gap to the next start. The latest cycle has no length.
 - Every symptom entry belongs to the cycle its **local** day falls in.
@@ -59,8 +59,9 @@ Migrations in `database/schema.ts` are forward-only and recorded in `schema_migr
 
 ## Predictions & insights
 
-- **Predictions** are recomputed from `cycles` on every read (`utils/predictionInvalidation.ts`), so the UI can't show a stale date. The engine is pure (`utils/predictions.ts`) and fully described in [PREDICTION_ENGINE.md](PREDICTION_ENGINE.md).
+- **Predictions** are recomputed from live `cycles` rows on every read (`database/predictionStore.ts`), so the UI can't show a stale date; `cycle_predictions` is an audit trail, never a cache. The engine is pure: `utils/predictions.ts` turns cycle rows into a result, `utils/cycleModel.ts` is the Bayesian model behind it, and `utils/conditionSignals.ts` holds the PCOS / endometriosis signals. Each saved prediction records `PREDICTION_MODEL_VERSION`. Details: [PREDICTION_ENGINE.md](PREDICTION_ENGINE.md).
 - **Insights** (`database/insights.ts`) use Spearman correlations over the last 90 logs. A pair needs at least 20 days where both were logged, survives Benjamini–Hochberg correction at FDR 10%, and has |ρ| > 0.3. Unlogged values are never treated as zero.
+- **Lifestyle suggestions** (`utils/lifestyleGuidance.ts`) turn recent logs into evidence-graded suggestions and warnings (activity, steps, sleep, iron, period pain, PMS, condition facts). Every claim cites a source in `data/evidence.ts`; the research and the rule table are in [EVIDENCE_REVIEW.md](EVIDENCE_REVIEW.md). Shown on Insights; the top personal item can become the `lifestyle-tip` notification.
 - **Phases** (`database/phaseMath.ts`): menstrual is days 1–5; ovulation is 14 days before the next period; follicular and luteal fill the rest. Calendar, Insights and reports share this one implementation.
 
 ## Privacy design

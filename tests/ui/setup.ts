@@ -37,6 +37,7 @@ jest.mock("@/utils/notifications", () => ({
   scheduleInsightNotification: jest.fn(async () => {}),
   scheduleFlareWarning: jest.fn(async () => {}),
   scheduleDailyLogReminder: jest.fn(async () => {}),
+  scheduleLifestyleNotification: jest.fn(async () => {}),
 }));
 
 jest.mock("@/utils/healthIntegrations", () => ({

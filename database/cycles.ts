@@ -5,7 +5,6 @@ import { addDays, differenceInCalendarDays, differenceInDays, parseISO } from "d
 import * as SQLite from "expo-sqlite";
 import { computeCycleLength, computePeriodLength } from "../utils/cycleMath";
 import { localDateKey } from "../utils/dates";
-import { invalidatePredictions } from "../utils/predictionInvalidation";
 import type { PredictionResult } from "../utils/predictions";
 
 import { createLocalId, ensureDb, execSql, queryAll, queryFirst, type SqlParams } from "./connection";
@@ -70,14 +69,28 @@ export const recomputeCycleLengths = async (database: SQLite.SQLiteDatabase): Pr
   await reassignEntryCycles(database);
 };
 
+/**
+ * Applies a cycle change and the length / entry upkeep above as one transaction, so a
+ * crash can never leave lengths or entry ownership half-updated. The prediction audit
+ * trail is refreshed after the commit.
+ */
+const commitCycleChange = async (change: () => Promise<void>): Promise<void> => {
+  const database = await ensureDb();
+  await database.withTransactionAsync(async () => {
+    await change();
+    await recomputeCycleLengths(database);
+  });
+  await retrainAndStoreCyclePrediction();
+};
+
 export const getLatestCycle = (): Promise<CycleRow | null> =>
   queryFirst<CycleRow>(`SELECT * FROM cycles ORDER BY start_date DESC LIMIT 1;`);
 
 /**
  * Records how far off the prediction the user actually saw was. Uses the stored
  * prediction (made before this period started, in the user's mode) — never a re-run,
- * which would already know the answer. Stores the pre-bias date so the bias
- * correction learns from the raw model error.
+ * which would already know the answer. Predictions saved before engine v5 may include
+ * a bias shift (`biasAppliedDays`); it is removed so the raw model is what gets scored.
  */
 const recordPredictionFeedback = async (prevCycleId: string, actualStartDate: string): Promise<void> => {
   const existing = await queryFirst<{ id: string }>(`SELECT id FROM prediction_feedback WHERE cycle_id = ?;`, [prevCycleId]);
@@ -86,7 +99,7 @@ const recordPredictionFeedback = async (prevCycleId: string, actualStartDate: st
   const stored = await queryFirst<{ payload_json: string }>(
     `SELECT payload_json FROM cycle_predictions ORDER BY generated_at DESC LIMIT 1;`,
   );
-  const shown = parseJsonColumn<PredictionResult & { _cyclesFingerprint?: string }>(stored?.payload_json);
+  const shown = parseJsonColumn<PredictionResult & { _cyclesFingerprint?: string; biasAppliedDays?: number }>(stored?.payload_json);
   // Only score a prediction that was anchored on the cycle that just ended.
   if (!shown?.predictedStartISO || !shown._cyclesFingerprint?.startsWith(`${prevCycleId}:`)) return;
 
@@ -112,14 +125,9 @@ export const createCycle = async (startDate: string) => {
     }
   }
 
-  await execSql(
-    `INSERT INTO cycles (id,start_date,is_confirmed) VALUES (?,?,1);`,
-    [id, startDate],
-  );
-  await recomputeCycleLengths(await ensureDb());
-
-  invalidatePredictions("createCycle");
-  await retrainAndStoreCyclePrediction();
+  await commitCycleChange(async () => {
+    await execSql(`INSERT INTO cycles (id,start_date,is_confirmed) VALUES (?,?,1);`, [id, startDate]);
+  });
   return id;
 };
 
@@ -141,21 +149,18 @@ export const seedInitialCycleFromOnboarding = async (
   // The previous cycle is only an estimate from the typical length the user gave: it feeds the
   // prediction prior but is not a logged period (is_confirmed = 0), so screens and reports skip it.
   const prevId = createLocalId();
-  await execSql(
-    `INSERT INTO cycles (id, start_date, cycle_length, is_confirmed) VALUES (?,?,?,0);`,
-    [prevId, prevStart, averageLength],
-  );
-
   // The current cycle is in progress — it has no length until the next period starts.
   const currentId = createLocalId();
-  await execSql(
-    `INSERT INTO cycles (id, start_date, cycle_length, is_confirmed) VALUES (?,?,NULL,1);`,
-    [currentId, normalizedDate],
-  );
-  await recomputeCycleLengths(await ensureDb());
-
-  invalidatePredictions("seedInitialCycleFromOnboarding");
-  await retrainAndStoreCyclePrediction();
+  await commitCycleChange(async () => {
+    await execSql(
+      `INSERT INTO cycles (id, start_date, cycle_length, is_confirmed) VALUES (?,?,?,0);`,
+      [prevId, prevStart, averageLength],
+    );
+    await execSql(
+      `INSERT INTO cycles (id, start_date, cycle_length, is_confirmed) VALUES (?,?,NULL,1);`,
+      [currentId, normalizedDate],
+    );
+  });
 
   const daysSince = differenceInDays(new Date(), parseISO(normalizedDate));
   const isRecentPeriod = daysSince >= 0 && daysSince <= 7;
@@ -171,7 +176,6 @@ export const closeCycle = async (cycleId: string, endDate: string) => {
     `UPDATE cycles SET end_date = ?, period_length = ?, is_confirmed = 1 WHERE id = ?;`,
     [endDate, periodLength, cycleId],
   );
-  invalidatePredictions("closeCycle");
   await retrainAndStoreCyclePrediction();
   return periodLength;
 };
@@ -230,21 +234,15 @@ export const updateCycle = async (
   }
 
   params.push(cycleId);
-  await execSql(
-    `UPDATE cycles SET ${updates.join(", ")} WHERE id = ?;`,
-    params,
-  );
-
-  await recomputeCycleLengths(await ensureDb());
-  invalidatePredictions("updateCycle");
-  await retrainAndStoreCyclePrediction();
+  await commitCycleChange(async () => {
+    await execSql(`UPDATE cycles SET ${updates.join(", ")} WHERE id = ?;`, params);
+  });
 };
 
 /** Deletes a period. Symptom logs are kept — they're about days, not the period — and move to the previous cycle. */
 export const deleteCycle = async (cycleId: string): Promise<void> => {
-  await execSql(`UPDATE symptom_entries SET cycle_id = NULL WHERE cycle_id = ?;`, [cycleId]);
-  await execSql(`DELETE FROM cycles WHERE id = ?;`, [cycleId]);
-  await recomputeCycleLengths(await ensureDb());
-  invalidatePredictions("deleteCycle");
-  await retrainAndStoreCyclePrediction();
+  await commitCycleChange(async () => {
+    await execSql(`UPDATE symptom_entries SET cycle_id = NULL WHERE cycle_id = ?;`, [cycleId]);
+    await execSql(`DELETE FROM cycles WHERE id = ?;`, [cycleId]);
+  });
 };

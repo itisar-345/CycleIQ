@@ -21,10 +21,10 @@ const cycle = (id: string, startDaysAgo: number, length: number | null): CycleRo
 });
 
 const prediction = (overrides: Record<string, unknown> = {}) => ({
-  mean: 28, stdDev: 2, confidence: 0.7, model: "weighted-average", label: "Adaptive weighted avg (5 cycles)",
+  mean: 28, stdDev: 2, confidence: 0.7, model: "personal", label: "Personal model (5 cycles)",
   predictedStartISO: iso(-20), windowStartISO: iso(-18), windowEndISO: iso(-22), mae: 1.5,
   outlierFlagged: false, trendDirection: "stable", regimeChangeDetected: false, lateArrivalP90: 30,
-  nextOvulationWindowISO: null, biasAppliedDays: 0, irregularFlag: false, longestRecentCycle: 30,
+  nextOvulationWindowISO: null, irregularFlag: false, longestRecentCycle: 30,
   daysSinceLastPeriod: 8, cycleVariability: 1, pcosCyclePattern: "regular", amenorrheaFlag: false,
   predictedOvulationDay: 14, widePredictionWindow: false, inStressFlareWindow: false,
   flareRiskWindowStart: null, ovulationPainDay: null, currentCycleDay: 9, inFlareRiskWindow: false, periodLengthAvg: 5,
@@ -75,6 +75,22 @@ describe("Insights screen", () => {
     render(<AnalyticsScreen />);
     await screen.findByText("Stress & Pain");
     expect(findUnlabelledPressables(screen.root)).toEqual([]);
+  });
+
+  test("heavy periods + tiredness show the iron-check suggestion with its sources", async () => {
+    const entry = (daysAgo: number, fields: Partial<SymptomEntryRow>) => ({ id: `e${daysAgo}`, logged_date: iso(daysAgo), ...fields }) as SymptomEntryRow;
+    mock(db.getAllEntries).mockResolvedValue([
+      entry(10, { flow_intensity: "Heavy" }), entry(11, { flow_intensity: "Very Heavy" }), entry(12, { flow_intensity: "Heavy" }),
+      entry(1, { fatigue_score: 8 }), entry(2, { fatigue_score: 9 }), entry(3, { energy_score: 2 }),
+    ]);
+    render(<AnalyticsScreen />);
+    expect(await screen.findByText("suggestions for you")).toBeTruthy();
+    expect(screen.getByText("heavy periods + tiredness")).toBeTruthy();
+    expect(screen.getByText(/ferritin/)).toBeTruthy();
+    fireEvent.press(screen.getByLabelText("Sources: heavy periods + tiredness"));
+    expect(screen.getByText(/Iron insufficiency among young Australian women/)).toBeTruthy();
+    expect(findUnlabelledPressables(screen.root)).toEqual([]);
+    mock(db.getAllEntries).mockResolvedValue([]);
   });
 });
 

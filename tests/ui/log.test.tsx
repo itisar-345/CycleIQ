@@ -42,6 +42,32 @@ test("answers the user gives are saved with their stored values", async () => {
   expect(entry.bloating).toBe("Severe"); // label is playful, stored value is clinical
 });
 
+test("the optional food card saves structured answers, and nothing when skipped", async () => {
+  render(<LogScreen />);
+  fireEvent.press(screen.getByText("Save today's log"));
+  await waitFor(() => expect(createSymptomEntry).toHaveBeenCalledTimes(1));
+  expect(createSymptomEntry.mock.calls[0][0].extended_symptoms.food).toBeUndefined();
+
+  fireEvent.press(screen.getAllByText("5+")[0]); // fruit & veg portions
+  fireEvent.press(screen.getByText("oily fish"));
+  fireEvent.press(screen.getByText("wholegrains / beans / lentils"));
+  fireEvent.press(screen.getAllByText("3+")[0]); // alcoholic drinks
+  fireEvent.press(screen.getByText("Save today's log"));
+  await waitFor(() => expect(createSymptomEntry).toHaveBeenCalledTimes(2));
+  expect(createSymptomEntry.mock.calls[1][0].extended_symptoms.food).toEqual({
+    fruitVeg: 5,
+    foods: ["OilyFish", "Wholegrains"],
+    caffeine: null,
+    alcohol: 3,
+  });
+});
+
+test("teens don't get the food card", () => {
+  useAppStore.setState({ isTeen: true });
+  render(<LogScreen />);
+  expect(screen.queryByText("Food & drink")).toBeNull();
+});
+
 test("classic tone shows plain wording", () => {
   useAppStore.setState({ tone: "classic" });
   render(<LogScreen />);

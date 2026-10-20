@@ -87,7 +87,7 @@ export default function ConsentScreen() {
       const prediction = runPredictionEngine({
         cycles: [
           { start_date: start, cycle_length: null },
-          { start_date: previousStart, cycle_length: averageCycleLength },
+          { start_date: previousStart, cycle_length: averageCycleLength, is_confirmed: 0 },
         ],
         currentMode,
         postPillMode,

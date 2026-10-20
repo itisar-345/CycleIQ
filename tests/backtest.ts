@@ -42,6 +42,7 @@ export const PROFILES: Record<string, Profile> = {
   pcos_long: { mode: "pcos", gen: (_, g) => Math.round(Math.max(24, 42 + 10 * g())) },
   trend_27to33: { mode: "standard", gen: (i, g) => Math.round(27 + i * 0.4 + 1.5 * g()) },
   missed_log: { mode: "standard", gen: (i, g) => (i === 7 ? 56 : Math.round(28 + 2 * g())) },
+  shift_28to35: { mode: "standard", gen: (i, g) => Math.round((i < 8 ? 28 : 35) + 2 * g()) },
 };
 
 const median = (a: number[]) => {

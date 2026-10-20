@@ -27,7 +27,7 @@ It's built for people whose cycles don't fit a 28-day template: honest predictio
 
 ## Features
 
-- **Predictions that show their uncertainty.** A next-period date, a likely window and a confidence score, all calibrated by back-testing the model on your own history ([how it works](docs/PREDICTION_ENGINE.md)).
+- **Predictions that show their uncertainty.** A next-period date, a likely window and the real chance it lands within two days, all from one Bayesian model that learns your own pattern (trends included) and isn't thrown by a missed log. Its accuracy is checked against your own history ([how it works](docs/PREDICTION_ENGINE.md)).
 - **A 30-second daily log.** Mood, pain, energy, sleep, stress, flow and lifestyle. Skip anything you like; unanswered questions are never filled in for you.
 - **Condition modes.** PCOS, PCOD, endometriosis (with flare mode) and perimenopause each get their own questions, priors and insights. There's also a post-pill mode that holds predictions back for about 90 days.
 - **Personal patterns.** Correlations between your own symptoms (e.g. *stress ↔ mood*), with multiple-testing correction so you don't see noise.

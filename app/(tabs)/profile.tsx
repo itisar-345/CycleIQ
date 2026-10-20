@@ -371,6 +371,7 @@ export default function ProfileScreen() {
             { key: 'heatPadReminder',  label: tx('heat pad reminder (day 1)', 'Heat pad reminder (day 1)') },
             { key: 'periodDayTips',    label: tx('period survival tips (days 1–5)', 'Period day tips (days 1–5)') },
             { key: 'moodCheckIn',      label: tx('PMS vibe check', 'PMS mood check-in') },
+            { key: 'lifestyleTips',    label: tx('activity, sleep & food tips from your logs', 'Activity, sleep and nutrition suggestions') },
             { key: 'insights',         label: tx('new pattern alerts', 'New insight alerts') },
             { key: 'ovulation',        label: tx('ovulation heads-up', 'Ovulation reminder') },
             { key: 'flares',           label: tx('flare & symptom warnings', 'Flare and symptom warnings') },
@@ -380,7 +381,7 @@ export default function ProfileScreen() {
             <View key={key} style={styles.toggleRow}>
               <Text style={[styles.toggleText, { color: theme.text }]}>{label}</Text>
               <Switch
-                value={notificationPrefs[key]}
+                value={notificationPrefs[key] ?? true /* switches added after install default on */}
                 onValueChange={(val) => setNotificationPrefs({ [key]: val })}
                 trackColor={{ true: theme.tint }}
                 accessibilityLabel={label}

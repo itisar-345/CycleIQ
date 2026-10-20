@@ -165,6 +165,19 @@ const buildCopy = (tone: Tone) => {
         opt("Strength", "lift", "Strength training"),
       ],
       exerciseFromHealth: opt("Health activity", "from your Health app", "From Health app"),
+      // Food log: stored values are FOOD_ITEMS in database/types.ts.
+      foods: [
+        opt("Wholegrains", "wholegrains / beans / lentils", "Wholegrains or pulses"),
+        opt("IronRich", "iron-rich food", "Iron-rich food"),
+        opt("CalciumRich", "dairy / calcium-rich", "Dairy or calcium-rich food"),
+        opt("OilyFish", "oily fish", "Oily fish"),
+        opt("RedMeat", "red meat", "Red meat"),
+        opt("ProcessedMeat", "processed meat", "Processed meat"),
+        opt("Fried", "fried / fast food", "Fried or fast food"),
+        opt("SugaryDrinks", "sugary drinks", "Sugary drinks"),
+      ],
+      portions: [opt("0", "0"), opt("1", "1"), opt("2", "2"), opt("3", "3"), opt("4", "4"), opt("5", "5+")],
+      drinks: [opt("0", "0"), opt("1", "1"), opt("2", "2"), opt("3", "3+")],
       bowel: [
         opt("Constipation", "constipated"),
         opt("Diarrhoea", "diarrhoea"),

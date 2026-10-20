@@ -3,10 +3,12 @@ import { useCopy } from "@/constants/copy";
 import { router } from "expo-router";
 import { useTx } from "@/utils/tone";
 import { Colors } from "@/constants/theme";
-import { getAllCycles, getPhaseAverages, generateInsights, persistAndRetireInsights, CycleInsight, PhaseAverage, getCyclePredictions, type CycleRow } from "@/database";
+import { getAllCycles, getAllEntries, getPhaseAverages, generateInsights, persistAndRetireInsights, CycleInsight, PhaseAverage, getCyclePredictions, type CycleRow } from "@/database";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useAppStore } from "@/store";
-import { scheduleInsightNotification, scheduleFlareWarning } from "@/utils/notifications";
+import { GuidanceCard } from "@/components/guidance-card";
+import { buildLifestyleGuidance, pickNotifiableGuidance, type Guidance } from "@/utils/lifestyleGuidance";
+import { scheduleInsightNotification, scheduleFlareWarning, scheduleLifestyleNotification } from "@/utils/notifications";
 import { PredictionResult } from "@/utils/predictions";
 import { format, parseISO } from "date-fns";
 import React, { useEffect, useState } from "react";
@@ -25,12 +27,13 @@ export default function AnalyticsScreen() {
   const theme = Colors[colorScheme];
   const tx = useTx();
   const copy = useCopy();
-  const { currentMode, postPillMode, postPillStartDate, dismissedInsights, dismissInsight: storeDismissInsight, notificationPrefs, tone } = useAppStore();
+  const { currentMode, postPillMode, postPillStartDate, dismissedInsights, dismissInsight: storeDismissInsight, notificationPrefs, tone, isTeen, inFlare } = useAppStore();
 
   const [cycles, setCycles] = useState<CycleRow[]>([]);
   const [phaseAverages, setPhaseAverages] = useState<PhaseAverage[]>([]);
   const [insights, setInsights] = useState<CycleInsight[]>([]);
   const [prediction, setPrediction] = useState<PredictionResult | null>(null);
+  const [guidance, setGuidance] = useState<Guidance[]>([]);
 
   useEffect(() => {
     const loadData = async () => {
@@ -38,6 +41,15 @@ export default function AnalyticsScreen() {
       setCycles(allCycles.filter((c) => c.is_confirmed !== 0)); // the onboarding estimate is not a logged period
       const pred = await getCyclePredictions(currentMode, postPillMode, postPillStartDate ?? null);
       setPrediction(pred);
+      const lifestyle = buildLifestyleGuidance({
+        mode: currentMode,
+        isTeen,
+        inFlare,
+        entries: await getAllEntries(),
+        periodStarts: allCycles.filter((c) => c.is_confirmed !== 0).map((c) => c.start_date),
+      });
+      setGuidance(lifestyle);
+      await scheduleLifestyleNotification(pickNotifiableGuidance(lifestyle), notificationPrefs.lifestyleTips ?? true);
       if (allCycles.length > 0) {
         const avgs = await getPhaseAverages(allCycles[0].id, pred.model !== "none" ? pred.mean : 28);
         setPhaseAverages(avgs);
@@ -81,7 +93,7 @@ export default function AnalyticsScreen() {
       }
     };
     loadData();
-  }, [currentMode, postPillMode, postPillStartDate, notificationPrefs.flares, notificationPrefs.insights, tone]);
+  }, [currentMode, postPillMode, postPillStartDate, notificationPrefs.flares, notificationPrefs.insights, notificationPrefs.lifestyleTips, tone, isTeen, inFlare]);
   const visibleInsights = insights.filter((i) => !dismissedInsights.includes(i.title));
 
   const dismissInsight = (title: string) => {
@@ -193,6 +205,20 @@ export default function AnalyticsScreen() {
           <Text style={{ color: theme.textSecondary, textAlign: "center" }}>
             {tx("log across different phases and your trends show up here", "Log across different phases to see trends.")}
           </Text>
+        )}
+
+        {guidance.length > 0 && (
+          <View style={{ marginBottom: 8 }}>
+            <Text style={[styles.sectionTitle, { color: theme.text }]} accessibilityRole="header">
+              {tx("suggestions for you", "Suggestions for you")}
+            </Text>
+            <Text style={{ color: theme.textSecondary, fontSize: 13, marginBottom: 12, marginTop: -6 }}>
+              {tx("from your recent logs + what the research says", "Based on your recent logs and published research.")}
+            </Text>
+            {guidance.map((item) => (
+              <GuidanceCard key={item.id} item={item} theme={theme} tx={tx} />
+            ))}
+          </View>
         )}
 
         {visibleInsights.map((insight, idx) => (

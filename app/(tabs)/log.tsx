@@ -9,20 +9,23 @@ import {
   SAFEGUARDING_LOW_MOOD_SCORE,
   SAFEGUARDING_RESOURCES_ROUTE,
 } from "@/constants/safeguarding";
-import { createRedFlagPromptLog, createSymptomEntry, getAllEntries, parseJsonColumn, saveFlareEnd } from "@/database";
+import { createRedFlagPromptLog, createSymptomEntry, getAllEntries, parseJsonColumn, readExtendedSymptoms, saveFlareEnd, type FoodItem } from "@/database";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useAppStore } from "@/store";
 import { encryptField, decryptFieldOrEmpty } from "@/utils/fieldEncryption";
 import { readDailyHealthMetrics } from "@/utils/healthIntegrations";
+import { refreshLifestyleNotification } from "@/utils/lifestyleNotifications";
 import { useTx } from "@/utils/tone";
 import {
   buildExtendedSymptoms,
   EMPTY_ENDO_LOG,
   EMPTY_FLARE_LOG,
+  EMPTY_FOOD_LOG,
   EMPTY_PCOS_LOG,
   EMPTY_PERI_LOG,
   type EndoLog,
   type FlareLog,
+  type FoodLog,
   type PcosLog,
   type PeriLog,
 } from "@/utils/logEntry";
@@ -33,7 +36,7 @@ import {
   valuesForPreviousDays,
 } from "@/utils/safetyRules";
 import { router } from "expo-router";
-import { BatteryMedium, Brain, Droplet, Flame, Leaf, Moon, Smile } from "@/components/icons";
+import { Apple, BatteryMedium, Brain, Droplet, Flame, Leaf, Moon, Smile } from "@/components/icons";
 import React, { useState, useEffect } from "react";
 import {
   Alert,
@@ -98,6 +101,7 @@ export default function LogScreen() {
   const [endo, setEndo] = useState<EndoLog>(EMPTY_ENDO_LOG);
   const [peri, setPeri] = useState<PeriLog>(EMPTY_PERI_LOG);
   const [flare, setFlare] = useState<FlareLog>(EMPTY_FLARE_LOG);
+  const [food, setFood] = useState<FoodLog>(EMPTY_FOOD_LOG);
   const [flareReflection, setFlareReflection] = useState<string>('');
   const [endingFlare, setEndingFlare] = useState<boolean>(false);
 
@@ -160,6 +164,7 @@ export default function LogScreen() {
         setHealthActivitySource(latest.health_activity_source);
         setDietNotes(await decryptFieldOrEmpty(latest.diet_notes_encrypted));
         setMedicationLog(await decryptFieldOrEmpty(latest.medication_log_encrypted));
+        setFood(readExtendedSymptoms(latest).food ?? EMPTY_FOOD_LOG);
       }
     };
     populateYesterday();
@@ -273,6 +278,7 @@ export default function LogScreen() {
           inFlare,
           flare,
           nowISO,
+          food,
         }),
         flare_start: inFlare ? (flareStartDate ?? nowISO) : undefined,
         flow_intensity: flow,
@@ -290,6 +296,8 @@ export default function LogScreen() {
         diet_notes_encrypted: dietNotes ? await encryptField(dietNotes) : undefined,
         medication_log_encrypted: medicationLog ? await encryptField(medicationLog) : undefined,
       });
+      // Non-fatal: the log is saved even if the tip can't be rescheduled.
+      refreshLifestyleNotification().catch((e) => console.warn("Lifestyle tip refresh failed", e));
       Alert.alert(tx("Logged", "Saved"), tx("Saved to your phone. Future-you says thanks.", "Your log has been saved on this device."));
       router.push("/");
     } catch (error) {
@@ -522,6 +530,34 @@ export default function LogScreen() {
             placeholder={tx("e.g. ibuprofen 400mg, iron, magnesium", "e.g. ibuprofen 400 mg, iron")}
             placeholderTextColor={theme.textSecondary}
             multiline
+          />
+        </Card>
+
+        {/* Optional structured food log — feeds the evidence-based food suggestions on Insights */}
+        <Card icon={Apple} title={tx("Food & drink", "Food and drink")} subtitle={tx("optional — powers your food tips. no calorie counting, ever", "Optional. Used for food suggestions; no calorie counting.")}>
+          <Question first>{tx("Fruit & veg portions", "Fruit and vegetable portions")}</Question>
+          <RadioGroup
+            options={Options.portions}
+            selected={food.fruitVeg === null ? null : String(food.fruitVeg)}
+            onChange={(v) => setFood((f) => ({ ...f, fruitVeg: Number(v) }))}
+          />
+          <Question hint={tx("tap all that apply", "Select all that apply")}>{tx("Had any of these?", "Did you have any of these?")}</Question>
+          <MultiSelect
+            options={Options.foods}
+            selected={food.foods}
+            onChange={(foods) => setFood((f) => ({ ...f, foods: foods as FoodItem[] }))}
+          />
+          <Question>{tx("Coffee, tea or energy drinks", "Caffeinated drinks")}</Question>
+          <RadioGroup
+            options={Options.portions}
+            selected={food.caffeine === null ? null : String(food.caffeine)}
+            onChange={(v) => setFood((f) => ({ ...f, caffeine: Number(v) }))}
+          />
+          <Question>{tx("Alcoholic drinks", "Alcoholic drinks")}</Question>
+          <RadioGroup
+            options={Options.drinks}
+            selected={food.alcohol === null ? null : String(food.alcohol)}
+            onChange={(v) => setFood((f) => ({ ...f, alcohol: Number(v) }))}
           />
         </Card>
         </> /* end non-teen */

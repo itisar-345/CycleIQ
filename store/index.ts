@@ -36,6 +36,8 @@ export interface NotificationPrefs {
   pcosNotifications: boolean; // pcos-specific cycle & symptom notifications
   redFlagAlerts: boolean;
   moodCheckIn: boolean;
+  /** Evidence-based activity, sleep and nutrition suggestions from recent logs. Added later: undefined = on. */
+  lifestyleTips?: boolean;
   dailyLogHour: number;
   quietHoursStart: number;
   quietHoursEnd: number;
@@ -43,7 +45,7 @@ export interface NotificationPrefs {
 
 /** NotificationPrefs keys that are on/off switches (excludes the hour settings). */
 export type BooleanNotificationPref = {
-  [K in keyof NotificationPrefs]: NotificationPrefs[K] extends boolean ? K : never;
+  [K in keyof NotificationPrefs]-?: NonNullable<NotificationPrefs[K]> extends boolean ? K : never;
 }[keyof NotificationPrefs];
 
 /** How the app talks: "chill" (casual, emoji) or "classic" (plain and calm). */
@@ -204,6 +206,7 @@ export const useAppStore = create<AppState>()(
         pcosNotifications: true,
         redFlagAlerts: true,
         moodCheckIn: true,
+        lifestyleTips: true,
         dailyLogHour: 20,
         quietHoursStart: 22,
         quietHoursEnd: 8,

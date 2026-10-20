@@ -27,7 +27,7 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "lint": "expo lint",
-    "test": "tsx --require ./tests/support/register-fakes.cjs tests/run-tests.ts && tsx --require ./tests/support/register-fakes.cjs tests/database.test.ts",
+    "test": "tsx --require ./tests/support/register-fakes.cjs tests/run-tests.ts && tsx tests/guidance.test.ts && tsx --require ./tests/support/register-fakes.cjs tests/database.test.ts",
     "backtest": "tsx tests/backtest.ts",
     "test:ui": "jest",
     "typecheck": "tsc --noEmit",

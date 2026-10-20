@@ -1,38 +1,22 @@
 /**
- * Runs the prediction engine against stored cycles and keeps the audit trail
- * plus the feedback used for bias correction.
+ * Runs the prediction engine against stored cycles and keeps an audit trail of the
+ * predictions shown, which is what prediction feedback is scored against.
+ *
+ * Predictions are always recomputed from live `cycles` rows; `cycle_predictions` is
+ * history, never a cache the UI reads from.
  */
-import { clearPredictionsDirty, PREDICTION_INVALIDATION_STRATEGY } from "../utils/predictionInvalidation";
-import { runPredictionEngine } from "../utils/predictions";
+import { PREDICTION_MODEL_VERSION, runPredictionEngine } from "../utils/predictions";
 import type { PredictionResult } from "../utils/predictions";
 
 import { createLocalId, execSql, queryAll, queryFirst } from "./connection";
 import { parseJsonColumn, type CycleRow } from "./types";
 import { getAppSettings } from "./settings";
 
-/**
- * Returns the mean signed error (actual - predicted) over the last N feedback records.
- * Positive = predictions were too early (need to add days).
- * Negative = predictions were too late (need to subtract days).
- * Capped at ±7 days to avoid over-correction.
- */
+/** How far off the most recent scored prediction was (actual − predicted, days). */
 export const getLatestPredictionFeedback = async (): Promise<{ error_days: number; recorded_at: string } | null> => {
   return queryFirst<{ error_days: number; recorded_at: string }>(
     `SELECT error_days, recorded_at FROM prediction_feedback ORDER BY recorded_at DESC LIMIT 1;`
   );
-};
-
-export const getPredictionBias = async (limit = 6): Promise<number> => {
-  const rows = await queryAll<{ error_days: number }>(
-    `SELECT error_days FROM prediction_feedback ORDER BY recorded_at DESC LIMIT ?;`,
-    [limit]
-  );
-  const n = rows.length;
-  if (n < 2) return 0;
-  const sum = rows.reduce((total, row) => total + row.error_days, 0);
-  // Shrink toward 0 so two noisy cycles can't shift every future date.
-  const bias = (sum / n) * (n / (n + 2));
-  return Math.max(-7, Math.min(7, Math.round(bias * 10) / 10));
 };
 
 export const getCyclePredictions = async (
@@ -40,9 +24,6 @@ export const getCyclePredictions = async (
   postPillMode = false,
   postPillStartDate: string | null = null
 ): Promise<PredictionResult> => {
-  // Policy: PREDICTION_INVALIDATION_STRATEGY === "recompute-on-read"
-  // Always runs engine against live cycles; never reads stale cycle_predictions rows.
-  void PREDICTION_INVALIDATION_STRATEGY;
   return retrainAndStoreCyclePrediction(currentMode, postPillMode, postPillStartDate);
 };
 
@@ -79,16 +60,13 @@ export const retrainAndStoreCyclePrediction = async (
 
   const run = (async () => {
     const cycles = await queryAll<CycleRow>(`SELECT * FROM cycles ORDER BY start_date DESC;`);
-    const biasCorrection = await getPredictionBias();
     const prediction = runPredictionEngine({
       cycles,
       currentMode: mode,
       postPillMode: pillMode,
       postPillStartDate: pillStart,
-      biasCorrection,
     });
     await saveCyclePrediction(prediction, mode, cycles);
-    clearPredictionsDirty();
     return prediction;
   })().finally(() => {
     retrainsInFlight.delete(key);
@@ -126,7 +104,7 @@ export const saveCyclePrediction = async (
     [
       createLocalId(),
       new Date().toISOString(),
-      "cycleiq-prediction-v3",
+      PREDICTION_MODEL_VERSION,
       currentMode,
       prediction.predictedStartISO,
       prediction.windowStartISO,

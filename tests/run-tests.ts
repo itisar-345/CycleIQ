@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import { computeCycleLength, computePeriodLength } from "../utils/cycleMath";
 import { LUTEAL_PHASE_DAYS, runPredictionEngine } from "../utils/predictions";
-import { arePredictionsDirty, clearPredictionsDirty, invalidatePredictions } from "../utils/predictionInvalidation";
 import { countConsecutivePriorDays, evaluateEndoRedFlag, shouldShowSafeguardingPrompt, valuesForPreviousDays } from "../utils/safetyRules";
 import { getDailyWindows, unionDurationMs } from "../utils/health/types";
 import { buildExtendedSymptoms, EMPTY_ENDO_LOG, EMPTY_PCOS_LOG, EMPTY_PERI_LOG } from "../utils/logEntry";
@@ -54,12 +53,24 @@ const noHistory = runPredictionEngine({ cycles: makeCycles([]), currentMode: "st
 assert.equal(noHistory.model, "none");
 assert.match(noHistory.label, /Log your next period/);
 
-// One completed cycle (e.g. the onboarding-reported average): low-confidence, wide estimate.
-const reportedOnly = runPredictionEngine({ cycles: makeCycles([32]), currentMode: "standard", now: NOW });
-assert.equal(reportedOnly.model, "rule-based");
-assert.ok(reportedOnly.confidence <= 0.3);
+// Only the onboarding answer (an unconfirmed cycle): it sets the prior, it isn't a logged
+// cycle. Wide window, modest confidence (calibrated: the real ±2-day hit rate with this
+// little data is higher than this in backtests, so it errs on the cautious side).
+const reportedCycles = makeCycles([32]);
+reportedCycles[1].is_confirmed = 0;
+const reportedOnly = runPredictionEngine({ cycles: reportedCycles, currentMode: "standard", now: NOW });
+assert.equal(reportedOnly.model, "prior");
+assert.equal(reportedOnly.mean, 32);
+assert.ok(reportedOnly.confidence <= 0.5);
 assert.ok(reportedOnly.stdDev >= 4);
+assert.equal(reportedOnly.mae, null);
 assert.match(reportedOnly.label, /reported cycle length/);
+
+// One logged cycle is evidence, so it is "learning" and pulled only part-way to the prior.
+const oneLogged = runPredictionEngine({ cycles: makeCycles([32]), currentMode: "standard", now: NOW });
+assert.equal(oneLogged.model, "learning");
+assert.ok(oneLogged.mean > 28 && oneLogged.mean <= 32);
+assert.ok(oneLogged.stdDev >= 4);
 
 // The in-progress cycle's length is ignored even if a stale value is present.
 const staleOpen = makeCycles([28, 28, 28, 28, 28]);
@@ -67,7 +78,7 @@ staleOpen[0].cycle_length = 90;
 assert.equal(runPredictionEngine({ cycles: staleOpen, currentMode: "standard", now: NOW }).mean, 28);
 
 const stablePrediction = runPredictionEngine({ cycles: makeCycles([28, 29, 27, 28, 28]), currentMode: "standard", now: NOW });
-assert.equal(stablePrediction.model, "weighted-average");
+assert.equal(stablePrediction.model, "personal");
 assert.ok(Math.abs(stablePrediction.mean - 28) <= 1);
 assert.ok(stablePrediction.stdDev <= 4, `window too wide for a regular user: ±${stablePrediction.stdDev}d`);
 assert.equal(daysFromCurrentStart(stablePrediction.predictedStartISO), stablePrediction.mean);
@@ -78,7 +89,7 @@ assert.equal(
 
 // Perfectly regular history → tight window and high confidence.
 const perfect = runPredictionEngine({ cycles: makeCycles(Array(12).fill(28)), currentMode: "standard", now: NOW });
-assert.equal(perfect.model, "full-rules");
+assert.equal(perfect.model, "personal");
 assert.equal(perfect.mean, 28);
 assert.ok(perfect.stdDev <= 2);
 assert.ok(perfect.confidence >= 0.8);
@@ -88,9 +99,18 @@ assert.equal(perfect.mae, 0);
 const twoLong = runPredictionEngine({ cycles: makeCycles([35, 35]), currentMode: "standard", now: NOW });
 assert.ok(twoLong.mean - twoLong.stdDev <= 35 && 35 <= twoLong.mean + twoLong.stdDev);
 
-// A single missed log (56d) is trimmed instead of dragging the prediction.
+// A single missed log (56d) is down-weighted instead of dragging the prediction, and
+// isn't counted against the engine's accuracy figure.
 const missedLog = runPredictionEngine({ cycles: makeCycles([28, 27, 29, 56, 28, 28, 27]), currentMode: "standard", now: NOW });
 assert.ok(Math.abs(missedLog.mean - 28) <= 1);
+assert.ok(missedLog.stdDev <= 3);
+assert.ok(missedLog.mae !== null && missedLog.mae <= 2, `mae ${missedLog.mae}`);
+assert.match(missedLog.label, /1 unusual cycle down-weighted/);
+
+// Steadily lengthening cycles: the forecast follows the trend and says so.
+const lengthening = runPredictionEngine({ cycles: makeCycles([33, 32, 31, 31, 30, 29, 29, 28, 27]), currentMode: "standard", now: NOW });
+assert.equal(lengthening.trendDirection, "lengthening");
+assert.ok(lengthening.mean >= 32);
 
 const widePcosPrediction = runPredictionEngine({ cycles: makeCycles([42, 31, 55, 36, 48]), currentMode: "pcos", now: NOW });
 assert.equal(widePcosPrediction.widePredictionWindow, true);
@@ -98,7 +118,8 @@ assert.equal(widePcosPrediction.irregularFlag, true);
 
 // PCOD has its own prior rather than silently using "standard".
 const pcodOne = runPredictionEngine({ cycles: makeCycles([28]), currentMode: "pcod", now: NOW });
-assert.ok(pcodOne.mean > reportedOnly.mean - 4 && pcodOne.stdDev > runPredictionEngine({ cycles: makeCycles([28]), currentMode: "standard", now: NOW }).stdDev);
+const standardOne = runPredictionEngine({ cycles: makeCycles([28]), currentMode: "standard", now: NOW });
+assert.ok(pcodOne.mean >= standardOne.mean && pcodOne.stdDev > standardOne.stdDev);
 
 const postPill = runPredictionEngine({
   cycles: makeCycles([28, 29, 28]),
@@ -119,19 +140,15 @@ const postPillDone = runPredictionEngine({
 });
 assert.notEqual(postPillDone.model, "none");
 
-// Bias shifts dates (not the cycle-length estimate) and is reported.
-const biased = runPredictionEngine({ cycles: makeCycles([28, 29, 27, 28, 28]), currentMode: "standard", biasCorrection: 2.4, now: NOW });
-assert.equal(biased.biasAppliedDays, 2);
-assert.equal(daysFromCurrentStart(biased.predictedStartISO), stablePrediction.mean + 2);
-
 // ── backtest regression gate ──
-// The engine must stay competitive with a plain 6-cycle median, its window should cover
-// roughly 80% of outcomes, and its confidence should track the real ±2-day hit rate.
+// The engine must beat (or tie) a plain 6-cycle median on every profile, its window must
+// cover at least ~80% of outcomes without being needlessly wide, and its confidence must
+// track the real ±2-day hit rate.
 for (const [name, profile] of Object.entries(PROFILES)) {
   const m = evaluateProfile(profile, 80);
-  assert.ok(m.engineMae <= m.baselineMae.median6 * 1.15, `${name}: MAE ${m.engineMae.toFixed(2)} vs median6 ${m.baselineMae.median6.toFixed(2)}`);
-  assert.ok(m.coverage >= 0.7 && m.coverage <= 0.95, `${name}: window coverage ${(m.coverage * 100).toFixed(0)}%`);
-  assert.ok(Math.abs(m.avgConfidence - m.hitRate) <= 0.12, `${name}: confidence ${m.avgConfidence.toFixed(2)} vs hit rate ${m.hitRate.toFixed(2)}`);
+  assert.ok(m.engineMae <= m.baselineMae.median6 * 1.02, `${name}: MAE ${m.engineMae.toFixed(2)} vs median6 ${m.baselineMae.median6.toFixed(2)}`);
+  assert.ok(m.coverage >= 0.78 && m.coverage <= 0.93, `${name}: window coverage ${(m.coverage * 100).toFixed(0)}%`);
+  assert.ok(Math.abs(m.avgConfidence - m.hitRate) <= 0.08, `${name}: confidence ${m.avgConfidence.toFixed(2)} vs hit rate ${m.hitRate.toFixed(2)}`);
 }
 
 // ── health import helpers ──
@@ -217,10 +234,5 @@ assert.equal(
   }).triggerType,
   "severe_pain_3_days",
 );
-
-clearPredictionsDirty();
-assert.equal(arePredictionsDirty(), false);
-invalidatePredictions("test");
-assert.equal(arePredictionsDirty(), true);
 
 console.log("All CycleIQ tests passed.");

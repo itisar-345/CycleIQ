@@ -6,6 +6,7 @@
 export type { LucideIcon } from "lucide-react-native";
 
 export { default as Activity } from "lucide-react-native/icons/activity";
+export { default as Apple } from "lucide-react-native/icons/apple";
 export { default as Annoyed } from "lucide-react-native/icons/face-expressionless";
 export { default as BatteryMedium } from "lucide-react-native/icons/battery-medium";
 export { default as Brain } from "lucide-react-native/icons/brain";

@@ -1,4 +1,5 @@
 import { NotificationPrefs, useAppStore } from "@/store";
+import type { Guidance } from "./lifestyleGuidance";
 import { addDays, format } from "date-fns";
 import Constants from "expo-constants";
 import { LUTEAL_PHASE_DAYS, type PredictionResult } from "./predictions";
@@ -10,6 +11,7 @@ const isExpoGo = Constants.executionEnvironment === "storeClient";
 const getNotifications = () => import("expo-notifications");
 const PERIOD_DAY_IDS = ["pd1-am","pd1-pm","pd2-am","pd2-pm","pd3-am","pd3-pm","pd4-am","pd4-pm","pd5-am","pd5-pm"];
 const ENDO_IDS = ["endo-pre3","endo-pre1","endo-d1-am","endo-d1-pm","endo-d2-am","endo-d2-pm","endo-d3-am","endo-d3-pm","endo-d4-am","endo-d4-pm","endo-d5-am","endo-d5-pm","endo-post1","endo-post3","endo-mid","endo-flare-pre"];
+const LIFESTYLE_TIP_ID = "lifestyle-tip";
 const PCOS_IDS = ["pcos-d35","pcos-d60","pcos-d90","pcos-pred-wide","pcos-insulin-d3","pcos-insulin-d7","pcos-supplement-am","pcos-supplement-d14","pcos-ovulation-watch","pcos-stress-pre","pcos-skin-d5","pcos-hair-d10","pcos-post-reset","pcos-log-nudge"];
 
 const initHandler = async () => {
@@ -100,20 +102,20 @@ const CLASSIC_COPY: Record<string, [title: string, body: string]> = {
   "period-reminder": ["Period expected soon", "Your next period is predicted in about 2 days."],
   "pad-reminder": ["Time to restock", "Your period is about 5 days away. You may want to check your supplies."],
   "hydration-nudge": ["Hydration reminder", "Your period is about 3 days away. Staying hydrated may help with bloating and cramps."],
-  "anti-inflam-food": ["Nutrition tip", "Your period is about 2 days away. Oily fish, walnuts, leafy greens and berries may help with inflammation."],
+  "anti-inflam-food": ["Nutrition tip", "Your period is about 2 days away. Oily fish, walnuts and flax provide omega-3s; trials link omega-3 to reduced period pain."],
   "heat-pad": ["Heat pad reminder", "Your period may start today. Twenty minutes of heat can ease cramps."],
   "mood-checkin": ["Mood check-in", "You're in your luteal phase, when mood changes are common. Would you like to log how you feel?"],
   "pd1-am": ["Day 1", "Heat, pain relief if needed and a warm drink can help today. Take it easy."],
-  "pd1-pm": ["Evening comfort", "A warm bath with Epsom salts may help your muscles relax."],
+  "pd1-pm": ["Evening comfort", "A warm bath may help. Heat is one of the best-supported ways to ease cramps."],
   "pd2-am": ["Iron and vitamin C", "Day 2: pairing iron-rich food with vitamin C (such as orange juice) helps absorption."],
-  "pd2-pm": ["Magnesium", "Dark chocolate, almonds or avocado provide magnesium, which may help with cramps."],
+  "pd2-pm": ["Ginger", "Small trials found ginger eased period pain about as well as common painkillers."],
   "pd3-am": ["Hydration", "Day 3: drinking enough water can help reduce bloating."],
   "pd3-pm": ["Iron top-up", "Pumpkin seeds or fortified cereal can help replace iron."],
   "pd4-am": ["Gentle movement", "A short walk or light yoga may lift your mood and ease remaining cramps."],
   "pd4-pm": ["Rest and comfort", "Make time for something relaxing this evening."],
   "pd5-am": ["Day 5", "Keep up iron-rich foods and fluids."],
   "pd5-pm": ["Nearly done", "Your period is likely ending. Well done getting through it."],
-  "endo-pre3": ["Endometriosis: 3 days to go", "Anti-inflammatory foods such as turmeric, ginger, oily fish and leafy greens may help."],
+  "endo-pre3": ["Endometriosis: 3 days to go", "No diet is proven to treat endometriosis, but omega-3-rich foods (oily fish, walnuts, flax) and plenty of vegetables are a reasonable choice."],
   "endo-pre1": ["Prepare your comfort kit", "Your period is likely tomorrow. Heat pad, TENS, medication and comfortable clothes ready?"],
   "endo-d1-am": ["Endometriosis day 1: pain plan", "Pain relief tends to work better taken before cramps peak. Apply heat to your abdomen and lower back."],
   "endo-d1-pm": ["Digestive care", "Warm peppermint tea may ease bloating. Avoid foods you know trigger symptoms."],
@@ -132,11 +134,11 @@ const CLASSIC_COPY: Record<string, [title: string, body: string]> = {
   "pcos-d90": ["Please see your doctor", "It has been 90 days without a period. Please contact a healthcare provider. Your CycleIQ report can help."],
   "pcos-insulin-d3": ["Blood sugar tip", "Including protein and healthy fat with meals can help keep blood sugar steady."],
   "pcos-insulin-d7": ["Low-GI foods", "Oats, lentils, berries and sweet potato release energy slowly."],
-  "pcos-supplement-am": ["Supplements", "Inositol has the most research for PCOS; vitamin D and magnesium may also help. Check with your doctor first."],
-  "pcos-supplement-d14": ["Spearmint tea", "Small studies suggest spearmint tea may modestly lower androgens."],
+  "pcos-supplement-am": ["Supplements", "Inositol is widely used, but the 2023 PCOS guideline found the evidence limited and inconclusive. Check with your doctor before taking supplements."],
+  "pcos-supplement-d14": ["Spearmint tea", "A few very small studies suggest spearmint tea may modestly lower androgens; this is not well established."],
   "pcos-stress-pre": ["Stress and your cycle", "Stress hormones can affect ovulation. A few minutes of deep breathing may help."],
   "pcos-skin-d5": ["Skin check", "After your period is a good time to focus on skincare. Consider logging your skin today."],
-  "pcos-hair-d10": ["Scalp care", "Some people find a scalp massage with rosemary oil helpful."],
+  "pcos-hair-d10": ["Scalp care", "Some people find a scalp massage helpful; evidence is limited."],
   "pcos-post-reset": ["Post-period energy", "Energy often improves after your period — a good time for exercise and demanding tasks."],
   "pcos-log-nudge": ["Daily logging", "Logging each day helps CycleIQ learn your pattern. Even 30 seconds helps."],
 };
@@ -223,6 +225,7 @@ export const cancelCycleNotifications = async () => {
     cancelId("heat-pad"),
     cancelId("mood-checkin"),
     cancelId("red-flag"),
+    cancelId(LIFESTYLE_TIP_ID),
     ...PERIOD_DAY_IDS.map(cancelId),
     ...ENDO_IDS.map(cancelId),
     ...PCOS_IDS.map(cancelId),
@@ -244,6 +247,18 @@ export const cancelPredictiveNotifications = async () => {
     ...ENDO_IDS.map(cancelId),
     ...PCOS_IDS.map(cancelId),
   ]);
+};
+
+/**
+ * One evidence-based suggestion from the user's recent logs (utils/lifestyleGuidance.ts),
+ * delivered the next morning. Replaces the previous one; warnings win over suggestions.
+ */
+export const scheduleLifestyleNotification = async (item: Guidance | null, enabled: boolean) => {
+  if (isExpoGo) return;
+  await cancelId(LIFESTYLE_TIP_ID);
+  const { notificationsEnabled } = useAppStore.getState();
+  if (!enabled || !notificationsEnabled || !item) return;
+  await scheduleAt(LIFESTYLE_TIP_ID, item.title[0], item.body[0], addDays(new Date(), 1), 10, [item.title[1], item.body[1]]);
 };
 
 export const scheduleInsightNotification = async (insightTitle: string, enabled: boolean) => {
@@ -297,7 +312,7 @@ export const scheduleAntiInflammatoryReminder = async (predictedStartDate: Date,
   if (isExpoGo) return;
   await cancelId("anti-inflam-food");
   if (!enabled) return;
-  await scheduleAt("anti-inflam-food", "cramp-fighting snacks", "Period in ~2 days. Salmon, walnuts, leafy greens & berries may help calm inflammation", addDays(predictedStartDate, -2), 12);
+  await scheduleAt("anti-inflam-food", "cramp-fighting snacks", "Period in ~2 days. Oily fish, walnuts & flax have omega-3s — trials link omega-3 to less period pain", addDays(predictedStartDate, -2), 12);
 };
 
 export const scheduleHeatPadReminder = async (predictedStartDate: Date, enabled: boolean) => {
@@ -320,9 +335,9 @@ export const schedulePeriodDayNotifications = async (periodStartDate: Date, enab
   if (!enabled) return;
   const d = (n: number) => addDays(periodStartDate, n);
   await scheduleAt("pd1-am", "day 1 — you got this", "Heat pad on, pain relief if you need it, warm ginger tea. Go easy on yourself today", d(0), 8);
-  await scheduleAt("pd1-pm", "cozy mode", "Warm bath tonight? Epsom salts can help those muscles chill out", d(0), 19);
+  await scheduleAt("pd1-pm", "cozy mode", "Warm bath tonight? Heat is one of the best-proven cramp helpers", d(0), 19);
   await scheduleAt("pd2-am", "fuel up", "Day 2 — iron-rich food + something with vitamin C (like OJ) helps your body absorb the iron", d(1), 9);
-  await scheduleAt("pd2-pm", "magnesium moment", "Dark chocolate, almonds or avocado — magnesium may help cramps. Science-approved snacking", d(1), 20);
+  await scheduleAt("pd2-pm", "ginger moment", "Small trials found ginger eased cramps about as well as common painkillers. Ginger tea counts", d(1), 20);
   await scheduleAt("pd3-am", "hydrate check", "Day 3 — keep the water coming, it can help with bloating", d(2), 9);
   await scheduleAt("pd3-pm", "halfway there", "Pumpkin seeds or fortified cereal for an iron top-up. You're doing amazing", d(2), 18);
   await scheduleAt("pd4-am", "gentle movement?", "A slow walk or light yoga can lift your mood & ease leftover cramps — only if you feel like it", d(3), 9);
@@ -338,7 +353,7 @@ export const scheduleEndoNotifications = async (prediction: PredictionResult, en
   const base = prediction.predictedStartISO ? new Date(prediction.predictedStartISO) : new Date();
   const d = (n: number) => addDays(base, n);
   const cycleLength = prediction.mean;
-  await scheduleAt("endo-pre3", "endo prep: 3 days out", "Anti-inflammatory foods may help — turmeric, ginger, omega-3s, leafy greens", d(-3), 9);
+  await scheduleAt("endo-pre3", "endo prep: 3 days out", "No diet is proven for endo, but omega-3s (oily fish, walnuts, flax) & lots of veg are a solid bet", d(-3), 9);
   await scheduleAt("endo-pre1", "comfort kit check", "Period likely tomorrow. Heat pad, TENS, meds, comfy fits & snacks — all set?", d(-1), 10);
   await scheduleAt("endo-d1-am", "endo day 1 pain plan", "Taking pain relief before cramps peak tends to work better. Heat on belly + lower back", d(0), 8);
   await scheduleAt("endo-d1-pm", "tummy care", "Warm peppermint tea may ease bloating. Skip any foods you know set you off", d(0), 19);
@@ -371,13 +386,13 @@ export const schedulePcosNotifications = async (prediction: PredictionResult, en
   if (prediction.widePredictionWindow) await scheduleAt("pcos-pred-wide", "your cycle's keeping us guessing", `Next period could land anywhere in a ~${Math.round(prediction.stdDev * 2)}-day window. Keep supplies handy`, addDays(base, prediction.lateArrivalP90 ?? 35), 9, ["Wide prediction window", `Your next period could fall anywhere in a ${Math.round(prediction.stdDev * 2)}-day window. Keep supplies handy.`]);
   await scheduleAt("pcos-insulin-d3", "blood sugar tip", "Protein + healthy fat with meals can help keep blood sugar steadier — eggs, avocado, nuts", d(3), 9);
   await scheduleAt("pcos-insulin-d7", "low-GI snack ideas", "Oats, lentils, berries & sweet potato release energy slowly — fewer crashes", d(7), 12);
-  await scheduleAt("pcos-supplement-am", "supplement check", "Inositol has the most research for PCOS; vitamin D & magnesium may help too. Ask your doctor first", d(2), 8);
-  await scheduleAt("pcos-supplement-d14", "spearmint tea moment", "Small studies suggest spearmint tea may lower androgens a bit. Cozy + maybe helpful", d(14), 19);
+  await scheduleAt("pcos-supplement-am", "supplement check", "Inositol is popular, but the 2023 PCOS guideline found the evidence limited. Ask your doctor before any supplement", d(2), 8);
+  await scheduleAt("pcos-supplement-d14", "spearmint tea moment", "A couple of tiny studies hint spearmint tea may lower androgens a little — far from proven, but cozy", d(14), 19);
   const ovWatchDay = prediction.predictedOvulationDay ?? Math.max(10, cycleLength - LUTEAL_PHASE_DAYS);
   await scheduleAt("pcos-ovulation-watch", "ovulation signs watch", `Around day ${ovWatchDay}: look out for stretchy clear discharge, a temp bump or an energy boost`, d(ovWatchDay), 9, ["Signs of ovulation", `Around day ${ovWatchDay}, look for clear stretchy discharge, a temperature rise or more energy.`]);
   await scheduleAt("pcos-stress-pre", "stress check", "Stress hormones can mess with ovulation. 10 mins of deep breathing today?", d(Math.max(7, cycleLength - LUTEAL_PHASE_DAYS)), 18);
   await scheduleAt("pcos-skin-d5", "skin check", "Post-period is a nice window for skincare. Log your skin today", d(5), 9);
-  await scheduleAt("pcos-hair-d10", "scalp care tip", "Some people like a scalp massage with rosemary oil for hair health. Optional self-care", d(10), 19);
+  await scheduleAt("pcos-hair-d10", "scalp care tip", "Some people like a scalp massage for hair health. Evidence is thin — optional self-care", d(10), 19);
   await scheduleAt("pcos-post-reset", "main character window", "Period just ended — energy often picks up now. Good time for workouts & big tasks", d(6), 9);
   await scheduleAt("pcos-log-nudge", "log streak this week?", "Daily logs are how we learn YOUR pattern. Even 30 seconds counts", d(4), 20);
 };

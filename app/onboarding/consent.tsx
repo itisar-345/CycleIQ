@@ -1,5 +1,6 @@
 import { seedInitialCycleFromOnboarding } from "@/database";
 import { Colors, Radius, Shadow } from "@/constants/theme";
+import { requestNotificationPermission } from "@/utils/notifications";
 import { runPredictionEngine } from "@/utils/predictions";
 import { useTx } from "@/utils/tone";
 import { OnboardingProgress } from "@/components/onboarding-progress";
@@ -9,7 +10,7 @@ import { router } from "expo-router";
 import { addDays, format, parseISO } from "date-fns";
 import { Activity, CalendarDays, HeartPulse, Moon, type LucideIcon } from "@/components/icons";
 import React, { useState } from "react";
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Alert, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 type Pair = readonly [chill: string, classic: string];
@@ -111,6 +112,35 @@ export default function ConsentScreen() {
     }
   })();
 
+  /**
+   * The one time the app asks about reminders, right after setup. Whatever the answer, it is
+   * never asked again automatically; Profile → Notifications has the switch for later.
+   */
+  const askForRemindersOnce = () =>
+    new Promise<void>((resolve) => {
+      const store = useAppStore.getState();
+      if (Platform.OS === "web" || !store.shouldAskNotificationPermission()) return resolve();
+      store.setLastNotificationPrompt(new Date().toISOString());
+      Alert.alert(
+        tx("want a heads-up before your period?", "Turn on reminders?"),
+        tx(
+          "we'll ping you ~2 days before your next period, plus tips timed to your cycle. we only ask this once — change it anytime in You → reminders & pings",
+          "CycleIQ can remind you about 2 days before your next period and send tips timed to your cycle. We'll only ask once; you can change this any time in Profile → Notifications.",
+        ),
+        [
+          { text: tx("Not now", "Not now"), style: "cancel", onPress: () => { store.setNotificationsEnabled(false); resolve(); } },
+          {
+            text: tx("yes pls", "Turn on"),
+            onPress: async () => {
+              store.setNotificationsEnabled(await requestNotificationPermission());
+              resolve();
+            },
+          },
+        ],
+        { cancelable: false },
+      );
+    });
+
   const handleComplete = async () => {
     if (completing) return;
     setCompleting(true);
@@ -127,6 +157,7 @@ export default function ConsentScreen() {
           setActivePeriod(cycleId, normalizedDate);
         }
       }
+      await askForRemindersOnce();
       setOnboarded(true);
       router.replace("/(tabs)");
     } catch (error) {

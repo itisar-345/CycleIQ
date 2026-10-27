@@ -1,4 +1,4 @@
-import { Alert, Platform, StyleSheet, View, Text, Switch, ScrollView, TouchableOpacity, TextInput } from 'react-native';
+import { Alert, Linking, Platform, StyleSheet, View, Text, Switch, ScrollView, TouchableOpacity, TextInput } from 'react-native';
 import { router } from 'expo-router';
 import { Colors, getModeColor, Radius, Shadow } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -6,7 +6,7 @@ import { useAppStore, AppMode, type BooleanNotificationPref } from '@/store';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronRight, ClipboardList, DatabaseBackup, FileDown, FileText, FileUp, Files, Share, ShieldCheck, Trash2, type LucideIcon } from "@/components/icons";
 import { differenceInDays, parseISO } from 'date-fns';
-import { scheduleDailyLogReminder } from '@/utils/notifications';
+import { requestNotificationPermission, scheduleDailyLogReminder } from '@/utils/notifications';
 import { isHealthBridgeAvailable, requestHealthPermissions } from '@/utils/healthIntegrations';
 import { getDatabaseEncryptionStatus } from '@/database';
 import { useEffect, useState } from 'react';
@@ -25,10 +25,12 @@ export default function ProfileScreen() {
     appLockEnabled, setAppLockEnabled,
     currentMode, setMode,
     notificationPrefs, setNotificationPrefs,
+    notificationsEnabled, setNotificationsEnabled,
     healthImportPrefs, setHealthImportPrefs,
     languagePreset, setLanguagePreset,
     customTerms, setCustomTerms,
     postPillMode, postPillStartDate, setPostPillMode,
+    isTeen,
   } = useAppStore();
   const [databaseEncryption, setDatabaseEncryption] = useState<{
     keyApplied: boolean;
@@ -100,6 +102,26 @@ export default function ProfileScreen() {
     const newHour = Math.max(8, Math.min(21, (notificationPrefs.dailyLogHour ?? 20) + delta));
     setNotificationPrefs({ dailyLogHour: newHour });
     await scheduleDailyLogReminder(notificationPrefs.dailyLog, newHour);
+  };
+
+  /** User-initiated only. If Android/iOS won't show its prompt again, offer system settings. */
+  const handleRemindersToggle = async (value: boolean) => {
+    if (!value) {
+      setNotificationsEnabled(false);
+      return;
+    }
+    if (await requestNotificationPermission()) {
+      setNotificationsEnabled(true);
+      return;
+    }
+    Alert.alert(
+      tx("notifications are off for CycleIQ", "Notifications are turned off"),
+      tx("your phone's blocking them. flip them on in Settings → Notifications, then come back", "Notifications are blocked for CycleIQ in your device settings. Turn them on there, then return to the app."),
+      [
+        { text: tx("Cancel", "Cancel"), style: "cancel" },
+        { text: tx("open settings", "Open settings"), onPress: () => Linking.openSettings().catch(() => {}) },
+      ],
+    );
   };
 
   const handleHealthToggle = async (key: keyof typeof healthImportPrefs, value: boolean) => {
@@ -349,6 +371,21 @@ export default function ProfileScreen() {
 
           <View style={[styles.toggleRow, { alignItems: 'flex-start' }]}>
             <View style={{ flex: 1, paddingRight: 12 }}>
+              <Text style={[styles.toggleText, { color: theme.text, fontWeight: '700' }]}>{tx("reminders", "Reminders")}</Text>
+              <Text style={{ color: theme.textSecondary, fontSize: 12, marginTop: 2 }}>
+                {tx("we only asked once — this is where you turn them on or off", "CycleIQ asks only once. Turn reminders on or off here.")}
+              </Text>
+            </View>
+            <Switch
+              value={notificationsEnabled}
+              onValueChange={handleRemindersToggle}
+              trackColor={{ true: theme.tint }}
+              accessibilityLabel={tx("Reminders", "Reminders")}
+            />
+          </View>
+
+          <View style={[styles.toggleRow, { alignItems: 'flex-start' }]}>
+            <View style={{ flex: 1, paddingRight: 12 }}>
               <Text style={[styles.toggleText, { color: theme.text }]}>{tx("discreet mode", "Discreet notifications")}</Text>
               <Text style={{ color: theme.textSecondary, fontSize: 12, marginTop: 2 }}>
                 {tx("lock screen just says \"CycleIQ reminder\" — no period or symptom details", "Notifications show only \"CycleIQ\" with no health details.")}
@@ -372,6 +409,7 @@ export default function ProfileScreen() {
             { key: 'periodDayTips',    label: tx('period survival tips (days 1–5)', 'Period day tips (days 1–5)') },
             { key: 'moodCheckIn',      label: tx('PMS vibe check', 'PMS mood check-in') },
             { key: 'lifestyleTips',    label: tx('activity, sleep & food tips from your logs', 'Activity, sleep and nutrition suggestions') },
+            ...(isTeen ? [] : [{ key: 'supplementTips', label: tx('supplement tips, timed to your cycle', 'Supplement suggestions') }]),
             { key: 'insights',         label: tx('new pattern alerts', 'New insight alerts') },
             { key: 'ovulation',        label: tx('ovulation heads-up', 'Ovulation reminder') },
             { key: 'flares',           label: tx('flare & symptom warnings', 'Flare and symptom warnings') },

@@ -38,6 +38,8 @@ export interface NotificationPrefs {
   moodCheckIn: boolean;
   /** Evidence-based activity, sleep and nutrition suggestions from recent logs. Added later: undefined = on. */
   lifestyleTips?: boolean;
+  /** Evidence-based supplement tips timed to the cycle (adults only). Added later: undefined = on. */
+  supplementTips?: boolean;
   dailyLogHour: number;
   quietHoursStart: number;
   quietHoursEnd: number;
@@ -88,6 +90,7 @@ interface AppState {
   lastSafeguardPrompt: string | null; // ISO date for Sec 4.7 cooldown;
   lastRedFlagPrompt: string | null;
   lastPCOSPrompt: string | null;
+  /** When the app asked to turn on reminders. Set once per install; the app never asks again on its own. */
   lastNotificationPrompt: string | null;
   cycleVarianceDays: number | null;
   isTeen: boolean; // Teen mode trigger
@@ -116,7 +119,8 @@ interface AppState {
   setLastSafeguardPrompt: (date: string | null) => void;
   setLastRedFlagPrompt: (date: string | null) => void;
   setLastNotificationPrompt: (date: string | null) => void;
-  checkNotificationPromptCooldown: () => boolean;
+  /** True until the one-time reminders question has been asked on this install. */
+  shouldAskNotificationPermission: () => boolean;
   checkSafeguardCooldown: () => boolean;
   checkPCOSPromptCooldown: () => boolean;
   checkRedFlagCooldown: () => boolean;
@@ -207,6 +211,7 @@ export const useAppStore = create<AppState>()(
         redFlagAlerts: true,
         moodCheckIn: true,
         lifestyleTips: true,
+        supplementTips: true,
         dailyLogHour: 20,
         quietHoursStart: 22,
         quietHoursEnd: 8,
@@ -288,14 +293,7 @@ export const useAppStore = create<AppState>()(
         set({ lastPCOSPrompt: date }),
       setLastNotificationPrompt: (date: string | null) =>
         set({ lastNotificationPrompt: date }),
-      checkNotificationPromptCooldown: () => {
-        const state = get();
-        if (!state.lastNotificationPrompt) return true;
-        const daysDiff =
-          (Date.now() - new Date(state.lastNotificationPrompt).getTime()) /
-          (1000 * 60 * 60 * 24);
-        return daysDiff >= 30;
-      },
+      shouldAskNotificationPermission: () => !get().lastNotificationPrompt,
       setLanguagePreset: (preset) => {
         set({ languagePreset: preset });
         persistSettingsToSqlite(get());

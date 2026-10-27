@@ -38,6 +38,7 @@ jest.mock("@/utils/notifications", () => ({
   scheduleFlareWarning: jest.fn(async () => {}),
   scheduleDailyLogReminder: jest.fn(async () => {}),
   scheduleLifestyleNotification: jest.fn(async () => {}),
+  scheduleSupplementNotifications: jest.fn(async () => {}),
 }));
 
 jest.mock("@/utils/healthIntegrations", () => ({
@@ -77,6 +78,7 @@ jest.mock("@/database", () => {
     getCycleEntries: jest.fn(async () => []),
     getCyclePredictions: jest.fn(async () => ({ model: "none", label: "Log your next period to unlock predictions.", mean: 28, stdDev: 0, confidence: 0, mae: null })),
     getLatestPredictionFeedback: jest.fn(async () => null),
+    getLatestStoredCyclePrediction: jest.fn(async () => null),
     generateInsights: jest.fn(async () => []),
     persistAndRetireInsights: jest.fn(async () => {}),
     getPhaseAverages: jest.fn(async () => []),

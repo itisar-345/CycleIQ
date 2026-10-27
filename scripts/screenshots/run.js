@@ -5,6 +5,9 @@
  * headless Chrome in light and dark mode, then writes 1x PNGs and GIFs. Needs Chrome or
  * Chromium (set CHROME_PATH if it isn't found) and an internet connection (sql.js loads
  * from jsDelivr). Screens show sample data only.
+ *
+ * `npm run store-assets` (--play) instead writes Google Play listing assets to docs/store/play/:
+ * 1080×1920 phone screenshots, the 512×512 icon and the 1024×500 feature graphic.
  */
 const { spawn, execSync } = require("child_process");
 const fs = require("fs");
@@ -12,11 +15,14 @@ const os = require("os");
 const path = require("path");
 const { capture } = require("./capture");
 const { makeAssets } = require("./make-assets");
+const { makePlayAssets } = require("./play-assets");
 
 const ROOT = path.resolve(__dirname, "../..");
 const PORT = Number(process.env.PORT || 8099);
 const URL = `http://localhost:${PORT}`;
-const DEST = path.join(ROOT, "docs", "screenshots");
+const PLAY = process.argv.includes("--play");
+const DEST = path.join(ROOT, "docs", PLAY ? "store/play" : "screenshots");
+const PLAY_VIEWPORT = { width: 360, height: 640, deviceScaleFactor: 3 };
 
 const waitForServer = async (timeoutMs = 240000) => {
   const deadline = Date.now() + timeoutMs;
@@ -49,9 +55,14 @@ const stop = (child) => {
     await waitForServer();
     for (const scheme of ["light", "dark"]) {
       const captureDir = path.join(tmp, scheme);
-      await capture({ url: URL, outDir: captureDir, scheme });
-      makeAssets({ captureDir, destDir: DEST, scheme });
+      if (PLAY) {
+        await capture({ url: URL, outDir: path.join(DEST, `phone-${scheme}`), scheme, viewport: PLAY_VIEWPORT });
+      } else {
+        await capture({ url: URL, outDir: captureDir, scheme });
+        makeAssets({ captureDir, destDir: DEST, scheme });
+      }
     }
+    if (PLAY) await makePlayAssets({ root: ROOT, destDir: DEST });
     console.log(`Done → ${path.relative(ROOT, DEST)}`);
   } finally {
     stop(server);

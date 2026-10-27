@@ -7,7 +7,7 @@
  * Ground rules (see docs/EVIDENCE_REVIEW.md and docs/CLINICAL_REVIEW.md §5):
  * - Signposting, never diagnosis. Warnings suggest talking to a clinician.
  * - Unlogged days are never treated as zero: a rule needs enough logged days to speak.
- * - No supplement doses, and no supplement talk for teens.
+ * - No supplement talk for teens. Supplement tips live in utils/supplementGuidance.ts.
  * - No weight-loss or calorie messaging; food tips are about what to add or swap.
  * - Never nudge more activity during a flare or a run of severe pain.
  * - Every item names its evidence grade and sources, and says so when evidence is weak.
@@ -59,7 +59,7 @@ const KIND_ORDER: Record<GuidanceKind, number> = { warning: 0, suggestion: 1, po
 
 // ─── day aggregation ─────────────────────────────────────────────────────────
 
-interface Day {
+export interface Day {
   key: string;
   ageDays: number;
   pain: number | null;
@@ -96,7 +96,7 @@ const minOf = (a: number | null, b: number | null | undefined) =>
   b === null || b === undefined ? a : a === null ? b : Math.min(a, b);
 
 /** Several logs on one day collapse to one: worst pain and mood, most activity. */
-function toDays(entries: GuidanceEntry[], today: Date): Day[] {
+export function toDays(entries: GuidanceEntry[], today: Date): Day[] {
   const days = new Map<string, Day>();
   for (const e of entries) {
     const key = localDateKey(e.logged_date);
@@ -127,7 +127,7 @@ function toDays(entries: GuidanceEntry[], today: Date): Day[] {
   return [...days.values()];
 }
 
-const within = (days: Day[], n: number) => days.filter((d) => d.ageDays < n);
+export const within = (days: Day[], n: number) => days.filter((d) => d.ageDays < n);
 const avg = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
 const values = (days: Day[], pick: (d: Day) => number | null) =>
   days.map(pick).filter((v): v is number => v !== null);
@@ -287,25 +287,19 @@ function periodPainGuidance(days: Day[], input: GuidanceInput): Guidance[] {
       ],
     }];
   }
-  const supplements: [string, string] = input.isTeen
-    ? ["", ""]
-    : [
-        " trials of vitamin D and omega-3 also show less period pain (smaller studies) — check with a doctor before supplements",
-        " Trials of vitamin D and omega-3 supplements also show reduced period pain, though the studies are small; check with a healthcare provider before starting supplements.",
-      ];
+  // Vitamin D / omega-3 for period pain live in utils/supplementGuidance.ts (supp-period-pain).
   return [{
-    id: "pain-period", kind: "suggestion", grade: "moderate",
-    sources: ["cochraneExerciseDysmenorrhoea", ...(input.isTeen ? [] : (["vitDDysmenorrhoea", "omega3Dysmenorrhoea"] as const))],
+    id: "pain-period", kind: "suggestion", grade: "moderate", sources: ["cochraneExerciseDysmenorrhoea"],
     title: ["cramps: what the research says", "Period pain: what helps"],
     body: [
-      "regular exercise (about 3x a week, all cycle long) reduced period pain in trials. heat and taking pain relief early help too." + supplements[0],
-      "In trials, regular exercise (around three sessions a week throughout the cycle) reduced period pain. Heat and taking pain relief early also help." + supplements[1],
+      "regular exercise (about 3x a week, all cycle long) reduced period pain in trials. heat and taking pain relief early help too",
+      "In trials, regular exercise (around three sessions a week throughout the cycle) reduced period pain. Heat and taking pain relief early also help.",
     ],
   }];
 }
 
 /** Low mood (≤ 2 of 5) in the 7 days before a period, at least 3 times in recent cycles. */
-function hasPremenstrualLowMood(days: Day[], input: GuidanceInput, today: Date): boolean {
+export function hasPremenstrualLowMood(days: Day[], input: GuidanceInput, today: Date): boolean {
   const starts = input.periodStarts.map((s) => parseLocalDate(localDateKey(s))).sort((a, b) => a.getTime() - b.getTime());
   let lowLuteal = 0;
   for (const d of within(days, 75)) {

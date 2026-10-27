@@ -9,6 +9,14 @@ import { EVIDENCE_SOURCES } from "../data/evidence";
 import type { FoodExtended, FoodItem } from "../database/types";
 import { buildExtendedSymptoms, EMPTY_ENDO_LOG, EMPTY_FOOD_LOG, EMPTY_PCOS_LOG, EMPTY_PERI_LOG } from "../utils/logEntry";
 import { buildLifestyleGuidance, pickNotifiableGuidance, type GuidanceEntry, type GuidanceInput } from "../utils/lifestyleGuidance";
+import {
+  buildSupplementGuidance,
+  buildSupplementGuide,
+  isSouthernHemisphereTimeZone,
+  planSupplementNotifications,
+  SUPPLEMENT_TIP_IDS,
+  type SupplementInput,
+} from "../utils/supplementGuidance";
 
 const NOW = new Date(2026, 5, 28, 21, 0);
 
@@ -250,6 +258,108 @@ test("the food log is saved only when something was answered", () => {
   const base = { mode: "standard", pcos: EMPTY_PCOS_LOG, endo: EMPTY_ENDO_LOG, peri: EMPTY_PERI_LOG, clotsSize: null, inFlare: false, flare: { pain: null, nausea: false, movement: null }, nowISO: NOW.toISOString() };
   assert.equal(buildExtendedSymptoms({ ...base, food: EMPTY_FOOD_LOG }).food, undefined);
   assert.deepEqual(buildExtendedSymptoms({ ...base, food: { ...EMPTY_FOOD_LOG, alcohol: 0 } }).food, { ...EMPTY_FOOD_LOG, alcohol: 0 });
+});
+
+// ── supplements (utils/supplementGuidance.ts) ──
+
+const supp = (overrides: Partial<SupplementInput>) =>
+  buildSupplementGuidance({ mode: "standard", isTeen: false, entries: [], periodStarts: [], now: NOW, ...overrides });
+const suppIds = (overrides: Partial<SupplementInput>) => supp(overrides).map((g) => g.id);
+
+test("supplements: teens get none, whatever they logged", () => {
+  const heavyPainful = [log(10, { flow_intensity: "Heavy", pain_score: 8 }), log(11, { flow_intensity: "Heavy", pain_score: 8 }), log(12, { flow_intensity: "Heavy" })];
+  assert.deepEqual(suppIds({ isTeen: true, entries: heavyPainful, now: new Date(2026, 11, 1) }), []);
+});
+
+test("supplements: folic acid for adults who could become pregnant, not in perimenopause mode", () => {
+  assert.deepEqual(suppIds({}), ["supp-folic-acid"]);
+  assert.match(supp({})[0].body[1], /400–800 µg/);
+  assert.equal(supp({})[0].grade, "guideline");
+  const peri = suppIds({ mode: "peri" });
+  assert.ok(!peri.includes("supp-folic-acid") && peri.includes("supp-peri-bone"));
+});
+
+test("supplements: vitamin D only in the darker months, flipped for the southern hemisphere", () => {
+  const june = NOW, december = new Date(2026, 11, 1);
+  assert.ok(!suppIds({ now: june }).includes("supp-vitamin-d"));
+  assert.ok(suppIds({ now: december }).includes("supp-vitamin-d"));
+  assert.ok(suppIds({ now: june, southernHemisphere: true }).includes("supp-vitamin-d"));
+  assert.ok(!suppIds({ now: december, southernHemisphere: true }).includes("supp-vitamin-d"));
+  assert.match(supp({ mode: "pcos", now: december }).find((g) => g.id === "supp-vitamin-d")!.body[1], /PCOS/);
+  assert.ok(isSouthernHemisphereTimeZone("Australia/Sydney") && isSouthernHemisphereTimeZone("America/Sao_Paulo"));
+  assert.ok(!isSouthernHemisphereTimeZone("Europe/London") && !isSouthernHemisphereTimeZone("Asia/Kolkata"));
+});
+
+test("supplements: heavy periods → iron, test first, never a dose, sent on period day 2", () => {
+  const heavy = [log(20, { flow_intensity: "Heavy" }), log(21, { flow_intensity: "Very Heavy" }), log(22, { flow_intensity: "Heavy" })];
+  const iron = supp({ entries: heavy }).find((g) => g.id === "supp-iron")!;
+  assert.match(iron.body[1], /blood test/);
+  assert.doesNotMatch(iron.body.join(" "), /\d+\s?mg/);
+  assert.deepEqual(iron.notify, { offsetDays: 1, hour: 12 });
+  assert.ok(!suppIds({ entries: heavy.slice(0, 2) }).includes("supp-iron"));
+});
+
+test("supplements: painful periods → vitamin D / omega-3 before the period, but not for endometriosis", () => {
+  const painful = [log(10, { flow_intensity: "Heavy", pain_score: 7 }), log(11, { flow_intensity: "Medium", pain_score: 6 })];
+  const tip = supp({ entries: painful }).find((g) => g.id === "supp-period-pain")!;
+  assert.ok(tip.notify.offsetDays < 0);
+  assert.ok(!suppIds({ mode: "endo", entries: painful }).includes("supp-period-pain"));
+});
+
+test("supplements: premenstrual low mood → calcium (ACOG) with the B6 safety note", () => {
+  const periodStarts = [log(30).logged_date, log(2).logged_date];
+  const lowBefore = [log(33, { mood_score: 1 }), log(34, { mood_score: 2 }), log(5, { mood_score: 2 })];
+  const tip = supp({ entries: lowBefore, periodStarts }).find((g) => g.id === "supp-calcium-pms")!;
+  assert.ok(tip.sources.includes("acogPmd2023") && tip.sources.includes("tgaB6"));
+  assert.match(tip.body[1], /1,000–1,200 mg/);
+  assert.match(tip.body[1], /B6/);
+});
+
+test("supplements: every tip has a known id, real sources and both voices", () => {
+  const heavyPainful = [log(10, { flow_intensity: "Heavy", pain_score: 8 }), log(11, { flow_intensity: "Heavy", pain_score: 8 }), log(12, { flow_intensity: "Heavy" })];
+  const periodStarts = [log(30).logged_date, log(2).logged_date];
+  const lowBefore = [log(33, { mood_score: 1 }), log(34, { mood_score: 2 }), log(5, { mood_score: 2 })];
+  // Southern hemisphere in June = vitamin D season, so every rule fires at NOW.
+  const all = [...supp({ entries: [...heavyPainful, ...lowBefore], periodStarts, southernHemisphere: true }), ...supp({ mode: "peri" })];
+  assert.equal(new Set(all.map((g) => g.id)).size, SUPPLEMENT_TIP_IDS.length);
+  for (const g of all) {
+    assert.ok((SUPPLEMENT_TIP_IDS as readonly string[]).includes(g.id), g.id);
+    for (const s of g.sources) assert.ok(EVIDENCE_SOURCES[s]?.url.startsWith("https://"), `${g.id}: ${s}`);
+    for (const text of [...g.title, ...g.body]) assert.ok(text.trim().length > 0, g.id);
+  }
+});
+
+test("supplement notifications: timed from the predicted period, past slots move to the next cycle", () => {
+  const heavyPainful = [log(10, { flow_intensity: "Heavy", pain_score: 8 }), log(11, { flow_intensity: "Heavy", pain_score: 8 }), log(12, { flow_intensity: "Heavy" })];
+  const tips = supp({ entries: heavyPainful });
+  // Period predicted 3 days after NOW (June 28, 21:00) → July 1.
+  const plan = planSupplementNotifications(tips, new Date(2026, 6, 1).toISOString(), 28, NOW);
+  const day = (id: string) => {
+    const d = plan.find((p) => p.tip.id === id)!.date;
+    return `${d.getMonth() + 1}/${d.getDate()}`;
+  };
+  assert.equal(day("supp-iron"), "7/2");         // period day 2
+  assert.equal(day("supp-folic-acid"), "7/7");   // a week in
+  assert.equal(day("supp-period-pain"), "7/24"); // 5 days before July 1 had passed → next cycle (July 29 − 5)
+  for (const p of plan) assert.ok(new Date(p.date.getFullYear(), p.date.getMonth(), p.date.getDate(), p.tip.notify.hour) > NOW);
+  assert.deepEqual(planSupplementNotifications(tips, "not a date", 28, NOW), []);
+});
+
+test("supplement guide: iron, zinc, omega-3 and the rest, condition entries only where relevant", () => {
+  const std = buildSupplementGuide({ mode: "standard", isTeen: false }).map((g) => g.id);
+  for (const id of ["guide-iron", "guide-zinc", "guide-omega-3", "guide-magnesium", "guide-b6", "guide-b12", "guide-folic-acid", "guide-vitamin-d", "guide-calcium"]) {
+    assert.ok(std.includes(id), id);
+  }
+  assert.ok(!std.includes("guide-inositol") && !std.includes("guide-hot-flush-herbals"));
+  assert.ok(buildSupplementGuide({ mode: "pcos", isTeen: false }).some((g) => g.id === "guide-inositol"));
+  assert.ok(buildSupplementGuide({ mode: "peri", isTeen: false }).some((g) => g.id === "guide-hot-flush-herbals"));
+  assert.deepEqual(buildSupplementGuide({ mode: "pcos", isTeen: true }), []);
+  for (const g of ["standard", "pcos", "peri"].flatMap((mode) => buildSupplementGuide({ mode, isTeen: false }))) {
+    assert.equal(g.kind, "learn", g.id);
+    for (const s of g.sources) assert.ok(EVIDENCE_SOURCES[s]?.url.startsWith("https://"), `${g.id}: ${s}`);
+    // Chill (Gen Z) and classic voices both present and actually different.
+    assert.ok(g.body[0].trim() && g.body[1].trim() && g.body[0] !== g.body[1], g.id);
+  }
 });
 
 console.log(`All ${passed} guidance tests passed.`);

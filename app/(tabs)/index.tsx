@@ -6,7 +6,7 @@ import { localDateKey } from "@/utils/dates";
 import { Colors, getModeColor, Radius, Shadow } from "@/constants/theme";
 import { closeCycle, createCycle, getAllEntries, getLatestCycle, getDayOfCycle, getPhaseForDay, getCyclePredictions, generateInsights, CycleInsight, getLatestPredictionFeedback } from "@/database";
 import { PredictionResult } from "@/utils/predictions";
-import { scheduleAllCycleNotifications, requestNotificationPermission } from "@/utils/notifications";
+import { scheduleAllCycleNotifications } from "@/utils/notifications";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useAppStore } from "@/store";
 import { differenceInDays, format, parseISO } from "date-fns";
@@ -43,15 +43,12 @@ export default function HomeScreen() {
     setLastPCOSPrompt,
     age,
     notificationsEnabled,
-    setNotificationPrefs,
     postPillMode,
     postPillStartDate,
     dismissedInsights,
     languagePreset,
     customTerms,
     healthImportPrefs,
-    setLastNotificationPrompt,
-    checkNotificationPromptCooldown,
   } = useAppStore();
   const [cycleLength, setCycleLength] = useState<number>(28);
   const [latestStartDate, setLatestStartDate] = useState<string | null>(null);
@@ -196,26 +193,6 @@ export default function HomeScreen() {
             const stats = await getCyclePredictions(currentMode, postPillMode, postPillStartDate ?? null);
             setPredictionStats(stats);
             await scheduleAllCycleNotifications(stats, new Date(startDate));
-            // Contextual notification ask — max once per 30 days, only when not yet granted
-            if (!notificationsEnabled && checkNotificationPromptCooldown()) {
-              setLastNotificationPrompt(new Date().toISOString());
-              setTimeout(() => {
-                Alert.alert(
-                  tx("want a heads-up next time?", "Turn on reminders?"),
-                  tx("We'll ping you ~2 days before your next predicted period. You can tweak every reminder in Profile.", "We can remind you 2 days before your next predicted period. You can change reminders in Profile."),
-                  [
-                    { text: tx("Not now", "Not now"), style: "cancel" },
-                    {
-                      text: tx("yes pls", "Yes, remind me"),
-                      onPress: async () => {
-                        const granted = await requestNotificationPermission();
-                        if (granted) setNotificationPrefs({ period: true, dailyLog: true });
-                      },
-                    },
-                  ],
-                );
-              }, 800);
-            }
           } catch (error) {
             console.error("Failed starting period", error);
             Alert.alert(tx("hmm, that didn't save", "Couldn't save"), tx("Couldn't log your period start — give it another tap.", "Your period start couldn't be saved. Please try again."));

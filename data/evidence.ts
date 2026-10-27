@@ -173,6 +173,59 @@ export const EVIDENCE_SOURCES = {
     citation: "HSE (Ireland). Hot flushes: spicy food, caffeine and alcohol can trigger them",
     url: "https://www2.hse.ie/conditions/hot-flushes",
   },
+  // ── supplements ──
+  uspstfFolicAcid2023: {
+    citation: "US Preventive Services Task Force. Folic acid to prevent neural tube defects: 0.4–0.8 mg daily for anyone who plans to or could become pregnant (grade A). JAMA 2023",
+    url: "https://www.uspreventiveservicestaskforce.org/uspstf/recommendation/folic-acid-for-the-prevention-of-neural-tube-defects-preventive-medication",
+  },
+  stoffelIron2017: {
+    citation: "Stoffel et al. Iron absorption from oral iron supplements given on consecutive versus alternate days: two open-label randomised trials in iron-depleted women. Lancet Haematol 2017",
+    url: "https://doi.org/10.1016/S2352-3026(17)30182-5",
+  },
+  whoIronMenstruating2011: {
+    citation: "WHO. Guideline: intermittent iron and folic acid supplementation in menstruating women. 2011",
+    url: "https://www.who.int/publications/i/item/9789241502023",
+  },
+  nhsVitaminD: {
+    citation: "NHS. Vitamin D: 10 µg (400 IU) a day from October to early March, all year for dark skin, covered skin or little time outdoors; adult upper limit 100 µg",
+    url: "https://www.nhs.uk/conditions/vitamins-and-minerals/vitamin-d/",
+  },
+  acogPmd2023: {
+    citation: "ACOG Clinical Practice Guideline No. 7. Management of premenstrual disorders (calcium 1,000–1,200 mg/day: conditional, low-quality evidence). Obstet Gynecol 2023",
+    url: "https://doi.org/10.1097/AOG.0000000000005426",
+  },
+  tgaB6: {
+    citation: "Therapeutic Goods Administration (Australia). Health supplements containing vitamin B6 can cause peripheral neuropathy, including at doses under 50 mg",
+    url: "https://www.tga.gov.au/news/safety-alerts/health-supplements-containing-vitamin-b6-can-cause-peripheral-neuropathy",
+  },
+  zincDysmenorrhoea2024: {
+    citation: "Hsu et al. Zinc supplementation for primary dysmenorrhoea: systematic review and meta-analysis (6 RCTs, 739 women; high heterogeneity). Nutrients 2024",
+    url: "https://pmc.ncbi.nlm.nih.gov/articles/PMC11643716/",
+  },
+  odsZinc: {
+    citation: "NIH Office of Dietary Supplements. Zinc fact sheet (adult upper limit 40 mg/day; excess causes copper deficiency)",
+    url: "https://ods.od.nih.gov/factsheets/Zinc-HealthProfessional/",
+  },
+  odsB12: {
+    citation: "NIH Office of Dietary Supplements. Vitamin B12 fact sheet (plant foods contain none unless fortified)",
+    url: "https://ods.od.nih.gov/factsheets/VitaminB12-HealthProfessional/",
+  },
+  cochraneSupplementsDysmenorrhoea: {
+    citation: "Pattanittum et al. Dietary supplements for dysmenorrhoea. Cochrane Database Syst Rev 2016 (no high-quality evidence for any supplement)",
+    url: "https://www.cochrane.org/CD002124",
+  },
+  vitexPms: {
+    citation: "Verkaik et al. Vitex agnus castus for premenstrual syndrome: systematic review and meta-analysis (high risk of bias; exploratory). Am J Obstet Gynecol 2017",
+    url: "https://repub.eur.nl/pub/99226",
+  },
+  nacPcos: {
+    citation: "Thakker et al. N-acetylcysteine for PCOS: systematic review and meta-analysis of RCTs (8 trials, 910 women). Obstet Gynecol Int 2015",
+    url: "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4306416/",
+  },
+  curcuminReview2025: {
+    citation: "Curcumin for premenstrual syndrome and dysmenorrhoea: systematic review of 10 RCTs (too heterogeneous to pool). 2025",
+    url: "https://pmc.ncbi.nlm.nih.gov/articles/PMC12639325/",
+  },
 } satisfies Record<string, EvidenceSource>;
 
 export type EvidenceSourceId = keyof typeof EVIDENCE_SOURCES;

@@ -86,7 +86,9 @@ describe("Insights screen", () => {
     render(<AnalyticsScreen />);
     expect(await screen.findByText("suggestions for you")).toBeTruthy();
     expect(screen.getByText("heavy periods + tiredness")).toBeTruthy();
-    expect(screen.getByText(/ferritin/)).toBeTruthy();
+    expect(screen.getByText(/iron \(ferritin\) blood test/)).toBeTruthy();
+    // The same heavy flow also brings the "test before you take iron" supplement tip.
+    expect(screen.getByText("iron: test before you take it")).toBeTruthy();
     fireEvent.press(screen.getByLabelText("Sources: heavy periods + tiredness"));
     expect(screen.getByText(/Iron insufficiency among young Australian women/)).toBeTruthy();
     expect(findUnlabelledPressables(screen.root)).toEqual([]);
@@ -228,5 +230,61 @@ describe("Profile screen", () => {
     render(<ProfileScreen />);
     await screen.findByText(/whole database encrypted/);
     expect(findUnlabelledPressables(screen.root)).toEqual([]);
+  });
+});
+
+// ── Consent: the reminders question is asked once per install ──────────────
+describe("Reminders permission", () => {
+  const notifications = jest.requireMock("@/utils/notifications") as { requestNotificationPermission: jest.Mock };
+
+  test("asked once at the end of onboarding, never again after that", async () => {
+    const ConsentScreen = require("@/app/onboarding/consent").default as React.ComponentType;
+    const alert = jest.spyOn(Alert, "alert").mockImplementation((_title, _message, buttons?: AlertButton[]) => {
+      buttons?.find((b) => b.style === "cancel")?.onPress?.(); // "Not now"
+    });
+    useAppStore.setState({ lastNotificationPrompt: null, lastPeriodDate: null, averageCycleLength: null, isOnboarded: false });
+
+    render(<ConsentScreen />);
+    fireEvent.press(screen.getByText("let's go"));
+    await waitFor(() => expect(useAppStore.getState().isOnboarded).toBe(true));
+    expect(alert).toHaveBeenCalledTimes(1);
+    expect(useAppStore.getState().lastNotificationPrompt).not.toBeNull();
+    expect(useAppStore.getState().notificationsEnabled).toBe(false);
+    expect(notifications.requestNotificationPermission).not.toHaveBeenCalled();
+
+    // Onboarding again (e.g. switching modes later) must not ask a second time.
+    screen.unmount();
+    render(<ConsentScreen />);
+    fireEvent.press(screen.getByText("let's go"));
+    await waitFor(() => expect(jest.requireMock("expo-router").router.replace).toHaveBeenCalledTimes(2));
+    expect(alert).toHaveBeenCalledTimes(1);
+    alert.mockRestore();
+  });
+
+  test("starting a period never asks about reminders", async () => {
+    const alert = jest.spyOn(Alert, "alert").mockImplementation((_title, _message, buttons?: AlertButton[]) => {
+      buttons?.find((b) => b.style !== "cancel")?.onPress?.(); // confirm "today is day 1"
+    });
+    useAppStore.setState({ notificationsEnabled: false, lastNotificationPrompt: null });
+    mock(db.getLatestCycle).mockResolvedValue(cycle("c2", 30, null));
+    mock(db.getCyclePredictions).mockResolvedValue(prediction());
+    render(<HomeScreen />);
+    fireEvent.press((await screen.findAllByText("my period started"))[0]);
+    await waitFor(() => expect(db.createCycle).toHaveBeenCalled());
+    expect(alert).toHaveBeenCalledTimes(1); // just the "is today day 1?" confirmation
+    expect(notifications.requestNotificationPermission).not.toHaveBeenCalled();
+    alert.mockRestore();
+  });
+
+  test("Profile's Reminders switch asks the OS only when the user flips it on", async () => {
+    useAppStore.setState({ notificationsEnabled: false });
+    notifications.requestNotificationPermission.mockResolvedValueOnce(true);
+    render(<ProfileScreen />);
+    expect(notifications.requestNotificationPermission).not.toHaveBeenCalled();
+    await act(async () => {
+      fireEvent(screen.getByLabelText("Reminders"), "valueChange", true);
+    });
+    expect(notifications.requestNotificationPermission).toHaveBeenCalledTimes(1);
+    expect(useAppStore.getState().notificationsEnabled).toBe(true);
   });
 });

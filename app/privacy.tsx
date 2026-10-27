@@ -39,8 +39,8 @@ const sections: { title: Pair; body: Pair }[] = [
   {
     title: ["Health app syncing", "Health app import"],
     body: [
-      "Totally optional and read-only. If you turn it on, we read sleep, steps and exercise to pre-fill your log. We never write anything to your Health app.",
-      "Optional and read-only. If enabled, sleep, steps and exercise are used to pre-fill your log. Nothing is written to your Health app.",
+      "Totally optional and read-only. If you turn it on, we read sleep, steps and exercise (Apple Health or Health Connect) to pre-fill your log. It stays on your phone, is never shared or used for ads, and we never write anything back.",
+      "Optional and read-only. If enabled, sleep, steps and exercise from Apple Health or Health Connect are used only to pre-fill your log on this device. This data is never shared, sold or used for advertising, and nothing is written back.",
     ],
   },
   {
@@ -67,7 +67,8 @@ export default function PrivacyScreen() {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
       <View style={[styles.header, { borderBottomColor: theme.border }]}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton} accessibilityRole="button">
+        {/* Health Connect opens this screen directly (cycleiq://privacy), with no screen to go back to. */}
+        <TouchableOpacity onPress={() => (router.canGoBack() ? router.back() : router.replace("/"))} style={styles.backButton} accessibilityRole="button">
           <Text style={[styles.backText, { color: theme.tint }]}>{tx("‹ back", "‹ Back")}</Text>
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: theme.text }]} accessibilityRole="header">{tx("privacy, no jargon", "Privacy policy")}</Text>

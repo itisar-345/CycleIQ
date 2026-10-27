@@ -35,6 +35,8 @@
     "check": "npm run typecheck && npm run lint && npm run test:all",
     "e2e": "maestro test .maestro",
     "screenshots": "node scripts/screenshots/run.js",
+    "store-assets": "node scripts/screenshots/run.js --play",
+    "icons": "node scripts/brand/make-icons.js",
     "web:demo": "node scripts/web-demo.js"
   },
   "dependencies": {

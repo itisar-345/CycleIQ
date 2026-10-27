@@ -233,7 +233,7 @@
 - [x] Content bundled with app (fully offline, updated via app releases)
 - [x] Content versioned with review date displayed on each article
 - [x] 24-month content review flag system
-- [x] No affiliate links, supplement recommendations, or product endorsements permitted (no such content in bundled articles)
+- [x] No affiliate links or product endorsements permitted (no such content in bundled articles). Supplement tips are evidence-graded and sourced, adults only, name a dose only where a guideline or regulator does, and never suggest iron without a blood test (see `docs/EVIDENCE_REVIEW.md` §6)
 
 ---
 

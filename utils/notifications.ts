@@ -3,6 +3,7 @@ import type { Guidance } from "./lifestyleGuidance";
 import { addDays, format } from "date-fns";
 import Constants from "expo-constants";
 import { LUTEAL_PHASE_DAYS, type PredictionResult } from "./predictions";
+import { SUPPLEMENT_TIP_IDS, type SupplementNotification } from "./supplementGuidance";
 import { currentTx, type Tx } from "./tone";
 
 const isExpoGo = Constants.executionEnvironment === "storeClient";
@@ -40,7 +41,10 @@ export const hasNotificationPermission = async (): Promise<boolean> => {
   }
 };
 
-/** Prompts the user if permission has not yet been granted. Use only from explicit user actions. */
+/**
+ * Prompts the user if permission has not yet been granted. Use only from explicit user actions:
+ * the one-time question at the end of onboarding, or the Reminders switch in Profile.
+ */
 export const requestNotificationPermission = async (): Promise<boolean> => {
   if (isExpoGo) return false;
   if (await hasNotificationPermission()) return true;
@@ -226,6 +230,7 @@ export const cancelCycleNotifications = async () => {
     cancelId("mood-checkin"),
     cancelId("red-flag"),
     cancelId(LIFESTYLE_TIP_ID),
+    ...SUPPLEMENT_TIP_IDS.map(cancelId),
     ...PERIOD_DAY_IDS.map(cancelId),
     ...ENDO_IDS.map(cancelId),
     ...PCOS_IDS.map(cancelId),
@@ -243,6 +248,7 @@ export const cancelPredictiveNotifications = async () => {
     cancelId("heat-pad"),
     cancelId("mood-checkin"),
     cancelId("red-flag"),
+    ...SUPPLEMENT_TIP_IDS.map(cancelId),
     ...PERIOD_DAY_IDS.map(cancelId),
     ...ENDO_IDS.map(cancelId),
     ...PCOS_IDS.map(cancelId),
@@ -259,6 +265,20 @@ export const scheduleLifestyleNotification = async (item: Guidance | null, enabl
   const { notificationsEnabled } = useAppStore.getState();
   if (!enabled || !notificationsEnabled || !item) return;
   await scheduleAt(LIFESTYLE_TIP_ID, item.title[0], item.body[0], addDays(new Date(), 1), 10, [item.title[1], item.body[1]]);
+};
+
+/**
+ * Supplement tips (utils/supplementGuidance.ts), each at its point in the cycle. Replaces
+ * every previously scheduled supplement tip, so a tip that no longer applies is dropped.
+ */
+export const scheduleSupplementNotifications = async (plan: SupplementNotification[], enabled: boolean) => {
+  if (isExpoGo) return;
+  await Promise.all(SUPPLEMENT_TIP_IDS.map(cancelId));
+  const { notificationsEnabled } = useAppStore.getState();
+  if (!enabled || !notificationsEnabled) return;
+  for (const { tip, date } of plan) {
+    await scheduleAt(tip.id, tip.title[0], tip.body[0], date, tip.notify.hour, [tip.title[1], tip.body[1]]);
+  }
 };
 
 export const scheduleInsightNotification = async (insightTitle: string, enabled: boolean) => {

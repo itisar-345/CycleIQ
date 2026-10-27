@@ -11,5 +11,8 @@ name: Onboarding → first prediction
 - tapOn: "Show my prediction"
 - assertVisible: "your next period, probably"
 - tapOn: "let's go"
+# Asked once per install, right after setup.
+- assertVisible: "want a heads-up before your period?"
+- tapOn: "Not now"
 - assertVisible: ".*hey.*"
 - assertVisible: "next period, probably"

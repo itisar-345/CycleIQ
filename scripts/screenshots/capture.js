@@ -27,13 +27,16 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 /** Tab title → output file name, in tab-bar order. */
 const TABS = [["Log", "04-log"], ["Calendar", "05-calendar"], ["Insights", "06-insights"], ["You", "07-profile"]];
 
-const capture = async ({ url, outDir, scheme }) => {
+/** README default: iPhone-sized 2x. Play Store passes 360×640 @3x = 1080×1920 (9:16). */
+const README_VIEWPORT = { width: 390, height: 844, deviceScaleFactor: 2 };
+
+const capture = async ({ url, outDir, scheme, viewport = README_VIEWPORT }) => {
   fs.mkdirSync(outDir, { recursive: true });
   const browser = await puppeteer.launch({ executablePath: findChrome(), headless: true, args: ["--no-sandbox", "--hide-scrollbars"] });
   try {
     const page = await browser.newPage();
     await page.emulateMediaFeatures([{ name: "prefers-color-scheme", value: scheme }]);
-    await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
+    await page.setViewport({ ...viewport, isMobile: true, hasTouch: true });
     page.on("pageerror", (e) => console.warn(`[${scheme}] page error:`, e.message));
 
     const tapText = async (text) => {
@@ -72,4 +75,4 @@ const capture = async ({ url, outDir, scheme }) => {
   }
 };
 
-module.exports = { capture };
+module.exports = { capture, findChrome };

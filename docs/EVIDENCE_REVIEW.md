@@ -47,7 +47,7 @@ It is a structured review of guidelines and meta-analyses, not a systematic revi
 | **Vitamin B6** (PMS) | Possible benefit (OR 2.32), but most trials are low quality | Limited | [Wyatt, BMJ 1999](https://pmc.ncbi.nlm.nih.gov/articles/PMC27878) |
 | **Magnesium** (PMS / cramps) | Insufficient evidence | Limited | [B6 / Mg reviews](https://www.ncbi.nlm.nih.gov/books/NBK72353/) |
 
-**Used in the app:** an iron-check warning when heavy flow and tiredness occur together, iron-food guidance after heavy periods, vitamin D and omega-3 mentioned (with "ask first") for painful periods, calcium foods for premenstrual low mood, and calcium + vitamin D for bone in perimenopause. **No supplement doses are given**, apart from the menopause calcium intake target, which is framed as food first. Teens get no supplement content.
+**Used in the app:** an iron-check warning when heavy flow and tiredness occur together, iron-food guidance after heavy periods, vitamin D and omega-3 mentioned (with "ask first") for painful periods, calcium foods for premenstrual low mood, and calcium + vitamin D for bone in perimenopause. Supplement tips and doses are covered in §6. Teens get no supplement content.
 
 ## 3. Foods and diets
 
@@ -127,7 +127,7 @@ Built from the last 1–11 weeks of logs. Each card shows its grade and tappable
 - **Signposting, not diagnosis.** Warnings suggest talking to a healthcare provider.
 - **Unlogged days are not zeros.** Activity, step and sleep rules need 4 logged days out of 7.
 - **No activity nudges** during a flare or when pain ≥ 7 was logged in the last 3 days.
-- **No weight-loss messaging**, and no supplement content for teens.
+- **No weight-loss messaging**, and no supplement content for teens. Supplement doses appear only where a guideline or regulator states one (§6).
 - **No calorie, portion-size or weight tracking.** Food tips are about adding or swapping foods, and the food card is not shown to teens.
 - Only a warning or a personal suggestion can become a notification (one at a time, next morning, `lifestyle-tip`). A warning always wins; otherwise suggestions **rotate daily**, so food, sleep and activity tips each get a turn. General education never does. Discreet notifications hide the wording as usual. The setting is under You → Notifications.
 
@@ -142,6 +142,39 @@ Built from the last 1–11 weeks of logs. Each card shows its grade and tappable
 | `pcos-supplement-am` | "Inositol has the most research for PCOS" | The 2023 guideline found the evidence limited and inconclusive |
 | `pcos-supplement-d14` | Spearmint "may lower androgens" | A few very small studies only; not well established |
 | `pcos-hair-d10` | Rosemary oil scalp massage | Scalp massage; evidence is limited |
+
+## 6. Supplements
+
+Rules live in [`utils/supplementGuidance.ts`](../utils/supplementGuidance.ts). **Adults only.** A dose is named only where a guideline or regulator names one (folic acid, vitamin D, calcium, zinc's upper limit). Iron is never suggested without a blood test. Food first wherever food can cover it.
+
+| Supplement | Finding | Grade | Source |
+|---|---|---|---|
+| **Folic acid** | **400–800 µg daily** for anyone who plans to or could become pregnant, from at least a month before conception (grade A, reaffirmed 2023) | Guideline | [USPSTF 2023](https://www.uspreventiveservicestaskforce.org/uspstf/recommendation/folic-acid-for-the-prevention-of-neural-tube-defects-preventive-medication) |
+| **Iron** | Only when tests show low iron. 60 mg on **alternate days** was absorbed better than daily (21.8% vs 16.3%, two small RCTs; hepcidin). WHO recommends intermittent iron + folic acid for menstruating women where anaemia is ≥ 20% | Moderate / guideline (population) | [Stoffel 2017](https://doi.org/10.1016/S2352-3026(17)30182-5); [WHO 2011](https://www.who.int/publications/i/item/9789241502023); [NIH ODS](https://ods.od.nih.gov/factsheets/Iron-HealthProfessional/) |
+| **Vitamin D** | **10 µg (400 IU)** daily October–March, all year with dark skin, covered skin or little time outdoors; adult upper limit 100 µg | Guideline | [NHS](https://www.nhs.uk/conditions/vitamins-and-minerals/vitamin-d/) |
+| **Calcium** (PMS) | **1,000–1,200 mg/day**: ACOG conditional recommendation, low-quality evidence. Taken daily; benefit by cycle 3 in the main trial | Moderate | [ACOG 2023](https://doi.org/10.1097/AOG.0000000000005426); [Thys-Jacobs 1998](https://oadoi.org/10.1016/s0002-9378(98)70377-1) |
+| **Zinc** (period pain) | 6 RCTs, 739 women: less pain (g = −1.54) but I² = 94%, publication bias likely; benefit after ≥ 2 months; ~7 mg may suffice. Adult upper limit 40 mg (copper deficiency) | Limited | [Hsu 2024](https://pmc.ncbi.nlm.nih.gov/articles/PMC11643716/); [NIH ODS](https://ods.od.nih.gov/factsheets/Zinc-HealthProfessional/) |
+| **Vitamin B6** | Possible PMS benefit, poor trials. TGA: peripheral neuropathy **below 50 mg/day**, no safe minimum identified; often hidden in magnesium products | Limited + safety | [TGA](https://www.tga.gov.au/news/safety-alerts/health-supplements-containing-vitamin-b6-can-cause-peripheral-neuropathy) |
+| **Magnesium, B1, ginger, fish oil** | Cochrane: no high-quality evidence for any supplement for period pain; very limited evidence for B1, ginger, zinc, fish oil | Limited | [Cochrane 2016](https://www.cochrane.org/CD002124) |
+| **Vitamin B12** | Plant foods contain none unless fortified; vegans need fortified foods or a supplement | Guideline | [NIH ODS](https://ods.od.nih.gov/factsheets/VitaminB12-HealthProfessional/) |
+| **Chasteberry (vitex)** | Large pooled PMS effect, but high risk of bias and heterogeneity; authors call it exploratory. Hormonal: avoid with contraception, fertility treatment, pregnancy | Limited | [Verkaik 2017](https://repub.eur.nl/pub/99226) |
+| **Turmeric (curcumin)** | 10 small RCTs, too heterogeneous to pool; 6 positive | Limited | [Review 2025](https://pmc.ncbi.nlm.nih.gov/articles/PMC12639325/) |
+| **NAC** (PCOS) | Better ovulation / pregnancy vs placebo, worse than metformin (8 RCTs, 910 women) | Limited | [Thakker 2015](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4306416/) |
+
+### Supplement notifications
+
+One notification per applicable tip, at its offset from the predicted period start; a passed slot moves to the next cycle. Setting: You → Notifications → Supplement suggestions.
+
+| Id | When it applies | When it's sent |
+|---|---|---|
+| `supp-folic-acid` | All adults except perimenopause mode | Period day 7, 09:00 |
+| `supp-iron` | 3+ heavy days in 45 | Period day 2, 12:00 |
+| `supp-period-pain` | Pain ≥ 6 on 2+ bleeding days in 45; not endometriosis mode (vitamin D didn't help secondary dysmenorrhoea) | 5 days before, 18:00 |
+| `supp-calcium-pms` | Premenstrual low-mood pattern | 10 days before, 18:00 |
+| `supp-vitamin-d` | October–March (April–September for southern-hemisphere time zones); not perimenopause | Period day 14, 09:00 |
+| `supp-peri-bone` | Perimenopause mode | Period day 7, 09:00 |
+
+The A–Z guide on Insights (`guide-*`) is education only and never notified.
 
 ## Gaps and caveats
 

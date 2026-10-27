@@ -8,6 +8,8 @@ import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useAppStore } from "@/store";
 import { GuidanceCard } from "@/components/guidance-card";
 import { buildLifestyleGuidance, pickNotifiableGuidance, type Guidance } from "@/utils/lifestyleGuidance";
+import { loadSupplementTips } from "@/utils/lifestyleNotifications";
+import { buildSupplementGuide } from "@/utils/supplementGuidance";
 import { scheduleInsightNotification, scheduleFlareWarning, scheduleLifestyleNotification } from "@/utils/notifications";
 import { PredictionResult } from "@/utils/predictions";
 import { format, parseISO } from "date-fns";
@@ -34,6 +36,9 @@ export default function AnalyticsScreen() {
   const [insights, setInsights] = useState<CycleInsight[]>([]);
   const [prediction, setPrediction] = useState<PredictionResult | null>(null);
   const [guidance, setGuidance] = useState<Guidance[]>([]);
+  const [supplements, setSupplements] = useState<Guidance[]>([]);
+  const [showSupplementGuide, setShowSupplementGuide] = useState(false);
+  const supplementGuide = buildSupplementGuide({ mode: currentMode, isTeen });
 
   useEffect(() => {
     const loadData = async () => {
@@ -41,14 +46,16 @@ export default function AnalyticsScreen() {
       setCycles(allCycles.filter((c) => c.is_confirmed !== 0)); // the onboarding estimate is not a logged period
       const pred = await getCyclePredictions(currentMode, postPillMode, postPillStartDate ?? null);
       setPrediction(pred);
-      const lifestyle = buildLifestyleGuidance({
+      const guidanceInput = {
         mode: currentMode,
         isTeen,
         inFlare,
         entries: await getAllEntries(),
         periodStarts: allCycles.filter((c) => c.is_confirmed !== 0).map((c) => c.start_date),
-      });
+      };
+      const lifestyle = buildLifestyleGuidance(guidanceInput);
       setGuidance(lifestyle);
+      setSupplements(await loadSupplementTips(guidanceInput));
       await scheduleLifestyleNotification(pickNotifiableGuidance(lifestyle), notificationPrefs.lifestyleTips ?? true);
       if (allCycles.length > 0) {
         const avgs = await getPhaseAverages(allCycles[0].id, pred.model !== "none" ? pred.mean : 28);
@@ -216,6 +223,38 @@ export default function AnalyticsScreen() {
               {tx("from your recent logs + what the research says", "Based on your recent logs and published research.")}
             </Text>
             {guidance.map((item) => (
+              <GuidanceCard key={item.id} item={item} theme={theme} tx={tx} />
+            ))}
+          </View>
+        )}
+
+        {(supplements.length > 0 || supplementGuide.length > 0) && (
+          <View style={{ marginBottom: 8 }}>
+            <Text style={[styles.sectionTitle, { color: theme.text }]} accessibilityRole="header">
+              {tx("supplements worth knowing about", "Supplements")}
+            </Text>
+            <Text style={{ color: theme.textSecondary, fontSize: 13, marginBottom: 12, marginTop: -6 }}>
+              {tx(
+                "only where guidelines or trials back it — check with a pharmacist or doctor before starting anything, especially if you're pregnant or on medication",
+                "Only where guidelines or trials support it. Check with a pharmacist or doctor before starting a supplement, particularly if you are pregnant or take medication.",
+              )}
+            </Text>
+            {supplements.map((item) => (
+              <GuidanceCard key={item.id} item={item} theme={theme} tx={tx} />
+            ))}
+            <TouchableOpacity
+              onPress={() => setShowSupplementGuide((v) => !v)}
+              style={{ paddingVertical: 12, minHeight: 44, justifyContent: "center" }}
+              accessibilityRole="button"
+              accessibilityState={{ expanded: showSupplementGuide }}
+            >
+              <Text style={{ color: theme.tint, fontWeight: "700" }}>
+                {showSupplementGuide
+                  ? tx("hide the supplement guide", "Hide supplement guide")
+                  : tx("iron, zinc, omega-3 & more: what actually works", "Supplement guide: iron, zinc, omega-3 and more")}
+              </Text>
+            </TouchableOpacity>
+            {showSupplementGuide && supplementGuide.map((item) => (
               <GuidanceCard key={item.id} item={item} theme={theme} tx={tx} />
             ))}
           </View>

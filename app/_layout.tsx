@@ -12,6 +12,7 @@ import {
   cancelCycleNotifications,
   syncNotificationsWithOsPermission,
 } from "@/utils/notifications";
+import { refreshSupplementNotifications } from "@/utils/lifestyleNotifications";
 
 
 export const unstable_settings = {
@@ -19,7 +20,7 @@ export const unstable_settings = {
 };
 
 export default function RootLayout() {
-  const { isOnboarded, notificationsEnabled, notificationPrefs, postPillMode, postPillStartDate, currentMode, tone, discreetNotifications } = useAppStore();
+  const { isOnboarded, notificationsEnabled, notificationPrefs, postPillMode, postPillStartDate, currentMode, tone, discreetNotifications, isTeen } = useAppStore();
   const segments = useSegments();
   const [mounted, setMounted] = useState(false);
   const [dbReady, setDbReady] = useState(false);
@@ -57,6 +58,8 @@ export default function RootLayout() {
       try {
         const prediction = await getCyclePredictions(currentMode, postPillMode, postPillStartDate ?? null);
         await syncNotificationsWithOsPermission(prediction, notificationPrefs, currentMode);
+        // Supplement tips need logs, not just the prediction, so they refresh separately.
+        if (useAppStore.getState().notificationsEnabled) await refreshSupplementNotifications(prediction);
       } catch (e) {
         console.warn("Notification sync failed", e);
         await cancelCycleNotifications();
@@ -69,7 +72,7 @@ export default function RootLayout() {
     });
     return () => sub.remove();
     // tone / discreetNotifications: rescheduling rewrites already-scheduled wording.
-  }, [isOnboarded, dbReady, notificationsEnabled, notificationPrefs, currentMode, postPillMode, postPillStartDate, tone, discreetNotifications]);
+  }, [isOnboarded, dbReady, notificationsEnabled, notificationPrefs, currentMode, postPillMode, postPillStartDate, tone, discreetNotifications, isTeen]);
 
   useEffect(() => {
     if (!mounted || !dbReady || !storeReady) return;

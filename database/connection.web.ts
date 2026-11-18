@@ -4,7 +4,18 @@
  * jsDelivr on first use. The database lives in memory only: nothing is written to browser
  * storage and everything is gone when the tab closes. iOS and Android use connection.ts
  * (SQLCipher-encrypted, on device).
+ *
+ * IMPORTANT: This module is web-only and intentionally unencrypted. It must never be
+ * bundled into a native build. The metro resolver picks connection.ts for iOS/Android
+ * and this file only for the web target.
  */
+
+if (typeof document === "undefined") {
+  throw new Error(
+    "[CycleIQ] connection.web.ts was imported in a non-browser environment. " +
+    "This is a build configuration error — native builds must use connection.ts.",
+  );
+}
 
 const SQL_JS_VERSION = "1.14.2";
 const SQL_JS_BASE = `https://cdn.jsdelivr.net/npm/sql.js@${SQL_JS_VERSION}/dist/`;

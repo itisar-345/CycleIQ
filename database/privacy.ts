@@ -64,6 +64,12 @@ export const restoreLocalDataSnapshot = async (snapshot: Record<string, unknown>
   if (snapshot?.app !== "CycleIQ" || typeof snapshot?.schema !== "string") {
     throw new Error("Invalid CycleIQ local data backup.");
   }
+  if (typeof snapshot.schema_version === "number" && snapshot.schema_version > dbSchemaVersion) {
+    throw new Error(
+      `This backup was created by a newer version of CycleIQ (schema v${snapshot.schema_version}). ` +
+      `Update the app before restoring.`,
+    );
+  }
   const database = await initDb();
   await database.withTransactionAsync(async () => {
     await database.runAsync(`DELETE FROM symptom_entries;`);

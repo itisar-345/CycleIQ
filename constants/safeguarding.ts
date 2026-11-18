@@ -15,5 +15,11 @@ export const SAFEGUARDING_LOW_MOOD_SCORE = 1;
 /** Days before the same safeguarding prompt may appear again. */
 export const SAFEGUARDING_PROMPT_COOLDOWN_DAYS = 14;
 
+/** Days before the PCOS amenorrhea prompt may appear again. */
+export const PCOS_PROMPT_COOLDOWN_DAYS = 7;
+
+/** Days before the endo red-flag prompt may appear again. */
+export const RED_FLAG_PROMPT_COOLDOWN_DAYS = 30;
+
 /** Route shown when user taps "View Resources" on safeguarding alert. */
 export const SAFEGUARDING_RESOURCES_ROUTE = "/education/resources";

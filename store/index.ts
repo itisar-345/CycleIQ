@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
-import { SAFEGUARDING_PROMPT_COOLDOWN_DAYS } from "@/constants/safeguarding";
+import { PCOS_PROMPT_COOLDOWN_DAYS, RED_FLAG_PROMPT_COOLDOWN_DAYS, SAFEGUARDING_PROMPT_COOLDOWN_DAYS } from "@/constants/safeguarding";
 import type { HealthImportPrefs } from "@/utils/healthIntegrations";
 import { encryptedPersistStorage } from "@/utils/encryptedPersistStorage";
 
@@ -342,7 +342,7 @@ export const useAppStore = create<AppState>()(
         const daysDiff =
           (now.getTime() - new Date(state.lastPCOSPrompt).getTime()) /
           (1000 * 60 * 60 * 24);
-        return daysDiff >= 7; // Remind weekly once hit
+        return daysDiff >= PCOS_PROMPT_COOLDOWN_DAYS;
       },
       checkRedFlagCooldown: () => {
         const state = get();
@@ -351,7 +351,7 @@ export const useAppStore = create<AppState>()(
         const daysDiff =
           (now.getTime() - new Date(state.lastRedFlagPrompt).getTime()) /
           (1000 * 60 * 60 * 24);
-        return daysDiff >= 30;
+        return daysDiff >= RED_FLAG_PROMPT_COOLDOWN_DAYS;
       },
     }),
     {

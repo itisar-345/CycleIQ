@@ -140,6 +140,27 @@ const postPillDone = runPredictionEngine({
 });
 assert.notEqual(postPillDone.model, "none");
 
+// Exactly at the 90-day boundary: predictions must unlock (remaining === 0).
+const postPillExactBoundary = runPredictionEngine({
+  cycles: makeCycles([28, 29, 28]),
+  currentMode: "standard",
+  postPillMode: true,
+  postPillStartDate: isoDaysAgo(90),
+  now: NOW,
+});
+assert.notEqual(postPillExactBoundary.model, "none", "predictions must unlock at exactly day 90");
+
+// One day before the boundary: still suppressed.
+const postPillOneDayBefore = runPredictionEngine({
+  cycles: makeCycles([28, 29, 28]),
+  currentMode: "standard",
+  postPillMode: true,
+  postPillStartDate: isoDaysAgo(89),
+  now: NOW,
+});
+assert.equal(postPillOneDayBefore.model, "none", "predictions must stay suppressed at day 89");
+assert.match(postPillOneDayBefore.label, /Building baseline — 1 days/);
+
 // ── backtest regression gate ──
 // The engine must beat (or tie) a plain 6-cycle median on every profile, its window must
 // cover at least ~80% of outcomes without being needlessly wide, and its confidence must

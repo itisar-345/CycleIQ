@@ -4,8 +4,8 @@ import { AppLockGate } from "@/components/app-lock";
 import { useAppStore, waitForStoreHydration } from "@/store";
 import { Stack, router, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useEffect, useState } from "react";
-import { AppState, Platform, View, StyleSheet } from "react-native";
+import { Component, useEffect, useState } from "react";
+import { AppState, Platform, View, StyleSheet, Text, TouchableOpacity } from "react-native";
 import { currentTx } from "@/utils/tone";
 import "react-native-reanimated";
 import {
@@ -13,6 +13,39 @@ import {
   syncNotificationsWithOsPermission,
 } from "@/utils/notifications";
 import { refreshSupplementNotifications } from "@/utils/lifestyleNotifications";
+
+type ErrorBoundaryState = { error: Error | null };
+
+class RootErrorBoundary extends Component<{ children: React.ReactNode }, ErrorBoundaryState> {
+  state: ErrorBoundaryState = { error: null };
+
+  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+    return { error };
+  }
+
+  render() {
+    if (this.state.error) {
+      return (
+        <View style={{ flex: 1, alignItems: "center", justifyContent: "center", padding: 32 }}>
+          <Text style={{ fontSize: 17, fontWeight: "700", marginBottom: 12, textAlign: "center" }}>
+            Something went wrong
+          </Text>
+          <Text style={{ fontSize: 14, textAlign: "center", marginBottom: 24, opacity: 0.6 }}>
+            {this.state.error.message}
+          </Text>
+          <TouchableOpacity
+            onPress={() => this.setState({ error: null })}
+            style={{ paddingHorizontal: 28, paddingVertical: 14, borderRadius: 24, backgroundColor: "#c0392b" }}
+            accessibilityRole="button"
+          >
+            <Text style={{ color: "#fff", fontWeight: "800", fontSize: 15 }}>Try again</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 
 export const unstable_settings = {
@@ -88,33 +121,35 @@ export default function RootLayout() {
   }, [isOnboarded, mounted, dbReady, storeReady, segments]);
 
   return (
-    <>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="onboarding" options={{ headerShown: false }} />
-        <Stack.Screen name="cycle" options={{ headerShown: false }} />
-        <Stack.Screen name="privacy" options={{ headerShown: false }} />
-        <Stack.Screen name="report" options={{ headerShown: false }} />
-        <Stack.Screen name="reports" options={{ headerShown: false }} />
-        <Stack.Screen name="appointment-prep" options={{ headerShown: false }} />
-      </Stack>
-      <AppLockGate ready={mounted && dbReady && storeReady} />
-      {(!mounted || !dbReady || !storeReady) && (
-        <View style={StyleSheet.absoluteFill} pointerEvents="auto">
-          {dbFailed ? (
-            <AppLoading
-              message={currentTx()(
-                "couldn't open your data it's still safe on this phone — try again, or restart the app.",
-                "Your data couldn't be opened. It's still stored safely on this device. Try again or restart the app.",
-              )}
-              onRetry={() => setDbAttempt((n) => n + 1)}
-            />
-          ) : (
-            <AppLoading />
-          )}
-        </View>
-      )}
-      <StatusBar style="auto" />
-    </>
+    <RootErrorBoundary>
+      <>
+        <Stack>
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="onboarding" options={{ headerShown: false }} />
+          <Stack.Screen name="cycle" options={{ headerShown: false }} />
+          <Stack.Screen name="privacy" options={{ headerShown: false }} />
+          <Stack.Screen name="report" options={{ headerShown: false }} />
+          <Stack.Screen name="reports" options={{ headerShown: false }} />
+          <Stack.Screen name="appointment-prep" options={{ headerShown: false }} />
+        </Stack>
+        <AppLockGate ready={mounted && dbReady && storeReady} />
+        {(!mounted || !dbReady || !storeReady) && (
+          <View style={StyleSheet.absoluteFill} pointerEvents="auto">
+            {dbFailed ? (
+              <AppLoading
+                message={currentTx()(
+                  "couldn't open your data it's still safe on this phone — try again, or restart the app.",
+                  "Your data couldn't be opened. It's still stored safely on this device. Try again or restart the app.",
+                )}
+                onRetry={() => setDbAttempt((n) => n + 1)}
+              />
+            ) : (
+              <AppLoading />
+            )}
+          </View>
+        )}
+        <StatusBar style="auto" />
+      </>
+    </RootErrorBoundary>
   );
 }

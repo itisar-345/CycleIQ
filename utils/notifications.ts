@@ -229,6 +229,7 @@ export const cancelCycleNotifications = async () => {
     cancelId("heat-pad"),
     cancelId("mood-checkin"),
     cancelId("red-flag"),
+    cancelId("insight"),
     cancelId(LIFESTYLE_TIP_ID),
     ...SUPPLEMENT_TIP_IDS.map(cancelId),
     ...PERIOD_DAY_IDS.map(cancelId),
@@ -285,8 +286,9 @@ export const scheduleInsightNotification = async (insightTitle: string, enabled:
   if (isExpoGo || !enabled) return;
   try {
     const N = await getNotifications();
+    await N.cancelScheduledNotificationAsync("insight").catch(() => {});
     await N.scheduleNotificationAsync({
-      identifier: `insight-${Date.now()}`,
+      identifier: "insight",
       content: (([title, body]) => ({ title, body }))(
         resolveNotificationContent(
           "insight",

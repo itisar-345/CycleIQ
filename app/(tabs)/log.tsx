@@ -155,7 +155,7 @@ export default function LogScreen() {
         setClotsSize(latest.clots_size);
         setSpotting(!!latest.spotting);
         setStressScore(latest.stress_score);
-        setSleepHours(latest.sleep_hours);
+        setSleepHours(latest.sleep_hours !== null ? Math.round(latest.sleep_hours) : null);
         setHealthSleepSource(latest.health_sleep_source);
         setSleepQuality(latest.sleep_quality);
         setExerciseType(latest.exercise_type ?? "None");

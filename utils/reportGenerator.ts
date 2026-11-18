@@ -91,7 +91,7 @@ export const generateSpecialistReportHtml = (
 
     html += `<h3>Medication & Symptom Overlay</h3><table><tr><th>Date</th><th>Logged Medication</th><th>Pain</th><th>Energy</th></tr>`;
     entries.filter(e => e.medication_log_encrypted).slice(0, 15).forEach(e => {
-        html += `<tr><td>${localDateKey(e.logged_date)}</td><td>Encrypted Log Present</td><td>${e.pain_score || "-"}</td><td>${e.energy_score || "-"}</td></tr>`;
+        html += `<tr><td>${localDateKey(e.logged_date)}</td><td>Encrypted Log Present</td><td>${e.pain_score ?? "-"}</td><td>${e.energy_score ?? "-"}</td></tr>`;
     });
     if (!entries.some(e => e.medication_log_encrypted)) {
         html += `<tr><td colspan="4">No medications logged in this cycle.</td></tr>`;
@@ -220,7 +220,7 @@ export const generateSpecialistReportHtml = (
   }
   html += `</table>`;
 
-  html += `<h2>Mood & Energy Trends with Cycle-Phase Overlay</h2><table><tr><th>Date</th><th>Phase</th><th>Mood (1-5)</th><th>Energy (0-10)</th><th>Brain Fog (0-10)</th></tr>`;
+  html += `<h2>Mood, Energy and Detailed Log</h2><table><tr><th>Date</th><th>Phase</th><th>Pain (0-10)</th><th>Mood (1-5)</th><th>Energy (0-10)</th><th>Brain Fog (0-10)</th><th>Sleep</th></tr>`;
   entries.slice(0, 30).forEach(e => {
     let phase = '—';
     if (e.cycle_id) {
@@ -233,21 +233,12 @@ export const generateSpecialistReportHtml = (
     html += `<tr>
       <td>${localDateKey(e.logged_date)}</td>
       <td style="text-transform:capitalize">${phase}</td>
+      <td>${e.pain_score ?? '—'}</td>
       <td>${e.mood_score ?? '—'}</td>
       <td>${e.energy_score ?? '—'}</td>
       <td>${e.brain_fog_score ?? '—'}</td>
+      <td>${e.sleep_hours != null ? e.sleep_hours + 'h' : '—'}</td>
     </tr>`;
-  });
-  html += `</table>`;
-
-  html += `<h2>Detailed Log (Rolling View)</h2><table><tr><th>Date</th><th>Pain</th><th>Mood</th><th>Sleep</th></tr>`;
-  entries.slice(0, 30).forEach(e => {
-      html += `<tr>
-        <td>${localDateKey(e.logged_date)}</td>
-        <td>${e.pain_score ? e.pain_score : "-"}</td>
-        <td>${e.mood_score ? e.mood_score : "-"}</td>
-        <td>${e.sleep_hours ? e.sleep_hours + "h" : "-"}</td>
-      </tr>`;
   });
   html += `</table>`;
 

@@ -55,6 +55,7 @@ export default function HomeScreen() {
   const [currentCycleDay, setCurrentCycleDay] = useState<number>(1);
   const [currentPhase, setCurrentPhase] = useState<string>("menstrual");
   const [predictionStats, setPredictionStats] = useState<PredictionResult | null>(null);
+  const lastScheduledPredictionRef = useRef<string | null>(null);
   const [latestInsight, setLatestInsight] = useState<CycleInsight | null>(null);
   const [medicationLoggedToday, setMedicationLoggedToday] = useState(false);
   const [dataLoaded, setDataLoaded] = useState(false);
@@ -120,7 +121,11 @@ export default function HomeScreen() {
       }
 
       if (stats.predictedStartISO) {
-        await scheduleAllCycleNotifications(stats);
+        // Only reschedule when the predicted date has actually changed.
+        if (stats.predictedStartISO !== lastScheduledPredictionRef.current) {
+          lastScheduledPredictionRef.current = stats.predictedStartISO;
+          await scheduleAllCycleNotifications(stats);
+        }
       }
 
       const generatedInsights = await generateInsights(currentMode, useAppStore.getState().tone);

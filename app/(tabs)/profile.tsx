@@ -9,7 +9,7 @@ import { differenceInDays, parseISO } from 'date-fns';
 import { requestNotificationPermission, scheduleDailyLogReminder } from '@/utils/notifications';
 import { isHealthBridgeAvailable, requestHealthPermissions } from '@/utils/healthIntegrations';
 import { getDatabaseEncryptionStatus } from '@/database';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { exportAndShareDatabaseFileBackup, exportAndShareLocalData, restoreLocalDataBackupFromUri, wipeLocalDataAndFiles } from '@/utils/privacyData';
 import * as DocumentPicker from 'expo-document-picker';
 import { authenticate, getLockSupport } from '@/utils/appLock';
@@ -45,7 +45,7 @@ export default function ProfileScreen() {
       .catch(() => setDatabaseEncryption(null));
   }, []);
 
-  const toggleMode = (mode: AppMode) => {
+  const toggleMode = useCallback((mode: AppMode) => {
     setMode(mode);
     // If switching into a condition mode with no existing setup data, route to that condition's setup screen
     const { pcosData, endoData } = useAppStore.getState();
@@ -54,7 +54,7 @@ export default function ProfileScreen() {
     } else if (mode === 'endo' && !endoData) {
       router.push('/onboarding/endo');
     }
-  };
+  }, [setMode]);
 
   const handleAppLockToggle = async (enable: boolean) => {
     if (!enable) {
@@ -183,12 +183,11 @@ export default function ProfileScreen() {
             try {
               setPrivacyActionInProgress(true);
               await wipeLocalDataAndFiles();
-              Alert.alert(tx("all cleared", "Data deleted"), tx("Everything's been deleted from this phone. Fresh start.", "All data has been deleted from this device."));
+              router.replace('/onboarding');
             } catch (error) {
               console.error("Local data wipe failed", error);
-              Alert.alert(tx("hmm, that didn't fully work", "Delete failed"), tx("Some data couldn't be deleted — please try again.", "Some data couldn't be deleted. Please try again."));
-            } finally {
               setPrivacyActionInProgress(false);
+              Alert.alert(tx("hmm, that didn't fully work", "Delete failed"), tx("Some data couldn't be deleted — please try again.", "Some data couldn't be deleted. Please try again."));
             }
           },
         },

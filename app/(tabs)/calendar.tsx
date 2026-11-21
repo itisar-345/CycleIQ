@@ -107,7 +107,7 @@ export default function CalendarScreen() {
 
       const entry = loadedEntriesMap[dateStr];
       if (entry) {
-        dayData.painScore = entry.pain_score || 0;
+        dayData.painScore = entry.pain_score ?? 0;
         let isFlare = false;
         if (entry.extended_symptoms) {
           try {
@@ -128,9 +128,15 @@ export default function CalendarScreen() {
 
     const allEntries = await getAllEntries();
     const entriesMap: Record<string, SymptomEntryRow> = {};
+    // Keep the entry with the highest pain score for each day so the heat-map
+    // reflects the worst logged value rather than whichever entry happened to
+    // be inserted first.
     allEntries.forEach(e => {
       const d = localDateKey(e.logged_date);
-      if (!entriesMap[d]) entriesMap[d] = e;
+      const existing = entriesMap[d];
+      if (!existing || (e.pain_score ?? 0) > (existing.pain_score ?? 0)) {
+        entriesMap[d] = e;
+      }
     });
     setEntriesByDate(entriesMap);
 
@@ -208,7 +214,7 @@ export default function CalendarScreen() {
             const isSelected = day?.date === selectedDay?.date;
             return (
               <TouchableOpacity
-                key={i}
+                key={day ? day.date : `empty-${i}`}
                 style={styles.dayCell}
                 onPress={() => day && setSelectedDay(day)}
                 activeOpacity={day ? 0.7 : 1}
@@ -283,7 +289,7 @@ export default function CalendarScreen() {
             )}
             <TouchableOpacity
               style={[styles.logDayBtn, { backgroundColor: theme.tint }]}
-              onPress={() => router.push('/log')}
+              onPress={() => router.push({ pathname: '/log', params: { date: selectedDay.date } })}
               accessibilityRole="button"
             >
               <Text style={[styles.logDayBtnText, { color: theme.onTint }]}>{selectedEntry ? tx('update this log', 'Update log') : tx('log this day', 'Log this day')}</Text>

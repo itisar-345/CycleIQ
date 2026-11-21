@@ -27,7 +27,7 @@ const initHandler = async () => {
     }),
   });
 };
-if (!isExpoGo) initHandler();
+if (!isExpoGo && typeof jest === 'undefined') initHandler();
 
 /** Read-only OS permission check — never prompts. Use on every cold launch and foreground. */
 export const hasNotificationPermission = async (): Promise<boolean> => {

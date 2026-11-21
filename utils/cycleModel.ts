@@ -279,7 +279,7 @@ export function forecastNextCycle(lengths: number[], prior: ModelPrior): CycleFo
   // median to within a day; using it keeps this and pointForecast identical.
   const point = Math.round(posteriorMean(comps));
   let halfWidth = 0;
-  while (halfWidth < MAX_LENGTH && massWithin(pmf, point, halfWidth) < WINDOW_COVERAGE) halfWidth++;
+  while (halfWidth < MAX_LENGTH - 1 && massWithin(pmf, point, halfWidth) < WINDOW_COVERAGE) halfWidth++;
 
   let slopePerCycle = 0;
   let noiseSd = 0;

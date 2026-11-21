@@ -120,16 +120,21 @@ export const saveFlareEnd = async (
      SET flare_end = ?, flare_reflection_encrypted = ?
      WHERE id = (
        SELECT id FROM symptom_entries
-       WHERE flare_start = ? OR date(logged_date) = date(?)
+       WHERE flare_start = ? OR (logged_date >= ? AND logged_date <= ?)
        ORDER BY (flare_start = ?) DESC, logged_date DESC LIMIT 1
      );`,
-    [endDate, encryptedReflection, loggedDate, loggedDate, loggedDate]
+    [endDate, encryptedReflection, loggedDate,
+     new Date(localDateKey(loggedDate) + 'T00:00:00.000').toISOString(),
+     new Date(localDateKey(loggedDate) + 'T23:59:59.999').toISOString(),
+     loggedDate]
   );
   // Also insert a closing entry if none exists for today
   const today = localDateKey(new Date());
+  const todayStart = new Date(today + 'T00:00:00.000').toISOString();
+  const todayEnd = new Date(today + 'T23:59:59.999').toISOString();
   const todays = await queryAll<{ logged_date: string }>(
-    `SELECT logged_date FROM symptom_entries WHERE logged_date >= ?;`,
-    [new Date(Date.now() - 2 * 86400000).toISOString()]
+    `SELECT logged_date FROM symptom_entries WHERE logged_date >= ? AND logged_date <= ?;`,
+    [todayStart, todayEnd]
   );
   if (!todays.some((e) => localDateKey(e.logged_date) === today)) {
     await createSymptomEntry({

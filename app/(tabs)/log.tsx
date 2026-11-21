@@ -155,13 +155,19 @@ export default function LogScreen() {
         setClotsSize(latest.clots_size);
         setSpotting(!!latest.spotting);
         setStressScore(latest.stress_score);
-        setSleepHours(latest.sleep_hours !== null ? Math.round(latest.sleep_hours) : null);
-        setHealthSleepSource(latest.health_sleep_source);
+        // Only overwrite sleep if health sync hasn't already populated it.
+        if (healthSleepSource === null) {
+          setSleepHours(latest.sleep_hours !== null ? Math.round(latest.sleep_hours) : null);
+          setHealthSleepSource(latest.health_sleep_source);
+        }
         setSleepQuality(latest.sleep_quality);
-        setExerciseType(latest.exercise_type ?? "None");
-        setExerciseDuration(latest.exercise_duration ?? 0);
-        setStepsCount(latest.steps_count);
-        setHealthActivitySource(latest.health_activity_source);
+        // Only overwrite activity if health sync hasn't already populated it.
+        if (healthActivitySource === null) {
+          setExerciseType(latest.exercise_type ?? "None");
+          setExerciseDuration(latest.exercise_duration ?? 0);
+          setStepsCount(latest.steps_count);
+          setHealthActivitySource(latest.health_activity_source);
+        }
         setDietNotes(await decryptFieldOrEmpty(latest.diet_notes_encrypted));
         setMedicationLog(await decryptFieldOrEmpty(latest.medication_log_encrypted));
         setFood(readExtendedSymptoms(latest).food ?? EMPTY_FOOD_LOG);
@@ -247,13 +253,6 @@ export default function LogScreen() {
 
   const handleSave = async () => {
     try {
-      await runSafetyChecks();
-    } catch (error) {
-      // A failed safety lookup must not block saving the log.
-      console.error("Safety checks failed:", error);
-    }
-
-    try {
       const nowISO = new Date().toISOString();
       await createSymptomEntry({
         logged_date: nowISO,
@@ -298,6 +297,15 @@ export default function LogScreen() {
       });
       // Non-fatal: the log is saved even if the tip can't be rescheduled.
       refreshLifestyleNotification().catch((e) => console.warn("Lifestyle tip refresh failed", e));
+
+      // Safety checks run after the entry is saved so consecutive-day counts
+      // include today's entry.
+      try {
+        await runSafetyChecks();
+      } catch (error) {
+        console.error("Safety checks failed:", error);
+      }
+
       Alert.alert(tx("Logged", "Saved"), tx("Saved to your phone. Future-you says thanks.", "Your log has been saved on this device."));
       router.push("/");
     } catch (error) {

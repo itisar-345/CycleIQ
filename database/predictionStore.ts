@@ -53,8 +53,10 @@ export const retrainAndStoreCyclePrediction = async (
   const pillMode = postPillMode ?? persisted?.postPillMode ?? false;
   const pillStart = postPillStartDate !== undefined ? postPillStartDate : persisted?.postPillStartDate ?? null;
 
-  // Share an in-flight retrain only when it was asked for the same inputs.
-  const key = `${mode}|${pillMode}|${pillStart ?? ""}`;
+  // Normalise pillStart to a date-only key so equivalent dates with different
+  // times don't produce separate in-flight promises.
+  const pillStartKey = pillStart ? pillStart.slice(0, 10) : "";
+  const key = `${mode}|${pillMode}|${pillStartKey}`;
   const pending = retrainsInFlight.get(key);
   if (pending) return pending;
 
